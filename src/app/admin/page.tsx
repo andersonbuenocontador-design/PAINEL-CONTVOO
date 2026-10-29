@@ -18,6 +18,6 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
     <div className="card"><table><thead><tr><th>Empresa</th><th>Exigidos</th><th>Enviados</th><th>Aprovados</th><th>Rejeitados</th><th>Pendentes</th><th>%</th><th></th></tr></thead><tbody>
       {v.map((e) => (<tr key={e.id}><td>{e.razao_social}</td><td>{e.exigidos}</td><td>{e.enviados}</td><td>{e.aprovados}</td><td>{e.rejeitados}</td><td>{e.pendentes}</td><td>{e.percentual}%</td><td><Link href={`/admin/empresas/${e.id}/documentos?competencia=${comp}`}>Conferir</Link></td></tr>))}
       {!v.length && <tr><td colSpan={8} className="soon">Nenhuma empresa ativa.</td></tr>}</tbody></table></div>
-    <div className="card"><p className="soon">Extratos, classificação, informes e pendências ainda não foram implementados (Etapas 3 a 6).</p></div>
+    <div className="card"><p className="soon">Extratos e conciliação: <Link href={`/admin/conciliacoes?competencia=${comp}`}>Conciliações</Link> · Solicitações aos clientes: <Link href="/admin/pendencias">Pendências</Link> · Visão geral: <Link href="/admin/relatorios">Relatórios</Link></p></div>
   </main></>);
 }
