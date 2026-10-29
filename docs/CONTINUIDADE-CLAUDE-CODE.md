@@ -8,7 +8,7 @@ Atualizado em 29/10/2026. Cole este arquivo no Claude Code (ou deixe-o em `docs/
 
 ## O que é o sistema
 Portal web: clientes enviam documentos mensais e extratos bancários, conciliam (tela igual à do Conciliador da Contvoo), veem informes de lucros/pró-labore e pendências; o escritório administra tudo.
-- Next.js 16 (App Router, `src/proxy.ts`), React 19, TypeScript, PostgreSQL 16 (`pg`, migrações SQL em `migrations/001..009`), Vitest + Playwright (126 testes unitários; e2e em `tests/*.cjs`).
+- Next.js 16 (App Router, `src/proxy.ts`), React 19, TypeScript, PostgreSQL 16 (`pg`, migrações SQL em `migrations/001..009`), Vitest + Playwright (127 testes unitários; e2e em `tests/*.cjs`).
 - Segurança: bcrypt, sessão JWT revalidada no banco, 2FA TOTP opcional, bloqueio por tentativas, auditoria imutável, cabeçalhos CSP/HSTS, arquivos em pasta privada autenticada. Documentos: `docs/IMPLANTACAO.md`, `OPERACAO.md`, `SEGURANCA.md`, `LGPD.md`, `ORACLE-GRATIS.md`.
 - Variáveis em `.env.example`. Opções criadas nesta fase: `SENHA_POLITICA_BRANDA=1` (aceita qualquer senha de 10+ caracteres; `src/lib/senha.ts`), `EXIGIR_2FA_ADMIN=0|1`.
 
@@ -20,7 +20,7 @@ Portal web: clientes enviam documentos mensais e extratos bancários, conciliam 
 - **Pendente de confirmação:** o usuário ainda não confirmou que o endereço abre no celular fora do Wi-Fi.
 
 ## Scripts Windows (em `scripts/windows/`, na pasta `Downloads\painel-instalar` do notebook)
-`INSTALAR-PAINEL.bat`/`instalar.ps1` (instala Node, PostgreSQL 16 por download direto, cloudflared; cria banco, segredos, serviço, tarefas; compila com webpack; se o PostgreSQL existir com senha desconhecida e for instalação nova, reinstala limpo) · `CORRIGIR-PAINEL.bat` (recompila e reinicia) · `NOVA-SENHA-ADMIN.bat` (gera senha temporária; usa `scripts/redefinir-senha-admin.ts`) · `SENHA-LIVRE.bat` · `SEM-2FA.bat` · `CONFIGURAR-ENDERECO.bat` · `LIGAR-TUNEL.bat` · `LIGAR-TAILSCALE.bat` · `backup.ps1`/`restaurar.ps1`/`lembretes.ps1`/`comum.ps1`.
+`INSTALAR-PAINEL.bat`/`instalar.ps1` (instala Node, PostgreSQL 16 por download direto, cloudflared; cria banco, segredos, serviço, tarefas; compila com webpack; se o PostgreSQL existir com senha desconhecida e for instalação nova, reinstala limpo) · `CORRIGIR-PAINEL.bat` (recompila e reinicia) · `NOVA-SENHA-ADMIN.bat` (gera senha temporária; usa `scripts/redefinir-senha-admin.ts`) · `SENHA-LIVRE.bat` · `SEM-2FA.bat` · `CONFIGURAR-ENDERECO.bat` · `CONFIGURAR-BACKUP-EXTERNO.bat` · `TESTAR-BACKUP.bat` · `GUARDAR-CHAVES.bat` · `LIGAR-TUNEL.bat` · `LIGAR-TAILSCALE.bat` · `backup.ps1`/`restaurar.ps1`/`lembretes.ps1`/`comum.ps1`.
 **Nunca foram testados num Windows por mim** — todos os erros foram corrigidos iterativamente por prints do usuário (winget quebrado → download direto; `$ErrorActionPreference` + stderr nativo; MSI 1619 → download validado; etc.). Para Linux: `scripts/instalar-servidor.sh` (Ubuntu, systemd, cron, cloudflared) — também não testado em servidor real.
 
 ## DNS / domínio (decisão em aberto)
@@ -35,7 +35,7 @@ Portal web: clientes enviam documentos mensais e extratos bancários, conciliam 
 1. Confirmar acesso externo (celular no 4G) e rodar `CONFIGURAR-ENDERECO.bat`.
 2. Piloto: empresa fictícia → usuário cliente → plano de contas → competência completa; depois 1–2 clientes de confiança.
 3. Configurar SMTP (GoDaddy) e testar envio real.
-4. **Backup fora do notebook** (OneDrive/pen drive) e guardar `BACKUP_PASSPHRASE`/`APP_ENCRYPTION_KEY` (em `C:\painel-contabil\.env.local`) fora da máquina; rodar teste de restauração (`scripts/windows/restaurar.ps1`; no Windows o `testar-backup.sh` não existe).
+4. **Backup fora do notebook — criado em 29/10/2026, falta o usuário rodar no notebook:** `CONFIGURAR-BACKUP-EXTERNO.bat` (OneDrive e/ou pen drive USB), `GUARDAR-CHAVES.bat` e `TESTAR-BACKUP.bat` (mensal). Detalhes em `docs/OPERACAO.md`, seção "Backup fora do notebook". Scripts PowerShell **não testados em Windows** (o ambiente de nuvem não roda PowerShell); a contagem de linhas do dump foi validada com PostgreSQL 16 real.
 5. Notebook precisa ficar ligado 24h, na tomada, sem suspensão (o instalador ajusta `powercfg`). Planejar migração para servidor próprio (VPS) quando houver clientes reais: restaurar o backup e usar `scripts/instalar-servidor.sh`. A conta Oracle Free **falhou** (cartão); `docs/ORACLE-GRATIS.md` serve para qualquer VPS Ubuntu.
 6. Produto: validar o leitor de PDF com extratos reais (Itaú, BB, Cresol, Stone), comprovantes por lançamento, importação em lote, manual do cliente, teste de invasão independente, decisões de LGPD (retenção, bases legais, política de privacidade, encarregado).
 7. Segurança: usuário recusou 2FA obrigatório e política de senha forte; foi avisado. Reavaliar antes de abrir a muitos clientes.
