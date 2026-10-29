@@ -13,10 +13,19 @@ jobs:
     steps:
       - name: Chamar o painel
         env:
-          APP_URL: ${{ vars.APP_URL }}
+          APP_URL: ${{ vars.APP_URL || secrets.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          test -n "$APP_URL" && test -n "$CRON_SECRET" || { echo "Configure a variável APP_URL e o segredo CRON_SECRET"; exit 1; }
+          # mensagens ::error:: aparecem no resumo da execução (sem mostrar valores secretos)
+          [ -n "$APP_URL" ] || { echo "::error::Falta APP_URL (Settings → Secrets and variables → Actions → aba Variables)"; exit 1; }
+          [ -n "$CRON_SECRET" ] || { echo "::error::Falta o segredo CRON_SECRET (aba Secrets; copie o valor do Render → Environment)"; exit 1; }
+          case "$APP_URL" in https://*) ;; *) echo "::error::APP_URL deve começar com https:// (está: $APP_URL)"; exit 1;; esac
           # o Render grátis "dorme": a 1ª chamada pode levar ~1 minuto para acordar o site
-          curl -fsS --retry 4 --retry-all-errors --retry-delay 30 --max-time 180 -X POST \
-            -H "Authorization: Bearer $CRON_SECRET" "${APP_URL%/}/api/notificacoes/processar"
+          url="${APP_URL%/}/api/notificacoes/processar"
+          for i in 1 2 3 4 5; do
+            code=$(curl -sS -o resposta.txt -w '%{http_code}' --max-time 180 -X POST -H "Authorization: Bearer $CRON_SECRET" "$url" || echo 000)
+            [ "$code" = 200 ] && { cat resposta.txt; exit 0; }
+            [ "$code" = 401 ] && { echo "::error::O site recusou o CRON_SECRET (401): o segredo do GitHub está diferente do CRON_SECRET do Render"; exit 1; }
+            echo "tentativa $i: HTTP $code"; sleep 30
+          done
+          echo "::error::O site não respondeu em $url (último HTTP $code: $(head -c 200 resposta.txt 2>/dev/null)). Confira se o serviço está Live no Render e se APP_URL está certo"; exit 1

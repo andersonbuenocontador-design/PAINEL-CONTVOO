@@ -26,14 +26,27 @@ jobs:
       BACKUP_DIR: ${{ github.workspace }}/backup-saida
       TESTE_DB_URL: postgres://postgres:teste@localhost:5432/teste
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Conferir configuração
+        run: |
+          falta=""; for v in DATABASE_URL SUPABASE_URL SUPABASE_SECRET_KEY BACKUP_PASSPHRASE; do [ -n "${!v}" ] || falta="$falta $v"; done
+          [ -z "$falta" ] || { echo "::error::Faltam segredos (Settings → Secrets and variables → Actions → aba Secrets, nome exatamente igual):$falta"; exit 1; }
+          [ ${#BACKUP_PASSPHRASE} -ge 16 ] || { echo "::error::BACKUP_PASSPHRASE tem ${#BACKUP_PASSPHRASE} caracteres; precisa de 16 ou mais"; exit 1; }
+          case "$DATABASE_URL" in postgres://*|postgresql://*) ;; *) echo "::error::DATABASE_URL deve começar com postgresql://"; exit 1;; esac
+          case "$DATABASE_URL" in *YOUR-PASSWORD*) echo "::error::DATABASE_URL ainda tem [YOUR-PASSWORD]: troque pela senha do banco"; exit 1;; esac
+          case "$SUPABASE_URL" in https://*.supabase.co|https://*.supabase.co/) ;; *) echo "::error::SUPABASE_URL deve ser como https://xxxx.supabase.co"; exit 1;; esac
+          echo "configuração ok"
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm }
       - run: npm ci --no-audit --no-fund
       - name: Backup
-        run: bash scripts/backup-nuvem.sh
+        run: |
+          set -o pipefail
+          bash scripts/backup-nuvem.sh 2>&1 | tee saida.log || { echo "::error::Backup falhou: $(tail -n 4 saida.log | tr '\n' ' ' | cut -c1-600)"; exit 1; }
       - name: Testar restauração
-        run: bash scripts/testar-backup-nuvem.sh "$BACKUP_DIR"
+        run: |
+          set -o pipefail
+          bash scripts/testar-backup-nuvem.sh "$BACKUP_DIR" 2>&1 | tee saida.log || { echo "::error::Teste de restauração falhou: $(tail -n 4 saida.log | tr '\n' ' ' | cut -c1-600)"; exit 1; }
       - uses: actions/upload-artifact@v4
         with:
           name: backup-painel-${{ github.run_number }}
