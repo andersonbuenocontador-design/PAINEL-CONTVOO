@@ -1,0 +1,11 @@
+process.loadEnvFile('.env.local');
+const { query } = await import('../src/lib/db');
+const { criarEmpresa } = await import('../src/lib/services/empresas');
+const { criarUsuario } = await import('../src/lib/services/usuarios');
+const { criarExigencia } = await import('../src/lib/services/documentos');
+const a = { id: (await query("select id from usuarios where papel='admin'")).rows[0].id, papel: 'admin' as const };
+const e = await criarEmpresa(a, { razaoSocial: 'Empresa Beta Ltda', cnpj: '45.723.174/0001-10' });
+await criarUsuario(a, { nome: 'Cliente Beta', email: 'beta@cliente.com', papel: 'cliente', senhaTemporaria: 'Provisoria#Lua2026', empresaIds: [e] });
+await criarExigencia(a, e, { nome: 'Extrato', formatos: ['pdf'] });
+process.exit(0);
+export {};
