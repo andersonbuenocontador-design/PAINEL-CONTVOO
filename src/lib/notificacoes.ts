@@ -18,11 +18,24 @@ export async function enfileirar(r: Runner, n: { destinatarioId: string; empresa
 export const textoAviso = (nome: string, frase: string, caminho: string) =>
   `Olá, ${nome.split(' ')[0]}.\n\n${frase}\n\nPara ver os detalhes, acesse o Painel do Cliente (é preciso entrar com seu login):\n${linkPainel(caminho)}\n\nEsta é uma mensagem automática. Por segurança, não enviamos documentos nem informações financeiras por e-mail.`;
 
-/** Provedor por variável de ambiente: EMAIL_PROVIDER=smtp (SMTP_URL, EMAIL_FROM). Sem configuração: null (a fila só acumula). */
+/** "Nome <email@x>" ou "email@x" → partes. */
+export function remetente(from: string) { const m = from.match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/); return m ? { name: m[1].trim() || undefined, email: m[2].trim() } : { email: from.trim() }; }
+
+/** Provedor por variável de ambiente. Sem configuração: null (a fila só acumula).
+ *  - EMAIL_PROVIDER=brevo (BREVO_API_KEY, EMAIL_FROM): API HTTPS, funciona onde as portas SMTP são bloqueadas (ex.: Render grátis).
+ *  - EMAIL_PROVIDER=smtp (SMTP_URL, EMAIL_FROM). */
 export function provedorPadrao(): EmailProvider | null {
-  if ((process.env.EMAIL_PROVIDER ?? '').toLowerCase() !== 'smtp' || !process.env.SMTP_URL || !process.env.EMAIL_FROM) return null;
+  const tipo = (process.env.EMAIL_PROVIDER ?? '').toLowerCase(), from = process.env.EMAIL_FROM;
+  if (tipo === 'brevo' && process.env.BREVO_API_KEY && from) {
+    return { nome: 'brevo', async enviar(m) {
+      const r = await fetch('https://api.brevo.com/v3/smtp/email', { method: 'POST', headers: { 'api-key': process.env.BREVO_API_KEY!, 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ sender: remetente(from), to: [{ email: m.para }], subject: m.assunto, textContent: m.texto }) });
+      if (!r.ok) throw new Error(`Brevo HTTP ${r.status}: ${(await r.text().catch(() => '')).slice(0, 200)}`);
+    } };
+  }
+  if (tipo !== 'smtp' || !process.env.SMTP_URL || !from) return null;
   const transporte = nodemailer.createTransport(process.env.SMTP_URL);
-  return { nome: 'smtp', async enviar(m) { await transporte.sendMail({ from: process.env.EMAIL_FROM, to: m.para, subject: m.assunto, text: m.texto }); } };
+  return { nome: 'smtp', async enviar(m) { await transporte.sendMail({ from, to: m.para, subject: m.assunto, text: m.texto }); } };
 }
 
 /** Envia o que está pendente (ou falhou e ainda tem tentativas). Reivindica as linhas antes de enviar, então duas execuções simultâneas não mandam duas vezes. */

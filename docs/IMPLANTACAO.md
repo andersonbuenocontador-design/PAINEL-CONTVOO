@@ -1,4 +1,6 @@
-# Guia de implantação
+# Guia de implantação (servidor próprio)
+
+> **Produção atual: nuvem (Render + Supabase + GitHub Actions) — siga `docs/NUVEM.md`.** Este guia vale só para quem quiser hospedar num servidor Linux próprio.
 
 > Este guia foi escrito a partir do que foi testado no ambiente de desenvolvimento (Linux, Node 22, PostgreSQL 16).
 > Foi ensaiado do zero numa cópia limpa (npm ci → migrate → seed → build → verificar → produção → backup/restauração → SMTP de teste), mas **ainda não em servidor de produção real**: faça o primeiro ciclo completo (instalar, migrar, restaurar backup) num ambiente de teste, com dados fictícios, antes de usar dados de clientes.

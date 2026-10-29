@@ -1,6 +1,8 @@
 import { existsSync, accessSync, constants, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import pg from 'pg';
+import { configPg } from '../src/lib/db';
+import { armazenamentoOk, bucket } from '../src/lib/storage';
 
 // Uso: npm run verificar            (avisos não derrubam)
 //      npm run verificar -- --producao   (exige HTTPS, 2FA dos admins, chave de cifra própria etc.)
@@ -20,14 +22,21 @@ else if (e.APP_ENCRYPTION_KEY.length < 32) erro('APP_ENCRYPTION_KEY com menos de
 if (!e.APP_URL) aviso('APP_URL ausente (links dos e-mails ficam sem endereço)', true); else if (!/^https:\/\//.test(e.APP_URL)) aviso(`APP_URL não é HTTPS (${e.APP_URL}): em produção o painel só deve ser servido por HTTPS`, true); else ok(`APP_URL ${e.APP_URL}`);
 e.EXIGIR_2FA_ADMIN === '1' ? ok('2FA obrigatório para administradores') : aviso('EXIGIR_2FA_ADMIN=1 não definido: administradores podem entrar sem 2º fator', true);
 e.TRUST_PROXY === '1' ? ok('TRUST_PROXY=1 (limite de tentativas por IP ativo; o proxy reverso precisa sobrescrever X-Forwarded-For)') : aviso('TRUST_PROXY não definido: sem limite de tentativas por IP (só por conta). Defina TRUST_PROXY=1 atrás de UM proxy reverso confiável');
-if (e.EMAIL_PROVIDER === 'smtp' && e.SMTP_URL && e.EMAIL_FROM) ok('e-mail (SMTP) configurado'); else aviso('e-mail não configurado: os avisos ficam na fila');
+if (e.EMAIL_PROVIDER === 'smtp' && e.SMTP_URL && e.EMAIL_FROM) ok('e-mail (SMTP) configurado'); else if (e.EMAIL_PROVIDER === 'brevo' && e.BREVO_API_KEY && e.EMAIL_FROM) ok('e-mail (Brevo) configurado'); else aviso('e-mail não configurado: os avisos ficam na fila');
 if (!e.CRON_SECRET || e.CRON_SECRET.length < 24) aviso('CRON_SECRET ausente/curto (<24): o agendador não conseguirá chamar /api/notificacoes/processar'); else ok('CRON_SECRET definido');
 const anos = Number(e.RETENCAO_ANOS ?? 5); Number.isInteger(anos) && anos >= 1 ? ok(`retenção: ${anos} ano(s) (confirme o prazo com o jurídico/encarregado)`) : erro('RETENCAO_ANOS inválido');
-const storage = resolve(e.STORAGE_DIR ?? join(process.cwd(), 'storage'));
-try { mkdirSync(storage, { recursive: true }); accessSync(storage, constants.W_OK); ok(`armazenamento gravável: ${storage}`); if (storage.startsWith(resolve('public'))) erro('STORAGE_DIR está dentro de public/: os arquivos ficariam expostos'); } catch { erro(`armazenamento sem permissão de escrita: ${storage}`); }
+if (e.SUPABASE_URL || e.SUPABASE_SECRET_KEY) {
+  if (!e.SUPABASE_URL || !e.SUPABASE_SECRET_KEY) erro('defina SUPABASE_URL e SUPABASE_SECRET_KEY juntas');
+  else (await armazenamentoOk()) ? ok(`armazenamento na nuvem: bucket "${bucket()}" acessível`) : erro(`armazenamento na nuvem inacessível (bucket "${bucket()}" existe? rode npm run migrate; chave secreta correta?)`);
+} else {
+  const storage = resolve(e.STORAGE_DIR ?? join(process.cwd(), 'storage'));
+  if (prod) aviso(`documentos em disco local (${storage}): em servidor sem disco permanente (Render grátis) eles se perdem; configure SUPABASE_URL e SUPABASE_SECRET_KEY`, true);
+  try { mkdirSync(storage, { recursive: true }); accessSync(storage, constants.W_OK); ok(`armazenamento gravável: ${storage}`); if (storage.startsWith(resolve('public'))) erro('STORAGE_DIR está dentro de public/: os arquivos ficariam expostos'); } catch { erro(`armazenamento sem permissão de escrita: ${storage}`); }
+}
+if (e.DATABASE_URL && !/@(localhost|127\.0\.0\.1)[:/]/.test(e.DATABASE_URL) && e.DATABASE_SSL !== '0') e.DATABASE_CA_CERT ? ok('banco na nuvem com TLS e certificado verificado') : aviso('banco na nuvem com TLS, mas sem verificar o certificado (defina DATABASE_CA_CERT com o certificado do Supabase para verificar)');
 if (!e.DATABASE_URL) erro('DATABASE_URL ausente');
 else {
-  const c = new pg.Client({ connectionString: e.DATABASE_URL });
+  const c = new pg.Client(configPg(e.DATABASE_URL));
   try {
     await c.connect(); ok('conexão com o banco');
     const feitas = new Set((await c.query('SELECT nome FROM _migracoes').catch(() => ({ rows: [] as { nome: string }[] }))).rows.map((r) => r.nome));

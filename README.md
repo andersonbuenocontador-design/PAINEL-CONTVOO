@@ -9,7 +9,7 @@ npm install && npm run migrate && npm run seed
 npm run dev                       # http://localhost:3000
 npm run verificar                 # confere o ambiente
 ```
-Produção: **`docs/IMPLANTACAO.md`** (leia antes de publicar).
+Produção: **`docs/NUVEM.md`** (Render + Supabase + GitHub Actions, grátis). Servidor próprio: `docs/IMPLANTACAO.md`.
 
 ## O que existe
 | Etapa | Entrega |
@@ -27,14 +27,15 @@ Produção: **`docs/IMPLANTACAO.md`** (leia antes de publicar).
 npm test                    # unitários/serviços (banco `painel_test`)
 npx tsc --noEmit            # tipos
 # navegador (app em :3100 com o banco recém-semeado): node tests/e2e*.cjs
-npm run testar-backup       # backup → restauração → comparação
+npm run testar-backup       # backup → restauração → comparação (PostgreSQL local)
+# documentos no Supabase Storage: defina SUPABASE_URL e SUPABASE_SECRET_KEY; sem elas usa a pasta STORAGE_DIR
 ```
 Os testes de navegador de cada módulo estão em `tests/e2e-*.cjs`. Todos usam **dados fictícios**.
 
 ## Documentação
-- `docs/IMPLANTACAO.md` · `docs/OPERACAO.md` · `docs/SEGURANCA.md` · `docs/LGPD.md`
+- `docs/NUVEM.md` · `docs/IMPLANTACAO.md` · `docs/OPERACAO.md` · `docs/SEGURANCA.md` · `docs/LGPD.md`
 
 ## Limites e pendências conhecidos (resumo)
 - Leitores de PDF de Itaú, BB, Cresol, Stone e demais foram portados do Conciliador mas **só testados com PDFs fictícios** (Banrisul e tabela genérica). PDF digitalizado (imagem) não é lido.
 - Comprovantes por movimentação (anexar nota/recibo a cada lançamento) **não foram implementados**.
-- Sem teste de invasão independente, sem antivírus nos uploads; envio de e-mail depende de configurar o SMTP; prazos e bases legais da LGPD precisam ser definidos pelo escritório. Detalhes em `docs/SEGURANCA.md` e `docs/LGPD.md`.
+- Sem teste de invasão independente, sem antivírus nos uploads; envio de e-mail depende de configurar o Brevo (ou SMTP); prazos e bases legais da LGPD precisam ser definidos pelo escritório. Detalhes em `docs/SEGURANCA.md` e `docs/LGPD.md`.

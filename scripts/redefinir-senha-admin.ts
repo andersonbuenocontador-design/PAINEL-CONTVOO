@@ -4,11 +4,12 @@ import { existsSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import pg from 'pg';
+import { configPg } from '../src/lib/db';
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 const email = (process.argv[2] ?? process.env.SEED_ADMIN_EMAIL ?? '').toLowerCase();
 if (!email) { console.error('Informe o e-mail: npx tsx scripts/redefinir-senha-admin.ts email@exemplo.com'); process.exit(1); }
 const senha = randomBytes(10).toString('hex');
-const c = new pg.Client({ connectionString: process.env.DATABASE_URL });
+const c = new pg.Client(configPg());
 await c.connect();
 const r = await c.query(
   `UPDATE usuarios SET senha_hash=$2, deve_trocar_senha=true, token_version=token_version+1, falhas_login=0, bloqueado_ate=NULL WHERE lower(email)=$1 AND ativo RETURNING id`,

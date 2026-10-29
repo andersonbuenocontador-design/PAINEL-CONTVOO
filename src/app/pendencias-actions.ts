@@ -21,7 +21,7 @@ export async function acaoProcessarNotificacoes() {
   await exigirUsuario('admin'); let destino: string;
   try {
     const lembretes = await gerarLembretes(); const r = await processarFila();
-    destino = r.ativo ? `/admin/notificacoes?ok=${encodeURIComponent(`${r.enviadas} enviado(s), ${r.falhas} com falha, ${r.canceladas} cancelado(s). ${lembretes} lembrete(s) avaliado(s).`)}` : `/admin/notificacoes?erro=${encodeURIComponent('O envio de e-mails não está configurado (EMAIL_PROVIDER, SMTP_URL e EMAIL_FROM). Os avisos continuam na fila.')}`;
+    destino = r.ativo ? `/admin/notificacoes?ok=${encodeURIComponent(`${r.enviadas} enviado(s), ${r.falhas} com falha, ${r.canceladas} cancelado(s). ${lembretes} lembrete(s) avaliado(s).`)}` : `/admin/notificacoes?erro=${encodeURIComponent('O envio de e-mails não está configurado (EMAIL_PROVIDER, BREVO_API_KEY e EMAIL_FROM). Os avisos continuam na fila.')}`;
   } catch (e) { destino = `/admin/notificacoes?erro=${encodeURIComponent(mensagemDeErro(e))}`; }
   redirect(destino);
 }

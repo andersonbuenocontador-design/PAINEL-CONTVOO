@@ -23,5 +23,6 @@
 2. Publicar **aviso/política de privacidade** e ajustar contratos com clientes (o escritório pode ser controlador dos próprios dados e operador dos dados dos clientes: avaliar).
 3. Nomear o **encarregado** (DPO) e manter o registro das operações de tratamento; avaliar **RIPD** (relatório de impacto) dado o volume de dados financeiros.
 4. Atender direitos de **sócios e terceiros** (cujo CPF/nomes aparecem em informes e descrições bancárias): hoje o atendimento é manual (busca/edição pelo escritório); a anonimização automática cobre usuários, não sócios.
-5. Contratos com **fornecedores** que tocam dados (hospedagem, servidor de e-mail, backup).
+5. Contratos com **fornecedores** que tocam dados (suboperadores): **Supabase** (banco e documentos), **Render** (site), **GitHub** (código e backups cifrados), **Brevo** (e-mails, só nome/e-mail e aviso sem conteúdo). Todos oferecem DPA (acordo de tratamento de dados) — aceite/arquive.
+7. **Transferência internacional:** banco, documentos e site ficam nos **EUA (Virginia)**. A LGPD permite (art. 33) com garantias como cláusulas contratuais padrão (Resolução CD/ANPD nº 19/2024); informe isso na política de privacidade. Se preferir dados no Brasil: Supabase na região São Paulo (o site fica mais lento, porque o Render não tem servidor no Brasil).
 6. Procedimento de **incidente** (comunicação à ANPD e aos titulares) com prazos definidos pelo jurídico: veja `docs/OPERACAO.md`.

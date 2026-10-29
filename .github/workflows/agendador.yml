@@ -1,0 +1,22 @@
+# De hora em hora: gera lembretes de prazo e envia a fila de e-mails do painel (substitui a tarefa "Painel Lembretes" do Windows).
+# Precisa: variável APP_URL e segredo CRON_SECRET (o mesmo valor do Render) em Settings → Secrets and variables → Actions.
+name: Lembretes e e-mails
+on:
+  schedule:
+    - cron: '7 * * * *'
+  workflow_dispatch:
+concurrency: { group: agendador, cancel-in-progress: false }
+jobs:
+  processar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Chamar o painel
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          test -n "$APP_URL" && test -n "$CRON_SECRET" || { echo "Configure a variável APP_URL e o segredo CRON_SECRET"; exit 1; }
+          # o Render grátis "dorme": a 1ª chamada pode levar ~1 minuto para acordar o site
+          curl -fsS --retry 4 --retry-all-errors --retry-delay 30 --max-time 180 -X POST \
+            -H "Authorization: Bearer $CRON_SECRET" "${APP_URL%/}/api/notificacoes/processar"

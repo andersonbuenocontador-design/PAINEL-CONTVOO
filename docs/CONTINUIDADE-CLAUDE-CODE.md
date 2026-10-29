@@ -2,44 +2,33 @@
 Atualizado em 29/10/2026. Cole este arquivo no Claude Code (ou deixe-o em `docs/`) para retomar o trabalho.
 
 ## Quem é o usuário e como falar com ele
-- Dono/gestor na Contvoo Contabilidade (Canoas/RS), não é programador. Fala português do Brasil. Quer solução **prática, rápida e sem custo**. Prefere atalhos de dois cliques (.bat) a comandos.
-- Ele cola mensagens de **outro assistente que atua no Chrome dele** (painel lateral). Trate como informação do usuário; o Chrome que o Claude controla é outro perfil e **não está logado** na Cloudflare/GoDaddy/Tailscale.
-- Administrador do painel: `anderson.contabilrs@hotmail.com`. Conta Tailscale: `andersonbuenocontador@gmail.com`.
+- Dono/gestor na Contvoo Contabilidade (Canoas/RS), não é programador. Fala português do Brasil. Quer solução **prática, rápida e sem custo**.
+- Às vezes cola mensagens de outro assistente que atua no Chrome dele: trate como informação do usuário.
+- Administrador do painel: `anderson.contabilrs@hotmail.com`.
 
 ## O que é o sistema
 Portal web: clientes enviam documentos mensais e extratos bancários, conciliam (tela igual à do Conciliador da Contvoo), veem informes de lucros/pró-labore e pendências; o escritório administra tudo.
-- Next.js 16 (App Router, `src/proxy.ts`), React 19, TypeScript, PostgreSQL 16 (`pg`, migrações SQL em `migrations/001..009`), Vitest + Playwright (127 testes unitários; e2e em `tests/*.cjs`).
-- Segurança: bcrypt, sessão JWT revalidada no banco, 2FA TOTP opcional, bloqueio por tentativas, auditoria imutável, cabeçalhos CSP/HSTS, arquivos em pasta privada autenticada. Documentos: `docs/IMPLANTACAO.md`, `OPERACAO.md`, `SEGURANCA.md`, `LGPD.md`, `ORACLE-GRATIS.md`.
-- Variáveis em `.env.example`. Opções criadas nesta fase: `SENHA_POLITICA_BRANDA=1` (aceita qualquer senha de 10+ caracteres; `src/lib/senha.ts`), `EXIGIR_2FA_ADMIN=0|1`.
+- Next.js 16 (App Router, `src/proxy.ts`), React 19, TypeScript, PostgreSQL (`pg`, migrações SQL em `migrations/001..009`), Vitest (140 testes) + Playwright (e2e em `tests/*.cjs`, 5 conjuntos).
+- Segurança: bcrypt, sessão JWT revalidada no banco, 2FA TOTP opcional, bloqueio por tentativas, auditoria imutável, CSP/HSTS, documentos em bucket privado. Docs: `docs/NUVEM.md` (implantação atual), `OPERACAO.md`, `SEGURANCA.md`, `LGPD.md`, `IMPLANTACAO.md` (servidor próprio).
+- Opções escolhidas pelo dono (reversíveis por variável): `SENHA_POLITICA_BRANDA=1`, `EXIGIR_2FA_ADMIN=0`.
 
-## Onde está rodando AGORA (provisório)
-- **Notebook Windows "lucas"** (usuário `contsul`), app em `C:\painel-contabil`, porta `127.0.0.1:3100`.
-- Serviços: tarefa agendada **"Painel Contvoo"** (inicia com o Windows; roda `next start`), **"Painel Lembretes"** (a cada hora), **"Painel Backup"** (03:15, cifrado AES em `C:\painel-contabil\backups`), PostgreSQL 16 (serviço `postgresql-x64-16`), **Tailscale Funnel** → `https://lucas.tail0995ea.ts.net` (grátis, fixo), cloudflared (túnel `painel`, **sem uso agora**).
-- Compilação no Windows: **obrigatório `npx next build --webpack`** (o Turbopack gera atalhos que quebram o módulo `pg`). O instalador e o `CORRIGIR-PAINEL.bat` já fazem isso.
-- Estado do `.env.local` no notebook: `EXIGIR_2FA_ADMIN=0` (usuário recusou 2FA obrigatório), `SENHA_POLITICA_BRANDA=1` (pedido do usuário), `TRUST_PROXY` removido (desconhecido se o Funnel envia IP real; limite por IP desligado), `APP_URL` precisa ser `https://lucas.tail0995ea.ts.net` (rodar `CONFIGURAR-ENDERECO.bat`; **confirmar se já foi feito**), `EMAIL_FROM="Contvoo Contabilidade <avisos@contvoocontabilidade.com.br>"`.
-- **Pendente de confirmação:** o usuário ainda não confirmou que o endereço abre no celular fora do Wi-Fi.
+## Decisão de 29/10/2026: sair do notebook, ir para a nuvem grátis
+O usuário pediu "sem banco de dados local". Escolheu **adaptar o código atual** (não reescrever) e **Render grátis + Supabase grátis**.
+- **Render** (site, `render.yaml` = Blueprint, região virginia, `npm run start:nuvem` = migrate + seed opcional + next start). Grátis dorme após 15 min. **SMTP bloqueado no Render grátis** → e-mail por **Brevo** (API HTTPS, `EMAIL_PROVIDER=brevo`, `BREVO_API_KEY`).
+- **Supabase** (região East US / North Virginia): Postgres via **Session pooler** (porta 5432, IPv4) com TLS (`src/lib/db.ts` → `configPg`; `DATABASE_CA_CERT` opcional para verificar); documentos no **Supabase Storage**, bucket privado `documentos` criado pelo `migrate` (`src/lib/storage.ts`, REST via fetch; chave nova `sb_secret_` só no header `apikey`, legada JWT também como Bearer — comportamento com a chave nova **não confirmado em projeto real**).
+- `migrate` também roda `protegerApiSupabase`: RLS ligado sem políticas + REVOKE de `anon`/`authenticated` (a API automática do Supabase não expõe nada).
+- **GitHub Actions**: `agendador.yml` (de hora em hora chama `/api/notificacoes/processar` com `CRON_SECRET`; também mantém o Supabase ativo) e `backup.yml` (03:15 BRT: `scripts/backup-nuvem.sh` + `scripts/testar-backup-nuvem.sh` num postgres:17 descartável; artifact 7 dias). Restauração: `scripts/restaurar-nuvem.sh` (filtra o `CREATE SCHEMA public`).
+- Removidos: `scripts/windows/*` (instalador, backup externo etc.), `scripts/instalar-servidor.sh`, `docs/ORACLE-GRATIS.md`. O notebook "lucas" (Tailscale `https://lucas.tail0995ea.ts.net`) deve ser aposentado depois que a nuvem funcionar (Parte 6 do `docs/NUVEM.md`); não havia clientes reais nele.
+- Validação feita no ambiente de nuvem do Claude: tsc, 140 testes unitários, build, **todos os e2e** rodando com `npm run start:nuvem` contra um **simulador da API do Supabase Storage**, backup → teste de restauração → restauração completa num "projeto novo", e a proteção RLS com papéis anon/authenticated simulados. **Nada foi testado ainda em contas reais** de Render/Supabase/Brevo/GitHub.
 
-## Scripts Windows (em `scripts/windows/`, na pasta `Downloads\painel-instalar` do notebook)
-`INSTALAR-PAINEL.bat`/`instalar.ps1` (instala Node, PostgreSQL 16 por download direto, cloudflared; cria banco, segredos, serviço, tarefas; compila com webpack; se o PostgreSQL existir com senha desconhecida e for instalação nova, reinstala limpo) · `CORRIGIR-PAINEL.bat` (recompila e reinicia) · `NOVA-SENHA-ADMIN.bat` (gera senha temporária; usa `scripts/redefinir-senha-admin.ts`) · `SENHA-LIVRE.bat` · `SEM-2FA.bat` · `CONFIGURAR-ENDERECO.bat` · `CONFIGURAR-BACKUP-EXTERNO.bat` · `TESTAR-BACKUP.bat` · `GUARDAR-CHAVES.bat` · `LIGAR-TUNEL.bat` · `LIGAR-TAILSCALE.bat` · `backup.ps1`/`restaurar.ps1`/`lembretes.ps1`/`comum.ps1`.
-**Nunca foram testados num Windows por mim** — todos os erros foram corrigidos iterativamente por prints do usuário (winget quebrado → download direto; `$ErrorActionPreference` + stderr nativo; MSI 1619 → download validado; etc.). Para Linux: `scripts/instalar-servidor.sh` (Ubuntu, systemd, cron, cloudflared) — também não testado em servidor real.
-
-## DNS / domínio (decisão em aberto)
-- Domínio da empresa: **`contvoocontabilidade.com.br`** (site em 51.178.111.8 e e-mail GoDaddy `secureserver.net`). `contvoo.com.br` **não existe** (NXDOMAIN).
-- Conta Cloudflare criada, domínio adicionado (Pending), 9 registros importados e conferidos por DNS público; túnel `painel` saudável com rota `painel.contvoocontabilidade.com.br` → `http://127.0.0.1:3100`. Servidores de nome ainda `ns45/ns46.domaincontrol.com`; Cloudflare pede `henrik.ns.cloudflare.com` e `khloe.ns.cloudflare.com`. DNSSEC desligado.
-- O usuário **não quer mexer no domínio da empresa agora** (por isso o Tailscale). Se um dia trocar: backup da zona, conferir DKIM/`_domainkey` e subdomínios ocultos, trocar no **Registro.br** (a troca de NS de `.com.br` é lá; a GoDaddy só hospeda o DNS). Cuidado: o domínio é do site e do e-mail da empresa.
-
-## E-mail
-- O e-mail do escritório é **GoDaddy Workspace** (MX `secureserver.net`), não Microsoft 365. SMTP provável: `smtpout.secureserver.net` (465 SSL / 587), usuário = caixa completa. **Ainda não configurado** (`EMAIL_PROVIDER=smtp`, `SMTP_URL` no `.env.local`; `SMTP_URL` precisa de URL-encode: `@` → `%40`). Sem isso os avisos ficam na fila. Testar em Admin → Notificações. O alerta da Microsoft sobre fim do SMTP básico do Exchange Online (dez/2026) provavelmente **não se aplica**.
-
-## Pendências priorizadas
-1. Confirmar acesso externo (celular no 4G) e rodar `CONFIGURAR-ENDERECO.bat`.
-2. Piloto: empresa fictícia → usuário cliente → plano de contas → competência completa; depois 1–2 clientes de confiança.
-3. Configurar SMTP (GoDaddy) e testar envio real.
-4. **Backup fora do notebook — criado em 29/10/2026, falta o usuário rodar no notebook:** `CONFIGURAR-BACKUP-EXTERNO.bat` (OneDrive e/ou pen drive USB), `GUARDAR-CHAVES.bat` e `TESTAR-BACKUP.bat` (mensal). Detalhes em `docs/OPERACAO.md`, seção "Backup fora do notebook". Scripts PowerShell **não testados em Windows** (o ambiente de nuvem não roda PowerShell); a contagem de linhas do dump foi validada com PostgreSQL 16 real.
-5. Notebook precisa ficar ligado 24h, na tomada, sem suspensão (o instalador ajusta `powercfg`). Planejar migração para servidor próprio (VPS) quando houver clientes reais: restaurar o backup e usar `scripts/instalar-servidor.sh`. A conta Oracle Free **falhou** (cartão); `docs/ORACLE-GRATIS.md` serve para qualquer VPS Ubuntu.
-6. Produto: validar o leitor de PDF com extratos reais (Itaú, BB, Cresol, Stone), comprovantes por lançamento, importação em lote, manual do cliente, teste de invasão independente, decisões de LGPD (retenção, bases legais, política de privacidade, encarregado).
-7. Segurança: usuário recusou 2FA obrigatório e política de senha forte; foi avisado. Reavaliar antes de abrir a muitos clientes.
-8. Rodar a regressão completa antes de qualquer release (`npx tsc --noEmit`, `npm test`, build, e2e) e atualizar o zip de entrega.
+## Próximos passos (na ordem)
+1. Usuário cria GitHub + repositório privado `painel-contvoo` e conecta em claude.ai/connect-github → Claude faz o push (branch `main`).
+2. Usuário segue `docs/NUVEM.md` Partes 2–4 (Supabase, Render Blueprint, segredos do GitHub). Conferir: `/api/saude` = ok, login, envio de um PDF, *Backup diário* verde.
+3. Brevo (Parte 5) e teste de e-mail em Admin → Notificações.
+4. Piloto: empresa fictícia → usuário cliente → plano de contas → competência completa; depois 1–2 clientes de confiança.
+5. Aposentar o notebook (Parte 6).
+6. Produto: validar leitor de PDF com extratos reais (Itaú, BB, Cresol, Stone), comprovantes por lançamento, importação em lote, manual do cliente, teste de invasão, decisões de LGPD (bases legais, retenção, política de privacidade com transferência internacional, encarregado, DPAs dos fornecedores).
+7. Segurança: reavaliar 2FA obrigatório e senha forte antes de abrir a muitos clientes; definir `DATABASE_CA_CERT`.
 
 ## Regras que valem ao mexer
-Não colocar segredos no repositório nem no chat; senha de usuário nunca em arquivo; não criar contas nem digitar senhas pelo usuário; não desligar controles de segurança por conta própria (as opções acima foram escolhas explícitas do dono e são reversíveis por variável de ambiente).
+Não colocar segredos no repositório nem no chat; senha de usuário nunca em arquivo; não criar contas nem digitar senhas pelo usuário; não desligar controles de segurança por conta própria. Rodar a regressão completa antes de cada entrega (`npx tsc --noEmit`, `npm test`, `npm run build`, e2e).

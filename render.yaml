@@ -1,0 +1,48 @@
+# Blueprint do Render: cria o site do painel (plano grátis). No Render: New → Blueprint → escolha este repositório.
+# Os valores marcados "sync: false" o Render pede na tela (copie do Supabase/Brevo). Veja docs/NUVEM.md.
+services:
+  - type: web
+    name: painel-contvoo
+    runtime: node
+    plan: free
+    region: virginia            # mesma região do banco no Supabase (East US - North Virginia): telas mais rápidas
+    branch: main
+    buildCommand: npm ci --no-audit --no-fund && npm run build
+    startCommand: npm run start:nuvem
+    healthCheckPath: /api/saude
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL       # Supabase → Connect → Session pooler (porta 5432)
+        sync: false
+      - key: SUPABASE_URL       # Supabase → Project Settings → Data API → Project URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY  # Supabase → Project Settings → API Keys → Secret key
+        sync: false
+      - key: APP_URL            # endereço do site, ex.: https://painel-contvoo.onrender.com
+        sync: false
+      - key: SEED_ADMIN_EMAIL   # e-mail do 1º administrador (criado no 1º início)
+        sync: false
+      - key: SEED_ADMIN_PASSWORD  # senha provisória do 1º administrador (troca obrigatória no 1º acesso)
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: APP_ENCRYPTION_KEY
+        generateValue: true
+      - key: CRON_SECRET        # copie este valor para o segredo CRON_SECRET do GitHub (avisos de hora em hora)
+        generateValue: true
+      - key: EMAIL_PROVIDER
+        value: brevo
+      - key: BREVO_API_KEY      # Brevo → SMTP & API → API Keys (opcional; sem ela os avisos ficam na fila)
+        sync: false
+      - key: EMAIL_FROM
+        value: "Contvoo Contabilidade <avisos@contvoocontabilidade.com.br>"
+      - key: DB_POOL_MAX
+        value: "5"
+      - key: SENHA_POLITICA_BRANDA
+        value: "1"
+      - key: EXIGIR_2FA_ADMIN
+        value: "0"
+      - key: RETENCAO_ANOS
+        value: "5"
