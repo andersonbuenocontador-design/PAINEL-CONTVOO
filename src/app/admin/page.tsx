@@ -21,7 +21,6 @@ export default async function AdminHub({ searchParams }: { searchParams: Promise
         info={r.pendencias ? `${plural(r.pendencias, 'resposta', 'respostas')} de cliente para ver` : 'Nenhuma resposta nova'} alerta={r.pendencias > 0} />
       <Atalho href="/admin/relatorios" icone="grafico" titulo="Relatórios" desc="Visão geral e exportações em Excel" />
       <Atalho href="/admin/usuarios" icone="pessoas" titulo="Usuários" desc="Acessos do escritório e dos clientes" info={plural(r.usuarios, 'usuário ativo', 'usuários ativos')} />
-      <Atalho href="/admin/lgpd" icone="escudo" titulo="LGPD" desc="Prazo de guarda e dados pessoais" />
     </div>
   </main></>);
 }
