@@ -13,19 +13,24 @@ jobs:
     steps:
       - name: Chamar o painel
         env:
-          APP_URL: ${{ vars.APP_URL || secrets.APP_URL }}
+          APP_URL: ${{ vars.APP_URL || secrets.APP_URL || 'https://painel-contvoo.onrender.com' }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          # mensagens ::error:: aparecem no resumo da execução (sem mostrar valores secretos)
-          [ -n "$APP_URL" ] || { echo "::error::Falta APP_URL (Settings → Secrets and variables → Actions → aba Variables)"; exit 1; }
-          [ -n "$CRON_SECRET" ] || { echo "::error::Falta o segredo CRON_SECRET (aba Secrets; copie o valor do Render → Environment)"; exit 1; }
+          # mensagens ::error::/::warning::/::notice:: aparecem no resumo da execução (sem mostrar valores secretos)
           case "$APP_URL" in https://*) ;; *) echo "::error::APP_URL deve começar com https:// (está: $APP_URL)"; exit 1;; esac
-          # o Render grátis "dorme": a 1ª chamada pode levar ~1 minuto para acordar o site
-          url="${APP_URL%/}/api/notificacoes/processar"
+          base="${APP_URL%/}"
+          # 1) saúde do site (o Render grátis "dorme": a 1ª chamada pode levar ~1 minuto)
           for i in 1 2 3 4 5; do
-            code=$(curl -sS -o resposta.txt -w '%{http_code}' --max-time 180 -X POST -H "Authorization: Bearer $CRON_SECRET" "$url" || echo 000)
-            [ "$code" = 200 ] && { cat resposta.txt; exit 0; }
-            [ "$code" = 401 ] && { echo "::error::O site recusou o CRON_SECRET (401): o segredo do GitHub está diferente do CRON_SECRET do Render"; exit 1; }
+            code=$(curl -sS -o saude.json -w '%{http_code}' --max-time 120 "$base/api/saude" || echo 000)
+            [ "$code" = 200 ] || [ "$code" = 503 ] && break
             echo "tentativa $i: HTTP $code"; sleep 30
           done
-          echo "::error::O site não respondeu em $url (último HTTP $code: $(head -c 200 resposta.txt 2>/dev/null)). Confira se o serviço está Live no Render e se APP_URL está certo"; exit 1
+          if [ "$code" = 200 ]; then echo "::notice::Site OK: $(cat saude.json)"
+          elif [ "$code" = 503 ]; then echo "::error::Site no ar, mas com problema de configuração: $(cat saude.json)"; exit 1
+          else echo "::error::O site não respondeu em $base (HTTP $code). No Render, o serviço painel-contvoo está Live?"; exit 1; fi
+          # 2) lembretes e fila de e-mails
+          if [ -z "$CRON_SECRET" ]; then echo "::warning::Falta o segredo CRON_SECRET no GitHub (Settings → Secrets and variables → Actions → Secrets; copie do Render → Environment). Lembretes não enviados."; exit 0; fi
+          code=$(curl -sS -o resposta.txt -w '%{http_code}' --max-time 120 -X POST -H "Authorization: Bearer $CRON_SECRET" "$base/api/notificacoes/processar" || echo 000)
+          [ "$code" = 200 ] && { echo "::notice::Lembretes: $(cat resposta.txt)"; exit 0; }
+          [ "$code" = 401 ] && { echo "::error::O site recusou o CRON_SECRET (401): o segredo do GitHub está diferente do CRON_SECRET do Render"; exit 1; }
+          echo "::error::Falha ao processar lembretes (HTTP $code): $(head -c 200 resposta.txt)"; exit 1

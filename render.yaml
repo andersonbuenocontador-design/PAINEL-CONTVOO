@@ -9,7 +9,6 @@ services:
     branch: main
     buildCommand: npm ci --no-audit --no-fund && npm run build
     startCommand: npm run start:nuvem
-    healthCheckPath: /api/saude
     autoDeploy: true
     envVars:
       - key: NODE_VERSION

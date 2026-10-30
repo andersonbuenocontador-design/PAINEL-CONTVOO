@@ -13,7 +13,7 @@
     "verificar": "tsx scripts/verificar-ambiente.ts",
     "backup": "bash scripts/backup.sh",
     "testar-backup": "bash scripts/testar-backup.sh",
-    "start:nuvem": "npm run migrate && tsx scripts/seed.ts --se-configurado && next start",
+    "start:nuvem": "tsx scripts/iniciar-nuvem.ts; next start",
     "backup:nuvem": "bash scripts/backup-nuvem.sh"
   },
   "keywords": [],
