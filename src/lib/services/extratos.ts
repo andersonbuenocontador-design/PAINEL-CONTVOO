@@ -163,3 +163,35 @@ export async function listarImportacoes(actor: Actor, empresaId: string, compete
       WHERE i.empresa_id=$1 AND i.competencia=$2 AND i.status<>'cancelada' ORDER BY i.criado_em DESC`, [e.id, competencia])).rows;
 }
 
+
+/** Envio direto para a conciliação (sem tela de prévia): lê, grava o que é novo e devolve o resumo.
+ *  Ignora o que já existe (mesmo lançamento já importado) e o que é de outro mês; se o extrato inteiro é de UM outro mês,
+ *  importa na conciliação desse mês. */
+export async function importarDireto(actor: Actor, p: { empresaId: string; contaId?: string; competencia: string; nome: string; dados: Buffer }) {
+  let competencia = p.competencia;
+  let id = await criarPrevia(actor, { ...p, contaId: p.contaId ?? '' });
+  let prev = await obterPrevia(actor, id);
+  const meses = [...new Set(prev.linhas.map((l) => l.data.slice(0, 7)))];
+  if (prev.resumo.aImportar === 0 && prev.linhas.length && prev.linhas.every((l) => l.foraPeriodo) && meses.length === 1) {
+    const contaId = (await query('SELECT conta_id FROM importacoes WHERE id=$1', [id])).rows[0].conta_id as string; // a mesma conta já detectada
+    await cancelarImportacao(actor, id);
+    competencia = meses[0];
+    id = await criarPrevia(actor, { ...p, contaId, competencia });
+    prev = await obterPrevia(actor, id);
+  }
+  const r = await confirmarImportacao(actor, id, []);
+  const res = prev.resumo as { duplicadasCertas: number; duplicadasPossiveis: number; foraPeriodo: number; conferenciaSaldo: { confere: boolean | null } | null };
+  return { competencia, gravadas: r.gravadas, jaExistiam: res.duplicadasCertas + res.duplicadasPossiveis, outroMes: res.foraPeriodo, banco: prev.conta?.banco as string | undefined, saldoConfere: res.conferenciaSaldo?.confere ?? null };
+}
+
+/** Frase para o usuário depois do envio direto. */
+export function resumoImportacao(r: Awaited<ReturnType<typeof importarDireto>>, mesPedido?: string) {
+  const mes = (c: string) => `${c.slice(5)}/${c.slice(0, 4)}`;
+  const partes = [r.gravadas ? `${r.gravadas} lançamento(s)${r.banco ? ` do ${r.banco}` : ''} foram para a conciliação de ${mes(r.competencia)}` : 'Nenhum lançamento novo neste extrato'];
+  if (mesPedido && mesPedido !== r.competencia) partes.push(`o extrato é de ${mes(r.competencia)}`);
+  if (r.jaExistiam) partes.push(`${r.jaExistiam} já existiam e foram ignorados`);
+  if (r.outroMes) partes.push(`${r.outroMes} de outro mês ficaram de fora`);
+  if (r.saldoConfere === true) partes.push('saldo do extrato conferido');
+  if (r.saldoConfere === false) partes.push('ATENÇÃO: o saldo do extrato não fechou; confira se faltou alguma página');
+  return partes.join('; ') + '.';
+}

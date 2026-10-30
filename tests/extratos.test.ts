@@ -287,3 +287,26 @@ describe('conferência de saldos e fila do escritório', () => {
 });
 
 afterAll(async () => { await getPool().end(); });
+
+describe('envio direto para a conciliação (sem prévia)', () => {
+  it('grava os lançamentos na hora e reenviar o mesmo extrato não duplica', async () => {
+    const dados = csv(['05/10/2026;TARIFA PACOTE;-29,90', '06/10/2026;PIX RECEBIDO CLIENTE;1.500,00']);
+    const r = await X.importarDireto(ua, { empresaId: empA, contaId: contaA, competencia: C, nome: 'out.csv', dados });
+    expect(r).toMatchObject({ competencia: C, gravadas: 2, jaExistiam: 0, outroMes: 0 });
+    expect(X.resumoImportacao(r)).toMatch(/^2 lançamento\(s\) do Banrisul foram para a conciliação de 10\/2026/);
+    expect((await query('SELECT count(*)::int n FROM movimentacoes WHERE empresa_id=$1', [empA])).rows[0].n).toBe(2);
+    const r2 = await X.importarDireto(ua, { empresaId: empA, contaId: contaA, competencia: C, nome: 'out.csv', dados });
+    expect(r2).toMatchObject({ gravadas: 0, jaExistiam: 2 }); expect(X.resumoImportacao(r2)).toMatch(/Nenhum lançamento novo.*2 já existiam/);
+    expect((await query('SELECT count(*)::int n FROM movimentacoes WHERE empresa_id=$1', [empA])).rows[0].n).toBe(2);
+  });
+  it('extrato inteiro de outro mês vai para a conciliação daquele mês', async () => {
+    const r = await X.importarDireto(ua, { empresaId: empA, contaId: contaA, competencia: C, nome: 'jul.csv', dados: csv(['10/07/2026;TARIFA;-10,00', '11/07/2026;PIX;50,00']) });
+    expect(r).toMatchObject({ competencia: '2026-07', gravadas: 2 });
+    expect(X.resumoImportacao(r, C)).toContain('o extrato é de 07/2026');
+    expect((await query(`SELECT count(*)::int n FROM movimentacoes WHERE empresa_id=$1 AND competencia='2026-07'`, [empA])).rows[0].n).toBe(2);
+    expect((await query(`SELECT count(*)::int n FROM importacoes WHERE empresa_id=$1 AND status='cancelada'`, [empA])).rows[0].n).toBe(1);
+  });
+  it('cliente de outra empresa não importa', async () => {
+    await expect(X.importarDireto(ub, { empresaId: empA, contaId: contaA, competencia: C, nome: 'x.csv', dados: csv(['05/10/2026;X;-1,00']) })).rejects.toMatchObject({ code: 'nao_encontrado' });
+  });
+});

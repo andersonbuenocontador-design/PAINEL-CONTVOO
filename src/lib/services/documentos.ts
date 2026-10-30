@@ -301,3 +301,10 @@ export async function removerAvulso(actor: Actor, id: string) {
   });
   await apagar(d.chave_storage);
 }
+
+/** Documento exigido que é extrato bancário (pelo nome ou categoria): o envio também alimenta a conciliação. */
+export async function exigenciaEhExtrato(actor: Actor, empresaId: string, exigenciaId: string) {
+  const emp = await obterEmpresa(actor, empresaId);
+  const x = (await query('SELECT nome, categoria FROM exigencias WHERE id=$1 AND empresa_id=$2', [exigenciaId, emp.id])).rows[0];
+  return !!x && /extrato/i.test(`${x.nome} ${x.categoria ?? ''}`);
+}
