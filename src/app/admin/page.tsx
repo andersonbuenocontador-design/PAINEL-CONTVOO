@@ -1,23 +1,27 @@
-import Link from 'next/link';
 import { exigirUsuario } from '@/lib/session';
-import { visaoGeral } from '@/lib/services/documentos';
-import { Topo, CompetenciaSeletor, competenciaDe } from '../components';
+import { resumoEscritorio } from '@/lib/services/hub';
+import { Atalho, CompetenciaSeletor, Topo, competenciaDe } from '../components';
 
-export default async function AdminHome({ searchParams }: { searchParams: Promise<{ competencia?: string }> }) {
-  const u = await exigirUsuario('admin'); const comp = competenciaDe((await searchParams).competencia);
-  const v = await visaoGeral(u, comp);
-  const concluidas = v.filter((e) => e.concluida).length, semConfig = v.filter((e) => e.exigidos === 0).length;
+const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
+
+/** Tela inicial do escritório: um cartão por área, com o que pede atenção. */
+export default async function AdminHub({ searchParams }: { searchParams: Promise<{ competencia?: string }> }) {
+  const u = await exigirUsuario('admin'); const comp = competenciaDe((await searchParams).competencia); const c = `?competencia=${comp}`;
+  const r = await resumoEscritorio(u, comp); const [ano, mes] = comp.split('-');
   return (<><Topo u={u} /><main>
-    <h1>Entregas da competência</h1><CompetenciaSeletor atual={comp} />
-    <div className="grid">
-      <div className="card"><h2>Concluídas</h2><strong style={{ fontSize: '2rem' }}>{concluidas}</strong><p className="soon">de {v.length} empresas ativas</p></div>
-      <div className="card"><h2>Com pendências</h2><strong style={{ fontSize: '2rem' }}>{v.filter((e) => e.pendentes > 0).length}</strong></div>
-      <div className="card"><h2>Com rejeitados</h2><strong style={{ fontSize: '2rem' }}>{v.filter((e) => e.rejeitados > 0).length}</strong></div>
-      <div className="card"><h2>Sem documentos configurados</h2><strong style={{ fontSize: '2rem' }}>{semConfig}</strong></div>
+    <div className="saudacao"><div><h1>Olá, {u.nome.split(' ')[0]}</h1><p className="soon" style={{ margin: '4px 0 0' }}>Competência {mes}/{ano}</p></div><CompetenciaSeletor atual={comp} mini /></div>
+    <div className="hub">
+      <Atalho href={`/admin/entregas${c}`} icone="entrega" titulo="Entregas do mês" desc="Documentos exigidos de cada empresa"
+        info={r.a_conferir ? `${plural(r.a_conferir, 'documento', 'documentos')} para conferir` : `${r.entregasConcluidas} de ${r.empresas} empresas concluídas`} alerta={r.a_conferir > 0} ok={!r.a_conferir && r.empresas > 0 && r.entregasConcluidas === r.empresas} />
+      <Atalho href="/admin/empresas" icone="predio" titulo="Empresas" desc="Cadastro, usuários, documentos, sócios e retiradas"
+        info={r.pdfs_novos ? `${plural(r.pdfs_novos, 'PDF novo', 'PDFs novos')} enviado${r.pdfs_novos === 1 ? '' : 's'} por clientes` : `${plural(r.empresas, 'empresa ativa', 'empresas ativas')}${r.retiradas ? ` · ${r.retiradas} com retiradas enviadas` : ''}`} alerta={r.pdfs_novos > 0} />
+      <Atalho href={`/admin/conciliacoes${c}`} icone="banco" titulo="Conciliações" desc="Extratos classificados pelos clientes"
+        info={r.conciliacoes ? `${plural(r.conciliacoes, 'aguardando', 'aguardando')} sua conferência` : 'Nenhuma aguardando conferência'} alerta={r.conciliacoes > 0} />
+      <Atalho href="/admin/pendencias" icone="conversa" titulo="Pendências" desc="Solicitações aos clientes e respostas"
+        info={r.pendencias ? `${plural(r.pendencias, 'resposta', 'respostas')} de cliente para ver` : 'Nenhuma resposta nova'} alerta={r.pendencias > 0} />
+      <Atalho href="/admin/relatorios" icone="grafico" titulo="Relatórios" desc="Visão geral e exportações em Excel" />
+      <Atalho href="/admin/usuarios" icone="pessoas" titulo="Usuários" desc="Acessos do escritório e dos clientes" info={plural(r.usuarios, 'usuário ativo', 'usuários ativos')} />
+      <Atalho href="/admin/lgpd" icone="escudo" titulo="LGPD" desc="Prazo de guarda e dados pessoais" />
     </div>
-    <div className="card"><table><thead><tr><th>Empresa</th><th>Exigidos</th><th>Enviados</th><th>Aprovados</th><th>Rejeitados</th><th>Pendentes</th><th>%</th><th></th></tr></thead><tbody>
-      {v.map((e) => (<tr key={e.id}><td>{e.razao_social}</td><td>{e.exigidos}</td><td>{e.enviados}</td><td>{e.aprovados}</td><td>{e.rejeitados}</td><td>{e.pendentes}</td><td>{e.percentual}%</td><td><Link href={`/admin/empresas/${e.id}/documentos?competencia=${comp}`}>Conferir</Link></td></tr>))}
-      {!v.length && <tr><td colSpan={8} className="soon">Nenhuma empresa ativa.</td></tr>}</tbody></table></div>
-    <div className="card"><p className="soon">Extratos e conciliação: <Link href={`/admin/conciliacoes?competencia=${comp}`}>Conciliações</Link> · Solicitações aos clientes: <Link href="/admin/pendencias">Pendências</Link> · Visão geral: <Link href="/admin/relatorios">Relatórios</Link></p></div>
   </main></>);
 }

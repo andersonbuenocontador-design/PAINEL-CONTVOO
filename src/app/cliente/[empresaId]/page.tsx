@@ -1,51 +1,35 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { exigirUsuario } from '@/lib/session';
-import { obterEmpresa } from '@/lib/services/empresas';
-import { listarAvulsos, situacaoCompetencia } from '@/lib/services/documentos';
+import { listarEmpresas } from '@/lib/services/empresas';
+import { resumoCliente } from '@/lib/services/hub';
 import { AppError } from '@/lib/errors';
-import { resumoPendencias } from '@/lib/services/pendencias';
-import { Avisos, CompetenciaSeletor, ROTULO, Topo, competenciaDe } from '../../components';
-import { acaoEnviarArquivo, acaoEnviarAvulsos, acaoRemoverAvulso } from '../actions';
+import { Atalho, Avisos, CompetenciaSeletor, Topo, competenciaDe } from '../../components';
 
+const CONC = { revisao: 'Em preenchimento', enviada: 'Enviada ao escritório', devolvida: 'Devolvida: o escritório pediu correções', concluida: 'Concluída pelo escritório' } as const;
 
-export default async function ClienteEmpresa({ params, searchParams }: { params: Promise<{ empresaId: string }>; searchParams: Promise<{ competencia?: string; erro?: string; ok?: string }> }) {
+/** Tela inicial do cliente (por empresa): um cartão por tarefa do mês, com a situação de cada uma. */
+export default async function ClienteHub({ params, searchParams }: { params: Promise<{ empresaId: string }>; searchParams: Promise<{ competencia?: string; erro?: string; ok?: string }> }) {
   const u = await exigirUsuario('cliente');
-  const { empresaId } = await params; const sp = await searchParams;
-  const comp = competenciaDe(sp.competencia);
-  let e, s;
-  try { e = await obterEmpresa(u, empresaId); s = await situacaoCompetencia(u, empresaId, comp); } catch (x) { if (x instanceof AppError) notFound(); throw x; }
-  const [ano, mes] = comp.split('-'); const ind = s.indicadores; const pend = await resumoPendencias(u, empresaId); const avulsos = await listarAvulsos(u, empresaId, comp);
+  const { empresaId } = await params; const sp = await searchParams; const comp = competenciaDe(sp.competencia); const c = `?competencia=${comp}`;
+  let r; try { r = await resumoCliente(u, empresaId, comp); } catch (x) { if (x instanceof AppError) notFound(); throw x; }
+  const varias = (await listarEmpresas(u)).length > 1; const [ano, mes] = comp.split('-'); const d = r.docs; const p = r.pendencias;
+  const docsInfo = !d.exigidos ? (r.pdfs ? `${r.pdfs} PDF(s) enviado(s)` : 'Nenhum documento pedido neste mês')
+    : d.concluida ? 'Tudo entregue e aprovado ✓' : d.rejeitados ? `${d.rejeitados} recusado(s): envie de novo` : d.pendentes ? `Faltam ${d.pendentes} de ${d.exigidos}` : `Enviados; aguardando o escritório`;
   return (<><Topo u={u} /><main>
-    <h1>Bem-vindo, {e.razao_social}</h1><Avisos erro={sp.erro} ok={sp.ok} />
-    {pend.aguardando > 0 && <div className="msg-err" role="alert"><strong>Você tem {pend.aguardando} solicitação(ões) do escritório aguardando sua resposta{pend.vencidas > 0 ? ` (${pend.vencidas} com prazo vencido)` : ''}.</strong> <a href={`/cliente/${empresaId}/pendencias`}>Ver pendências</a></div>}
-    <CompetenciaSeletor atual={comp} />
-    <div className="card"><h2>Documentos de {mes}/{ano}</h2>
-      <p>{ind.aprovados} de {ind.exigidos} obrigatórios aprovados ({ind.percentual}%){ind.concluida ? ' — competência concluída' : ''}. Pendentes: {ind.pendentes} · Rejeitados: {ind.rejeitados}.</p>
-      <table><thead><tr><th>Documento</th><th>Situação</th><th>Enviar</th></tr></thead><tbody>
-        {s.itens.map((i) => (<tr key={i.exigencia_id}>
-          <td><strong>{i.nome}</strong>{i.instituicao && ` — ${i.instituicao}`}{!i.obrigatorio && <span className="tag off"> opcional</span>}
-            {i.instrucoes && <div className="soon">{i.instrucoes}</div>}<div className="soon">Formatos: {i.formatos.join(', ').toUpperCase()}</div></td>
-          <td><span className="tag">{ROTULO[i.situacao]}</span>{i.arquivo_id && <div className="soon">v{i.versao} · <a href={`/api/arquivos/${i.arquivo_id}`}>{i.nome_original}</a></div>}
-            {i.situacao === 'rejeitado' && <div className="msg-err" style={{ marginTop: 6 }}>Motivo: {i.motivo_rejeicao}</div>}</td>
-          <td>{i.situacao === 'aprovado' ? <span className="soon">Aprovado</span> : (
-            <form action={acaoEnviarArquivo}><input type="hidden" name="empresaId" value={empresaId} /><input type="hidden" name="competencia" value={comp} /><input type="hidden" name="exigenciaId" value={i.exigencia_id} />
-              <input type="file" name="arquivo" required accept={i.formatos.map((f: string) => '.' + f).join(',')} /><button>{i.arquivo_id ? 'Enviar novo arquivo' : 'Enviar arquivo'}</button></form>)}</td></tr>))}
-        {!s.itens.length && <tr><td colSpan={3} className="soon">Nenhum documento exigido nesta competência.</td></tr>}
-      </tbody></table></div>
-    <div className="card" id="outros"><h2>Outros documentos (PDF)</h2>
-      <p className="soon">Envie aqui qualquer outro PDF para o escritório (notas, recibos, contratos, guias…). Pode selecionar vários de uma vez, até 20 MB no total.</p>
-      <form action={acaoEnviarAvulsos}><input type="hidden" name="empresaId" value={empresaId} /><input type="hidden" name="competencia" value={comp} />
-        <div className="row"><input type="file" name="arquivos" multiple required accept=".pdf,application/pdf" />
-          <input name="descricao" maxLength={200} placeholder="Descrição (opcional), ex.: notas de compra" style={{ flex: 1, minWidth: 200 }} /></div>
-        <p><button>Enviar PDF</button></p></form>
-      {avulsos.length > 0 && <table><thead><tr><th>Arquivo</th><th>Enviado em</th><th></th></tr></thead><tbody>
-        {avulsos.map((d) => (<tr key={d.id}>
-          <td>{d.descartado_em ? <span className="soon">{d.nome_original} (descartado)</span> : <a href={`/api/avulsos/${d.id}`}>{d.nome_original}</a>}{d.descricao && <div className="soon">{d.descricao}</div>}</td>
-          <td>{new Date(d.enviado_em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}{d.visto_em && <div className="soon">Recebido pelo escritório</div>}</td>
-          <td>{!d.visto_em && <form action={acaoRemoverAvulso}><input type="hidden" name="empresaId" value={empresaId} /><input type="hidden" name="competencia" value={comp} /><input type="hidden" name="id" value={d.id} /><button className="sec">Retirar</button></form>}</td></tr>))}
-      </tbody></table>}</div>
-    <div className="card"><h2>Extratos bancários</h2><p>Envie os extratos do mês e identifique cada entrada e saída.</p><a className="btn" href={`/cliente/${empresaId}/extratos?competencia=${comp}`}>Abrir extratos de {mes}/{ano}</a></div>
-    <div className="card"><h2>Retiradas dos sócios</h2><p>Informe o pró-labore, os lucros e outras retiradas de cada sócio em {mes}/{ano}.</p><a className="btn" href={`/cliente/${empresaId}/informes?competencia=${comp}`}>Informar retiradas de {mes}/{ano}</a></div>
-    <div className="card"><h2>Pendências do escritório</h2><p>{pend.abertas ? `${pend.abertas} em andamento${pend.aguardando ? ` · ${pend.aguardando} aguardando você` : ''}.` : 'Nenhuma pendência em andamento.'}</p><a className="btn" href={`/cliente/${empresaId}/pendencias`}>Abrir pendências</a></div>
+    {varias && <p><Link href="/cliente">← Minhas empresas</Link></p>}
+    <div className="saudacao"><div><h1>{r.empresa.razao_social}</h1><p className="soon" style={{ margin: '4px 0 0' }}>Olá, {u.nome.split(' ')[0]}. Estas são as tarefas de {mes}/{ano}.</p></div><CompetenciaSeletor atual={comp} mini /></div>
+    <Avisos erro={sp.erro} ok={sp.ok} />
+    {p.aguardando > 0 && <div className="msg-err" role="alert"><strong>O escritório aguarda sua resposta em {p.aguardando} solicitação(ões){p.vencidas > 0 ? ` (${p.vencidas} com prazo vencido)` : ''}.</strong> <a href={`/cliente/${empresaId}/pendencias`}>Responder</a></div>}
+    <div className="hub">
+      <Atalho href={`/cliente/${empresaId}/documentos${c}`} icone="docs" titulo="Documentos do mês" desc="Envie os documentos pedidos e outros PDFs"
+        info={docsInfo} alerta={d.rejeitados > 0 || d.pendentes > 0} ok={d.concluida} />
+      <Atalho href={`/cliente/${empresaId}/extratos${c}`} icone="banco" titulo="Extratos e conciliação" desc="Envie o extrato e identifique entradas e saídas"
+        info={r.movimentacoes ? CONC[r.conciliacao] : 'Nenhum extrato enviado ainda'} alerta={r.conciliacao === 'devolvida' || (!r.movimentacoes)} ok={r.conciliacao === 'concluida'} />
+      <Atalho href={`/cliente/${empresaId}/informes${c}`} icone="dinheiro" titulo="Retiradas dos sócios" desc="Pró-labore, lucros e outras retiradas"
+        info={r.retiradas ? (r.retiradas.sem_retiradas ? 'Informado: sem retiradas ✓' : 'Enviadas ao escritório ✓') : 'Ainda não informadas'} alerta={!r.retiradas} ok={!!r.retiradas} />
+      <Atalho href={`/cliente/${empresaId}/pendencias`} icone="conversa" titulo="Pendências" desc="Solicitações do escritório"
+        info={p.aguardando ? `${p.aguardando} aguardando você` : p.abertas ? `${p.abertas} em andamento` : 'Nenhuma pendência'} alerta={p.aguardando > 0} ok={!p.abertas} />
+    </div>
   </main></>);
 }

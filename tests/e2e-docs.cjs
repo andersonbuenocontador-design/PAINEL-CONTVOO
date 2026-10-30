@@ -20,7 +20,7 @@ const trocar = async (p, atual, nova) => { await p.waitForURL('**/trocar-senha')
   // cliente Alfa
   const cli = await (await br.newContext()).newPage();
   await login(cli, 'alfa@cliente.com', 'Provisoria#Sol2026'); await trocar(cli, 'Provisoria#Sol2026', 'Cavalo#Verde2026!'); await cli.waitForURL(/\/cliente\//);
-  await cli.goto(`${B}/cliente/${idAlfa}?competencia=${C}`);
+  await cli.goto(`${B}/cliente/${idAlfa}/documentos?competencia=${C}`);
   ok(await cli.locator('span.tag:has-text("Pendente")').count() > 0, 'cliente vê documento pendente');
   await cli.setInputFiles('input[type=file]', '/tmp/e2e/ruim.txt'); await cli.click('button:has-text("Enviar arquivo")'); await cli.waitForURL(/erro=/);
   ok(await cli.locator('.msg-err:has-text("Formato não aceito")').count() > 0, 'formato inválido recusado');
@@ -29,7 +29,7 @@ const trocar = async (p, atual, nova) => { await p.waitForURL('**/trocar-senha')
   // admin rejeita
   await adm.goto(`${B}/admin/empresas/${idAlfa}/documentos?competencia=${C}`);
   await adm.fill('input[name=motivo]', 'Extrato de setembro'); await adm.click('button:has-text("Rejeitar")'); await adm.waitForURL(/ok=/);
-  await cli.goto(`${B}/cliente/${idAlfa}?competencia=${C}`);
+  await cli.goto(`${B}/cliente/${idAlfa}/documentos?competencia=${C}`);
   ok(await cli.locator('text=Motivo: Extrato de setembro').count() > 0, 'cliente vê o motivo da rejeição');
   await cli.setInputFiles('input[type=file]', '/tmp/e2e/ok.pdf'); await cli.click('button:has-text("Enviar novo arquivo")'); await cli.waitForURL(/ok=/);
   ok(await cli.locator('text=v2').count() > 0, 'reenvio cria versão 2');
@@ -44,9 +44,9 @@ const trocar = async (p, atual, nova) => { await p.waitForURL('**/trocar-senha')
   const rb2 = await bet.goto(`${B}/cliente/${idAlfa}`); ok(rb2.status() === 404, 'cliente Beta 404 na página da Alfa');
   // aprova
   await adm.goto(`${B}/admin/empresas/${idAlfa}/documentos?competencia=${C}`); await adm.click('button:has-text("Aprovar")'); await adm.waitForURL(/ok=/);
-  await cli.goto(`${B}/cliente/${idAlfa}?competencia=${C}`); ok(await cli.locator('text=competência concluída').count() > 0 && await cli.locator('text=(100%)').count() > 0, 'aprovado: 100% e competência concluída');
+  await cli.goto(`${B}/cliente/${idAlfa}/documentos?competencia=${C}`); ok(await cli.locator('text=competência concluída').count() > 0 && await cli.locator('text=(100%)').count() > 0, 'aprovado: 100% e competência concluída');
   ok(await cli.locator('input[type=file][name=arquivo]').count() === 0, 'cliente não pode reenviar após aprovação');
-  await adm.goto(`${B}/admin?competencia=${C}`); ok(await adm.locator('tr:has-text("Empresa Alfa") td:has-text("100%")').count() > 0, 'visão geral mostra Alfa 100%');
+  await adm.goto(`${B}/admin/entregas?competencia=${C}`); ok(await adm.locator('tr:has-text("Empresa Alfa") td:has-text("100%")').count() > 0, 'visão geral mostra Alfa 100%');
   await adm.goto(`${B}/admin/empresas/${idAlfa}/documentos?competencia=2026-09`); ok(await adm.locator('span.tag:has-text("Pendente")').count() > 0, 'outra competência segue pendente');
   await br.close();
 })().catch(e => { console.error(e); process.exit(1); });

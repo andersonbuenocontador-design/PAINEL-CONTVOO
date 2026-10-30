@@ -19,12 +19,12 @@ const sql = (q) => execSync(`PGPASSWORD=painel_dev psql -q -t -A -h localhost -U
   await adm.goto(`${B}/admin/pendencias?vencidas=1`); ok(await adm.locator('tbody tr:has-text("Empresa Alfa")').count() === 1, 'filtro "só vencidas"');
   const ex = await adm.request.get(`${B}/api/pendencias/exportar?vencidas=1`); ok(ex.status() === 200 && (await ex.body()).slice(0, 2).toString() === 'PK', 'exportar pendências (Excel)');
   const cli = await ctx(); await login(cli, 'alfa@cliente.com', 'Provisoria#Sol2026'); await trocar(cli, 'Provisoria#Sol2026', 'Cavalo#Verde2026!');
-  await cli.waitForURL(/\/cliente\//); ok(await cli.locator('.msg-err:has-text("1 solicitação(ões) do escritório aguardando sua resposta (1 com prazo vencido)")').count() > 0, 'tela inicial do cliente avisa da pendência e do prazo vencido');
+  await cli.waitForURL(/\/cliente\//); ok(await cli.locator('.msg-err:has-text("O escritório aguarda sua resposta em 1 solicitação(ões) (1 com prazo vencido)")').count() > 0, 'tela inicial do cliente avisa da pendência e do prazo vencido');
   ok((await cli.request.get(`${B}/api/pendencias/exportar`)).status() === 403, 'cliente não exporta a fila do escritório');
   await cli.goto(`${B}/cliente/${E}/pendencias`); ok(await cli.locator('text=Envie o extrato do Banrisul de outubro').count() > 0 && await cli.locator('.tag:has-text("Aguardando o cliente")').count() > 0, 'cliente vê a solicitação');
   await cli.fill('textarea[name=texto]', 'Enviei hoje pelo painel.'); await cli.click('button:has-text("Enviar resposta")'); await cli.waitForSelector('.msg-ok:has-text("Resposta enviada")');
   ok(await cli.locator('.tag:has-text("Aguardando o escritório")').count() > 0 && await cli.locator('text=Enviei hoje pelo painel.').count() > 0, 'resposta do cliente muda a situação e entra no histórico');
-  await cli.goto(`${B}/cliente`); ok(await cli.locator('.msg-err:has-text("aguardando sua resposta")').count() === 0, 'banner some quando não há nada aguardando o cliente');
+  await cli.goto(`${B}/cliente`); ok(await cli.locator('.msg-err:has-text("aguarda sua resposta")').count() === 0, 'banner some quando não há nada aguardando o cliente');
   await adm.goto(PA); ok(await adm.locator('.tag:has-text("Aguardando o escritório")').count() > 0, 'escritório vê que o cliente respondeu');
   await adm.locator('details summary').first().click(); await adm.fill('textarea[name=texto]', 'Recebido, obrigado.'); await adm.click('button:has-text("Enviar resposta")'); await adm.waitForSelector('.msg-ok:has-text("Resposta enviada")');
   await adm.locator('details summary').first().click(); await adm.click('button:has-text("Marcar como resolvida")'); await adm.waitForSelector('.msg-ok:has-text("Pendência resolvida")'); ok(await adm.locator('h2:has-text("Encerradas (1)")').count() > 0, 'escritório resolve; vai para "Encerradas"');

@@ -30,7 +30,7 @@ const ok = (c, m) => { console.log((c ? 'OK   ' : 'FALHA'), m); if (!c) process.
   const cli = await (await br.newContext()).newPage();
   await cli.goto(B + '/login'); await cli.fill('#email', 'alfa@cliente.com'); await cli.fill('#senha', 'Provisoria#Sol2026'); await cli.click('button');
   await cli.waitForURL('**/trocar-senha'); await cli.fill('#atual', 'Provisoria#Sol2026'); await cli.fill('#nova', 'Cavalo#Verde2026!'); await cli.fill('#confirma', 'Cavalo#Verde2026!'); await cli.click('button');
-  await cli.waitForURL(/\/cliente\/[0-9a-f-]{36}/); ok(await cli.locator('text=Bem-vindo, Empresa Alfa Ltda').count() > 0, 'cliente vê somente a Alfa');
+  await cli.waitForURL(/\/cliente\/[0-9a-f-]{36}/); ok(await cli.locator('h1:has-text("Empresa Alfa Ltda")').count() > 0 && await cli.locator('text=Empresa Beta').count() === 0, 'cliente vê somente a Alfa');
   const r1 = await cli.goto(B + '/cliente/' + idBeta.split('/').pop()); ok(r1.status() === 404, 'cliente -> empresa Beta = 404 (' + r1.status() + ')');
   const r2 = await cli.goto(B + idBeta); ok(!(await cli.url()).includes('/admin/empresas/') , 'cliente barrado em /admin (' + cli.url() + ')');
   await cli.goto(B + '/admin/auditoria'); ok(!cli.url().includes('/admin/auditoria'), 'cliente não vê auditoria');
