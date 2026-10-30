@@ -4,10 +4,9 @@ O painel roda em três serviços gratuitos. Nenhum deles precisa de computador l
 
 | Serviço | O que faz | Plano |
 |---|---|---|
-| **GitHub** | guarda o código; de hora em hora dispara os avisos por e-mail; todo dia às 03:15 faz e **testa** o backup | grátis (repositório privado) |
+| **GitHub** | guarda o código; todo dia confere o site (e mantém o Supabase ativo) e às 03:15 faz e **testa** o backup | grátis (repositório privado) |
 | **Supabase** | banco de dados e documentos dos clientes (bucket **privado**) | grátis: 500 MB de banco, 1 GB de documentos |
 | **Render** | o site em si (`https://…onrender.com`) | grátis: "dorme" após 15 min sem uso; o 1º acesso depois disso leva ~1 minuto |
-| **Brevo** (opcional) | envia os e-mails de aviso | grátis: 300 e-mails/dia |
 
 Você cria as contas e cola as chaves nos lugares indicados. **Ninguém mais (nem o Claude) precisa saber as senhas.** Guarde tudo num gerenciador de senhas ou num papel em local seguro.
 
@@ -49,40 +48,32 @@ Você cria as contas e cola as chaves nos lugares indicados. **Ninguém mais (ne
    | `APP_URL` | `https://painel-contvoo.onrender.com` (se o Render der outro endereço, corrija depois em *Environment*) |
    | `SEED_ADMIN_EMAIL` | `anderson.contabilrs@hotmail.com` |
    | `SEED_ADMIN_PASSWORD` | uma senha **provisória** que você inventa (10+ caracteres); será trocada no 1º acesso |
-   | `BREVO_API_KEY` | deixe em branco por enquanto (Parte 5) |
 
 3. **Apply**. A primeira publicação leva uns 5–10 minutos. Quando aparecer **Live**, abra o endereço do site, entre com o e-mail e a senha provisória e **troque a senha**.
 4. Depois do primeiro acesso: Render → serviço `painel-contvoo` → **Environment** → apague `SEED_ADMIN_PASSWORD` → *Save*.
 
-## Parte 4 — Avisos de hora em hora e backup diário (GitHub)
+## Parte 4 — Backup diário (GitHub)
 No GitHub, repositório `painel-contvoo` → **Settings → Secrets and variables → Actions**:
 1. Aba **Variables** → *New repository variable*: `APP_URL` = o endereço do site (ex.: `https://painel-contvoo.onrender.com`).
 2. Aba **Secrets** → *New repository secret*, um por vez:
 
    | Nome | Valor |
    |---|---|
-   | `CRON_SECRET` | copie do Render → *Environment* → `CRON_SECRET` (o Render gerou sozinho) |
    | `DATABASE_URL` | o mesmo da Parte 2 |
    | `SUPABASE_URL` | o mesmo da Parte 2 |
    | `SUPABASE_SECRET_KEY` | o mesmo da Parte 2 |
    | `BACKUP_PASSPHRASE` | **invente** uma frase longa (16+ caracteres, ex.: 5 palavras aleatórias). **Anote no papel/gerenciador**: sem ela nenhum backup abre |
 
-3. Aba **Actions** → *Backup diário* → **Run workflow**. Em ~3 minutos deve ficar **verde** ✔. Faça o mesmo em *Lembretes e e-mails*.
+3. Aba **Actions** → *Backup diário* → **Run workflow**. Em ~3 minutos deve ficar **verde** ✔. Faça o mesmo em *Manter site ativo*.
 
 A partir daí:
 - Todo dia às 03:15 o GitHub faz o backup cifrado, **restaura num banco descartável e confere** as contagens. O arquivo fica 7 dias em *Actions → Backup diário → (execução) → Artifacts*. Baixe um de vez em quando e guarde fora (pen drive/OneDrive): é o seu seguro.
 - Se o backup falhar, o GitHub manda e-mail para você.
 
-## Parte 5 — E-mails de aviso (Brevo, opcional)
-O Render grátis bloqueia SMTP, por isso os e-mails saem pela API do Brevo.
-1. **brevo.com** → conta grátis.
-2. **Senders, Domains & Dedicated IPs → Senders → Add a sender**: `avisos@contvoocontabilidade.com.br` (o Brevo manda um código para essa caixa; confirme).
-3. **SMTP & API → API Keys → Generate a new API key** → copie.
-4. Render → *Environment* → `BREVO_API_KEY` = a chave → *Save* (o site reinicia).
-5. No painel: **Admin → Notificações** deve mostrar "Envio de e-mails configurado (Brevo)". Envie um teste.
-6. Se os e-mails caírem no spam: no Brevo, *Domains → Authenticate* mostra 2–3 registros TXT para cadastrar na GoDaddy. Isso **não** muda os servidores de nome nem afeta o site ou o e-mail da empresa.
+## Sem e-mail
+O escritório optou por **não usar e-mail**: o painel não envia avisos (pendências, prazos). Os clientes veem as solicitações ao entrar no painel. Se um dia quiser e-mail, o código continua pronto (`EMAIL_PROVIDER` + `BREVO_API_KEY` ou `SMTP_URL`, veja `.env.example`).
 
-## Parte 6 — Aposentar o notebook
+## Parte 5 — Aposentar o notebook
 Quando o site na nuvem estiver funcionando:
 1. No notebook, **Agendador de Tarefas** → desabilite *Painel Contvoo*, *Painel Lembretes* e *Painel Backup*.
 2. Desligue o Tailscale Funnel (ícone do Tailscale → *Exit*/*Disconnect*).
@@ -109,6 +100,6 @@ Supabase → **Project Settings → Database → SSL Configuration → Download 
 
 ## Limites do plano grátis (para decidir quando pagar)
 - **Render grátis dorme**: o primeiro acesso após 15 min parado leva ~1 minuto. Para ficar sempre rápido: plano *Starter* (US$ 7/mês), sem mudar nada no código.
-- **Supabase grátis**: 500 MB de banco e 1 GB de documentos (mostrado em *Usage*). Projetos parados por 7 dias são pausados, mas o agendador de hora em hora mantém o projeto ativo.
+- **Supabase grátis**: 500 MB de banco e 1 GB de documentos (mostrado em *Usage*). Projetos parados por 7 dias são pausados, mas a checagem diária do GitHub mantém o projeto ativo.
 - **Backups**: 7 dias guardados no GitHub. Para guardar por mais tempo, baixe os arquivos periodicamente.
 - Os dados ficam nos EUA (Virginia). Veja `docs/LGPD.md` (transferência internacional).

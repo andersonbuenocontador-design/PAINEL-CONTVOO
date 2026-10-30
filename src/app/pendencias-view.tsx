@@ -40,7 +40,7 @@ export async function PendenciasPagina({ u, empresaId, sp, voltar }: { u: Usuari
       <div><label>Prazo (opcional)</label><input name="prazo" type="date" /></div>
       <div><label>Responsável no escritório</label><select name="responsavelId"><option value="">Padrão da empresa</option>{admins.map((a) => <option key={a.id} value={a.id}>{a.nome}</option>)}</select></div></div>
       <label>O que o cliente precisa fazer? *</label><textarea name="descricao" rows={3} required maxLength={2000} style={{ width: '100%' }} placeholder="Ex.: Envie o extrato do Banrisul de outubro." />
-      <p className="soon">O cliente recebe um aviso por e-mail sem o conteúdo: só um convite para entrar no painel.</p><p><button>Enviar solicitação</button></p></form></div>)}
+      <p><button>Enviar solicitação</button></p></form></div>)}
     <div className="card"><h2>Em andamento ({ativas.length})</h2>{ativas.map(bloco)}{!ativas.length && <p className="soon">{admin ? 'Nenhuma solicitação em andamento.' : 'Você não tem solicitações pendentes. 🎉'}</p>}</div>
     {encerradas.length > 0 && <div className="card"><h2>Encerradas ({encerradas.length})</h2>{encerradas.map(bloco)}</div>}
   </main></>);

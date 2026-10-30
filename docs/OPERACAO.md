@@ -18,7 +18,7 @@ scripts/restaurar.sh <painel-*.dump[.enc]> <arquivos-*.tar.gz[.enc]> <DATABASE_U
 - **Guarde fora:** `BACKUP_PASSPHRASE` (segredo do GitHub) e `APP_ENCRYPTION_KEY` (Render → Environment).
 
 ## Rotina
-- **Monitorar:** `GET /api/saude` (200/503; o Render usa como health check). Acompanhe *Actions* no GitHub (backup e lembretes verdes). Acompanhe `/admin/notificacoes` (fila e falhas) e `/admin/auditoria`.
+- **Monitorar:** `GET /api/saude` (200/503, com o motivo em português). Acompanhe *Actions* no GitHub (backup diário e "Manter site ativo" verdes).
 - **Novo funcionário no escritório:** criar usuário admin → ele troca a senha e ativa o 2FA. **Saída:** bloquear o usuário (derruba sessões na hora).
 - **Cliente perdeu o celular do 2FA:** Usuários → *Redefinir 2FA*; a pessoa configura de novo no próximo login.
 - **Cliente saiu / pediu exclusão:** `/admin/lgpd` → exportar/anonimizar o usuário; desativar a empresa (histórico permanece).
@@ -26,7 +26,7 @@ scripts/restaurar.sh <painel-*.dump[.enc]> <arquivos-*.tar.gz[.enc]> <DATABASE_U
 
 ## Resposta a incidente (roteiro)
 1. **Conter:** bloquear usuários/sessões suspeitos (Usuários → Bloquear), trocar `SESSION_SECRET` se houver suspeita de vazamento (derruba **todas** as sessões), isolar o servidor se necessário.
-2. **Preservar evidências:** exportar a auditoria (`/admin/auditoria`) e os logs do servidor/proxy; fazer backup do estado atual.
+2. **Preservar evidências:** exportar a auditoria (tabela `auditoria` no banco; o painel de auditoria foi retirado da tela, o registro continua sendo gravado) e os logs do servidor/proxy; fazer backup do estado atual.
 3. **Avaliar:** quais empresas/titulares e quais dados foram afetados (a auditoria registra acessos, downloads de informes, operações).
 4. **Comunicar:** decisão e prazos de comunicação à ANPD e aos titulares são do controlador com o jurídico/encarregado (defina o procedimento **antes** de precisar).
 5. **Corrigir e prevenir:** corrigir a causa, rotacionar segredos (`SESSION_SECRET`, `APP_ENCRYPTION_KEY`, senhas SMTP/banco), revisar este guia e `docs/SEGURANCA.md`.

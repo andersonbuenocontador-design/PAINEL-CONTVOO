@@ -38,6 +38,7 @@ const ok = (c, m) => { console.log((c ? 'OK   ' : 'FALHA'), m); if (!c) process.
   await adm.goto(B + '/admin/usuarios');
   const linha = adm.locator('tr', { hasText: 'alfa@cliente.com' }); await linha.locator('button:has-text("Bloquear")').click(); await adm.waitForURL(/[?&]ok=/);
   await cli.goto(B + '/cliente'); ok(cli.url().includes('/login'), 'cliente bloqueado perde a sessão imediatamente');
-  await adm.goto(B + '/admin/auditoria'); ok(await adm.locator('td:has-text("usuario.bloquear")').count() > 0, 'auditoria registra o bloqueio');
+  await adm.goto(B + '/admin/auditoria'); ok(new URL(adm.url()).pathname === '/admin', 'painel de auditoria retirado da tela');
+  ok(require('child_process').execSync(`PGPASSWORD=painel_dev psql -q -t -A -h localhost -U painel painel -c "select count(*) from auditoria where acao='usuario.bloquear'"`).toString().trim() !== '0', 'auditoria continua registrando (bloqueio gravado no banco)');
   await br.close();
 })().catch(e => { console.error(e); process.exit(1); });

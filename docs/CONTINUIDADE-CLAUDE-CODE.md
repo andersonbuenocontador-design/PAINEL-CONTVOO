@@ -27,10 +27,16 @@ O usuário pediu "sem banco de dados local". Escolheu **adaptar o código atual*
 - `agendador.yml` lê `/api/saude` (APP_URL padrão `https://painel-contvoo.onrender.com`) e põe o resultado em anotações (`::notice::`/`::error::`), que o Claude lê por `gh api repos/.../check-runs/<job>/annotations` e dispara por `gh api -X POST .../actions/workflows/agendador.yml/dispatches -f ref=main`. Logs completos das Actions e GraphQL são bloqueados no ambiente do Claude.
 - Segredos das Actions: usuário disse ter cadastrado, mas a execução de 29/10 não viu nenhum. Enquanto faltarem, backup e lembretes só avisam (não falham, não mandam e-mail).
 
+## Decisões do dono em 30/10/2026
+- **Sem e-mail**: avisos desligados. `enfileirar` não gera nada sem provedor configurado; página `/admin/notificacoes` redireciona; botão "E-mails: sim/não" e menu Notificações removidos. `agendador.yml` virou "Manter site ativo" (1×/dia, só `/api/saude`; mantém o Supabase grátis ativo). Código de e-mail (Brevo/SMTP) segue pronto se um dia quiserem.
+- **Painel de Auditoria fora do menu** (`/admin/auditoria` redireciona); a tabela `auditoria` continua gravando tudo.
+- **2FA oculto para clientes** (`MFA_CLIENTES=1` religa); administradores mantêm.
+- **Outros documentos (PDF)**: cliente envia PDFs avulsos (tabela `documentos_avulsos`, migração 010, `/api/avulsos/[id]`).
+- Recuperar senha do admin sem acesso ao servidor: `REDEFINIR_SENHA_ADMIN=1` + `SEED_ADMIN_PASSWORD` no Render.
+
 ## Próximos passos (na ordem)
 1. Usuário cria GitHub + repositório privado `painel-contvoo` e conecta em claude.ai/connect-github → Claude faz o push (branch `main`).
 2. Usuário segue `docs/NUVEM.md` Partes 2–4 (Supabase, Render Blueprint, segredos do GitHub). Conferir: `/api/saude` = ok, login, envio de um PDF, *Backup diário* verde.
-3. Brevo (Parte 5) e teste de e-mail em Admin → Notificações.
 4. Piloto: empresa fictícia → usuário cliente → plano de contas → competência completa; depois 1–2 clientes de confiança.
 5. Aposentar o notebook (Parte 6).
 6. Produto: validar leitor de PDF com extratos reais (Itaú, BB, Cresol, Stone), comprovantes por lançamento, importação em lote, manual do cliente, teste de invasão, decisões de LGPD (bases legais, retenção, política de privacidade com transferência internacional, encarregado, DPAs dos fornecedores).

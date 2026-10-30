@@ -3,7 +3,6 @@ import { listarUsuarios } from '@/lib/services/usuarios';
 import { listarEmpresas } from '@/lib/services/empresas';
 import { Avisos, Topo } from '../../components';
 import { acaoAtivoUsuario, acaoCriarUsuario, acaoSenhaUsuario } from '../actions';
-import { acaoPreferenciaEmail } from '../../pendencias-actions';
 import { acaoRedefinirMfa } from '../../seguranca-actions';
 
 export default async function Usuarios({ searchParams }: { searchParams: Promise<{ erro?: string; ok?: string }> }) {
@@ -13,7 +12,7 @@ export default async function Usuarios({ searchParams }: { searchParams: Promise
     <div className="card"><table><thead><tr><th>Nome</th><th>Tipo</th><th>Empresas</th><th>Acesso</th><th></th></tr></thead><tbody>
       {usuarios.map((x) => (<tr key={x.id}><td>{x.nome}<div className="soon">{x.email}</div></td><td>{x.papel}</td>
         <td>{x.papel === 'admin' ? <span className="soon">todas</span> : (x.empresas as { id: string; razao_social: string }[]).map((e) => e.razao_social).join(', ') || <span className="soon">nenhuma</span>}</td>
-        <td><span className={`tag ${x.ativo ? '' : 'off'}`}>{x.ativo ? 'ativo' : 'bloqueado'}</span><form action={acaoPreferenciaEmail} style={{ marginTop: 6 }}><input type="hidden" name="id" value={x.id} /><input type="hidden" name="valor" value={String(!x.receber_emails)} /><button className="sec" title="Avisos por e-mail">E-mails: {x.receber_emails ? 'sim' : 'não'}</button></form>{x.mfa_ativo && <form action={acaoRedefinirMfa} style={{ marginTop: 6 }}><input type="hidden" name="id" value={x.id} /><button className="sec" title="Perdeu o celular? Desliga a verificação em duas etapas desta pessoa">Redefinir 2FA</button></form>}</td>
+        <td><span className={`tag ${x.ativo ? '' : 'off'}`}>{x.ativo ? 'ativo' : 'bloqueado'}</span>{x.mfa_ativo && <form action={acaoRedefinirMfa} style={{ marginTop: 6 }}><input type="hidden" name="id" value={x.id} /><button className="sec" title="Perdeu o celular? Desliga a verificação em duas etapas desta pessoa">Redefinir 2FA</button></form>}</td>
         <td><div className="row">
           <form action={acaoAtivoUsuario}><input type="hidden" name="id" value={x.id} /><input type="hidden" name="ativo" value={String(!x.ativo)} /><button className="sec" disabled={x.id === u.id}>{x.ativo ? 'Bloquear' : 'Reativar'}</button></form>
           <form action={acaoSenhaUsuario} className="row"><input type="hidden" name="id" value={x.id} /><input name="senha" placeholder="Nova senha temporária" minLength={10} required style={{ width: 190 }} autoComplete="off" /><button className="sec">Redefinir senha</button></form>

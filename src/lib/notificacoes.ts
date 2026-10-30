@@ -9,8 +9,9 @@ export const MAX_TENTATIVAS = 5;
 const base = () => (process.env.APP_URL ?? '').replace(/\/$/, '');
 export const linkPainel = (caminho: string) => `${base()}${caminho}`;
 
-/** Fila (outbox): grava junto com a ação que a originou. `dedup` impede avisos repetidos. O texto NUNCA leva dados da empresa, valores nem documentos. */
+/** Fila (outbox): grava junto com a ação que a originou. Sem provedor de e-mail configurado, não gera nada (o escritório optou por não usar e-mail). `dedup` impede avisos repetidos. O texto NUNCA leva dados da empresa, valores nem documentos. */
 export async function enfileirar(r: Runner, n: { destinatarioId: string; empresaId?: string | null; pendenciaId?: string | null; tipo: string; assunto: string; corpo: string; dedup?: string }) {
+  if (!provedorPadrao()) return;
   await r.query(
     `INSERT INTO notificacoes(destinatario_id,empresa_id,pendencia_id,tipo,assunto,corpo,dedup) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (dedup) DO NOTHING`,
     [n.destinatarioId, n.empresaId ?? null, n.pendenciaId ?? null, n.tipo, n.assunto, n.corpo, n.dedup ?? null]);

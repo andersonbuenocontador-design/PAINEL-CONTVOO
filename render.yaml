@@ -1,5 +1,5 @@
 # Blueprint do Render: cria o site do painel (plano grátis). No Render: New → Blueprint → escolha este repositório.
-# Os valores marcados "sync: false" o Render pede na tela (copie do Supabase/Brevo). Veja docs/NUVEM.md.
+# Os valores marcados "sync: false" o Render pede na tela (copie do Supabase). Veja docs/NUVEM.md.
 services:
   - type: web
     name: painel-contvoo
@@ -29,14 +29,6 @@ services:
         generateValue: true
       - key: APP_ENCRYPTION_KEY
         generateValue: true
-      - key: CRON_SECRET        # copie este valor para o segredo CRON_SECRET do GitHub (avisos de hora em hora)
-        generateValue: true
-      - key: EMAIL_PROVIDER
-        value: brevo
-      - key: BREVO_API_KEY      # Brevo → SMTP & API → API Keys (opcional; sem ela os avisos ficam na fila)
-        sync: false
-      - key: EMAIL_FROM
-        value: "Contvoo Contabilidade <avisos@contvoocontabilidade.com.br>"
       - key: DB_POOL_MAX
         value: "5"
       - key: SENHA_POLITICA_BRANDA

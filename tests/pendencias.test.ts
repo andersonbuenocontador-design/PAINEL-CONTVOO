@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getPool, query } from '../src/lib/db';
 import { criarEmpresa } from '../src/lib/services/empresas';
 import { criarUsuario } from '../src/lib/services/usuarios';
@@ -12,6 +12,8 @@ const fila = async (where = '1=1') => (await query(`SELECT n.*, u.nome destino F
 const fake = (falhar = false) => { const enviados: { para: string; assunto: string; texto: string }[] = []; const p: EmailProvider = { nome: 'fake', async enviar(m) { if (falhar) throw new Error('smtp://usuario:segredo@host recusou'); enviados.push(m); } }; return { p, enviados }; };
 
 beforeEach(async () => {
+  // a fila só existe com e-mail configurado (o transporte não chega a conectar nestes testes)
+  vi.stubEnv('EMAIL_PROVIDER', 'smtp'); vi.stubEnv('SMTP_URL', 'smtp://u:p@localhost:2525'); vi.stubEnv('EMAIL_FROM', 'avisos@teste.local');
   for (const t of ['no_update', 'no_truncate']) await query(`ALTER TABLE auditoria DISABLE TRIGGER auditoria_${t}`);
   await query('TRUNCATE dicionario_classificacao, conciliacoes, plano_contas, movimentacoes, importacoes, contas_bancarias, arquivos, exigencias, modelo_itens, modelos_documento, usuario_empresas, empresas, usuarios, auditoria CASCADE');
   for (const t of ['no_update', 'no_truncate']) await query(`ALTER TABLE auditoria ENABLE TRIGGER auditoria_${t}`);
@@ -121,3 +123,12 @@ describe('lembretes e fila de e-mails', () => {
   });
 });
 afterAll(async () => { await getPool().end(); });
+
+describe('sem e-mail configurado', () => {
+  it('nenhum aviso é gerado (escritório optou por não usar e-mail)', async () => {
+    vi.stubEnv('EMAIL_PROVIDER', ''); vi.stubEnv('SMTP_URL', ''); vi.stubEnv('BREVO_API_KEY', '');
+    await P.criarPendencia(admin, empA, { categoria: 'documento', descricao: 'Falta o extrato de outubro', prazo: await dia(1) });
+    await gerarLembretes();
+    expect((await query('SELECT count(*)::int n FROM notificacoes')).rows[0].n).toBe(0);
+  });
+});

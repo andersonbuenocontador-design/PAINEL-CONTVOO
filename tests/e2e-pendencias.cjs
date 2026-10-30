@@ -14,7 +14,7 @@ const sql = (q) => execSync(`PGPASSWORD=painel_dev psql -q -t -A -h localhost -U
   execSync('npx tsx scripts/e2e-beta.ts', { stdio: 'inherit' });
   const PA = `${B}/admin/empresas/${E}/pendencias`;
   await adm.goto(PA); await adm.fill('textarea[name=descricao]', 'Envie o extrato do Banrisul de outubro'); await adm.fill('input[name=prazo]', ontem); await adm.click('button:has-text("Enviar solicitação")'); await adm.waitForSelector('.msg-ok:has-text("Solicitação enviada")'); ok(true, 'escritório criou a solicitação com prazo');
-  ok(sql("select count(*) from notificacoes where tipo='pendencia_nova'") === '1' && sql("select count(*) from notificacoes where corpo ilike '%Banrisul%' or assunto ilike '%Banrisul%'") === '0', 'aviso enfileirado sem o conteúdo da solicitação');
+  ok(sql("select count(*) from notificacoes") === '0', 'sem e-mail configurado, nenhum aviso é gerado');
   await adm.goto(`${B}/admin/pendencias`); ok(await adm.locator('tr:has-text("Empresa Alfa") :text("vencida")').count() > 0, 'fila global mostra a pendência vencida');
   await adm.goto(`${B}/admin/pendencias?vencidas=1`); ok(await adm.locator('tbody tr:has-text("Empresa Alfa")').count() === 1, 'filtro "só vencidas"');
   const ex = await adm.request.get(`${B}/api/pendencias/exportar?vencidas=1`); ok(ex.status() === 200 && (await ex.body()).slice(0, 2).toString() === 'PK', 'exportar pendências (Excel)');
@@ -28,17 +28,16 @@ const sql = (q) => execSync(`PGPASSWORD=painel_dev psql -q -t -A -h localhost -U
   await adm.goto(PA); ok(await adm.locator('.tag:has-text("Aguardando o escritório")').count() > 0, 'escritório vê que o cliente respondeu');
   await adm.locator('details summary').first().click(); await adm.fill('textarea[name=texto]', 'Recebido, obrigado.'); await adm.click('button:has-text("Enviar resposta")'); await adm.waitForSelector('.msg-ok:has-text("Resposta enviada")');
   await adm.locator('details summary').first().click(); await adm.click('button:has-text("Marcar como resolvida")'); await adm.waitForSelector('.msg-ok:has-text("Pendência resolvida")'); ok(await adm.locator('h2:has-text("Encerradas (1)")').count() > 0, 'escritório resolve; vai para "Encerradas"');
-  ok(sql("select count(*) from notificacoes where tipo='pendencia_resposta_cliente'") === '1' && sql("select count(*) from notificacoes where tipo='pendencia_resposta_escritorio'") === '1', 'avisos de resposta nos dois sentidos');
+  ok(sql("select count(*) from notificacoes") === '0', 'respostas também não geram aviso (sem e-mail)');
   const bet = await ctx(); await login(bet, 'beta@cliente.com', 'Provisoria#Lua2026'); await trocar(bet, 'Provisoria#Lua2026', 'Lua#Azul2026!x');
   ok((await bet.goto(`${B}/cliente/${E}/pendencias`)).status() === 404, 'cliente de outra empresa: 404 nas pendências');
-  await adm.goto(`${B}/admin/notificacoes`); ok(await adm.locator('.msg-err:has-text("NÃO configurado")').count() > 0, 'tela de notificações avisa que o provedor não está configurado');
-  await adm.click('button:has-text("Gerar lembretes e enviar agora")'); await adm.waitForSelector('.msg-err:has-text("não está configurado")'); ok(true, 'processar sem provedor: mensagem clara, fila preservada');
+  await adm.goto(`${B}/admin/notificacoes`); ok(new URL(adm.url()).pathname === '/admin', 'tela de notificações foi retirada (volta ao início)');
   const rq = await require('playwright').request.newContext();
   ok((await rq.post(`${B}/api/notificacoes/processar`)).status() === 401 && (await rq.post(`${B}/api/notificacoes/processar`, { headers: { Authorization: 'Bearer errado' } })).status() === 401, 'endpoint do agendador recusa sem segredo correto');
   const rc = await rq.post(`${B}/api/notificacoes/processar`, { headers: { Authorization: `Bearer ${SEG}` } }); ok(rc.status() === 200 && (await rc.json()).ativo === false, 'endpoint do agendador aceita o segredo (provedor ausente: ativo=false)');
-  await adm.goto(`${B}/admin/usuarios`); await adm.locator('tr:has-text("alfa@cliente.com") button:has-text("E-mails: sim")').click(); await adm.waitForSelector('.msg-ok');
-  const antes = sql('select count(*) from notificacoes'); await adm.goto(PA); await adm.fill('textarea[name=descricao]', 'Outra solicitação'); await adm.click('button:has-text("Enviar solicitação")'); await adm.waitForSelector('.msg-ok');
-  ok(sql('select count(*) from notificacoes') === antes, 'usuário que desligou e-mails não recebe aviso');
+  await adm.goto(`${B}/admin/usuarios`); ok(await adm.locator('button:has-text("E-mails:")').count() === 0, 'botão de preferência de e-mail foi retirado');
+
+
   await adm.goto(`${B}/admin/relatorios`); ok(await adm.locator('h2:has-text("Pendências")').count() > 0, 'relatório geral exibe indicadores');
   const rg = await adm.request.get(`${B}/api/relatorios/geral?competencia=2026-10`); ok(rg.status() === 200 && (await rg.body()).slice(0, 2).toString() === 'PK', 'relatório geral (Excel)');
   ok((await cli.request.get(`${B}/api/relatorios/geral?competencia=2026-10`)).status() === 403, 'cliente não baixa o relatório geral');
