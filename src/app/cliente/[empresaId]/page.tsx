@@ -18,7 +18,7 @@ export default async function ClienteHub({ params, searchParams }: { params: Pro
     : d.concluida ? 'Tudo entregue e aprovado ✓' : d.rejeitados ? `${d.rejeitados} recusado(s): envie de novo` : d.pendentes ? `Faltam ${d.pendentes} de ${d.exigidos}` : `Enviados; aguardando o escritório`;
   return (<><Topo u={u} /><main>
     {varias && <p><Link href="/cliente">← Minhas empresas</Link></p>}
-    <div className="saudacao"><div><h1>{r.empresa.razao_social}</h1><p className="soon" style={{ margin: '4px 0 0' }}>{saudacaoDoHorario()}, {u.nome.split(' ')[0]}! Estas são as tarefas de {mes}/{ano}.</p></div><CompetenciaSeletor atual={comp} mini /></div>
+    <div className="saudacao"><div><h1 className="ola">{saudacaoDoHorario()}, {u.nome.split(' ')[0]}!</h1><p className="empresa-sub"><strong>{r.empresa.razao_social}</strong> · tarefas de {mes}/{ano}</p></div><CompetenciaSeletor atual={comp} mini /></div>
     <Avisos erro={sp.erro} ok={sp.ok} />
     {p.aguardando > 0 && <div className="msg-err" role="alert"><strong>O escritório aguarda sua resposta em {p.aguardando} solicitação(ões){p.vencidas > 0 ? ` (${p.vencidas} com prazo vencido)` : ''}.</strong> <a href={`/cliente/${empresaId}/pendencias`}>Responder</a></div>}
     <div className="hub">

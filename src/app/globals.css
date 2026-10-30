@@ -28,3 +28,4 @@ header.top .inicio-topo,header.top .nome-topo{font-weight:500;opacity:.9;font-si
 .saudacao{display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:6px}.saudacao h1{margin:0}
 .comp-mini{display:flex;gap:8px;align-items:center}.comp-mini select{width:auto}
 @media (max-width:560px){header.top{padding:10px 14px;gap:10px}header.top .nome-topo{display:none}header.top .marca-topo strong{font-size:.95rem}.hub{grid-template-columns:1fr}}
+.saudacao h1.ola{font-size:1.9rem;font-weight:800}.empresa-sub{margin:6px 0 0;color:var(--mut);font-size:1rem}.empresa-sub strong{color:var(--tx)}
