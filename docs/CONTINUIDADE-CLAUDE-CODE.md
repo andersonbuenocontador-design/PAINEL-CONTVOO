@@ -21,6 +21,12 @@ O usuário pediu "sem banco de dados local". Escolheu **adaptar o código atual*
 - Removidos: `scripts/windows/*` (instalador, backup externo etc.), `scripts/instalar-servidor.sh`, `docs/ORACLE-GRATIS.md`. O notebook "lucas" (Tailscale `https://lucas.tail0995ea.ts.net`) deve ser aposentado depois que a nuvem funcionar (Parte 6 do `docs/NUVEM.md`); não havia clientes reais nele.
 - Validação feita no ambiente de nuvem do Claude: tsc, 140 testes unitários, build, **todos os e2e** rodando com `npm run start:nuvem` contra um **simulador da API do Supabase Storage**, backup → teste de restauração → restauração completa num "projeto novo", e a proteção RLS com papéis anon/authenticated simulados. **Nada foi testado ainda em contas reais** de Render/Supabase/Brevo/GitHub.
 
+## Estado em 30/10/2026
+- Repositório: `andersonbuenocontador-design/PAINEL-CONTVOO` (branch `main`). Render: serviço `painel-contvoo` (Blueprint, `https://painel-contvoo.onrender.com`), as 3 primeiras publicações falharam sem motivo visível para o Claude (o painel do Render e o domínio onrender.com são bloqueados no ambiente do Claude).
+- Por isso: `npm run start:nuvem` = `tsx scripts/iniciar-nuvem.ts; next start` — a preparação (migração, bucket, 1º admin) **não derruba o site**; erros viram frase em português em `/api/saude` (`src/lib/diagnostico.ts`, sem senhas). Health check do Render removido. Conexões com limite de tempo (banco 15 s, Storage 60 s).
+- `agendador.yml` lê `/api/saude` (APP_URL padrão `https://painel-contvoo.onrender.com`) e põe o resultado em anotações (`::notice::`/`::error::`), que o Claude lê por `gh api repos/.../check-runs/<job>/annotations` e dispara por `gh api -X POST .../actions/workflows/agendador.yml/dispatches -f ref=main`. Logs completos das Actions e GraphQL são bloqueados no ambiente do Claude.
+- Segredos das Actions: usuário disse ter cadastrado, mas a execução de 29/10 não viu nenhum. Enquanto faltarem, backup e lembretes só avisam (não falham, não mandam e-mail).
+
 ## Próximos passos (na ordem)
 1. Usuário cria GitHub + repositório privado `painel-contvoo` e conecta em claude.ai/connect-github → Claude faz o push (branch `main`).
 2. Usuário segue `docs/NUVEM.md` Partes 2–4 (Supabase, Render Blueprint, segredos do GitHub). Conferir: `/api/saude` = ok, login, envio de um PDF, *Backup diário* verde.
