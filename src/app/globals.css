@@ -7,7 +7,7 @@ main{max-width:1100px;margin:24px auto;padding:0 16px}h1{font-size:1.5rem}h2{fon
 table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px;border-bottom:1px solid var(--bd);font-size:.92rem;vertical-align:top}
 label{display:block;font-size:.85rem;color:var(--mut);margin:10px 0 4px}input,select{width:100%;padding:9px;border:1px solid var(--bd);border-radius:8px;font:inherit}
 button,.btn{background:var(--pri);color:#fff;border:0;border-radius:8px;padding:9px 14px;font:inherit;cursor:pointer;text-decoration:none;display:inline-block}
-button.sec{background:#fff;color:var(--tx);border:1px solid var(--bd)}button.danger{background:var(--err)}
+button.sec,.btn.sec{background:#fff;color:var(--tx);border:1px solid var(--bd)}button.danger{background:var(--err)}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
 .msg-err{background:#fef3f2;color:var(--err);padding:10px;border-radius:8px;margin-bottom:12px}.msg-ok{background:#ecfdf3;color:var(--ok);padding:10px;border-radius:8px;margin-bottom:12px}
 .tag{font-size:.75rem;padding:2px 8px;border-radius:99px;background:#eef2ff}.tag.off{background:#f2f4f7;color:var(--mut)}.soon{color:var(--mut)}
