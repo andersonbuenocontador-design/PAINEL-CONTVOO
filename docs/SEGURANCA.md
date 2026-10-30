@@ -26,7 +26,7 @@
 - **Sessões**: 8 horas absolutas, sem logout por inatividade.
 - **Sem `DATABASE_CA_CERT`** a conexão com o banco é cifrada, mas o certificado não é verificado. Defina-a (passo em `docs/NUVEM.md`).
 - Na nuvem, as chaves (`SUPABASE_SECRET_KEY`, `DATABASE_URL`, `BACKUP_PASSPHRASE`) ficam no Render e nos segredos do GitHub: proteja essas contas com **2FA** e não dê acesso a terceiros.
-- **Escolhas do dono (reversíveis no Render → Environment):** `EXIGIR_2FA_ADMIN=0` e `SENHA_POLITICA_BRANDA=1`. Com o site aberto na internet, recomenda-se `EXIGIR_2FA_ADMIN=1` e remover `SENHA_POLITICA_BRANDA`.
+- **Escolhas do dono (reversíveis no Render → Environment):** `EXIGIR_2FA_ADMIN=0`, `SENHA_POLITICA_BRANDA=1` e verificação em duas etapas **oculta para clientes** (`MFA_CLIENTES=1` religa; quem já ativou continua usando). Com o site aberto na internet, recomenda-se `EXIGIR_2FA_ADMIN=1` e remover `SENHA_POLITICA_BRANDA`.
 - A chave `APP_ENCRYPTION_KEY` fica no ambiente do servidor; quem tiver o servidor e o banco consegue abrir os segredos de 2FA.
 - A auditoria é imutável pelo aplicativo, mas não é assinada: quem tem acesso de superusuário ao PostgreSQL pode alterá-la (restrinja esse acesso).
 - **Não houve teste de invasão independente nem varredura dinâmica (DAST).** Faça antes de produção, especialmente por tratar extratos bancários e dados de sócios.

@@ -1,13 +1,13 @@
 import { redirect } from 'next/navigation';
 import QRCode from 'qrcode';
-import { usuarioAtual } from '@/lib/session';
+import { mfaDisponivel, usuarioAtual } from '@/lib/session';
 import { segredoPendente, statusMfa } from '@/lib/services/seguranca';
 import { Avisos, Topo } from '../../components';
 import { acaoIniciarMfa } from '../../seguranca-actions';
 import { MfaForm } from './MfaForm';
 
 export default async function Seguranca({ searchParams }: { searchParams: Promise<{ erro?: string; ok?: string; obrigatorio?: string }> }) {
-  const u = await usuarioAtual(); if (!u) redirect('/login'); if (u.deve_trocar_senha) redirect('/trocar-senha');
+  const u = await usuarioAtual(); if (!u) redirect('/login'); if (u.deve_trocar_senha) redirect('/trocar-senha'); if (!mfaDisponivel(u)) redirect('/cliente');
   const sp = await searchParams; const st = await statusMfa(u.id); const pend = st.pendente ? await segredoPendente(u.id) : null;
   const qr = pend ? await QRCode.toString(pend.uri, { type: 'svg', margin: 1, width: 220 }) : null;
   return (<><Topo u={u} /><main><h1>Segurança da conta</h1><Avisos erro={sp.erro} ok={sp.ok} />

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { sair } from './actions';
 import type { UsuarioSessao } from '@/lib/services/usuarios';
+import { mfaDisponivel } from '@/lib/session';
 
 export function Topo({ u }: { u: UsuarioSessao }) {
   return (
@@ -10,7 +11,7 @@ export function Topo({ u }: { u: UsuarioSessao }) {
       <nav>
         {u.papel === 'admin' ? (<><Link href="/admin">Início</Link><Link href="/admin/empresas">Empresas</Link><Link href="/admin/conciliacoes">Conciliações</Link><Link href="/admin/pendencias">Pendências</Link><Link href="/admin/relatorios">Relatórios</Link><Link href="/admin/notificacoes">Notificações</Link><Link href="/admin/modelos">Modelos</Link><Link href="/admin/usuarios">Usuários</Link><Link href="/admin/auditoria">Auditoria</Link><Link href="/admin/lgpd">LGPD</Link></>) : (<Link href="/cliente">Minhas empresas</Link>)}
       </nav>
-      <a href="/conta/seguranca" title="Segurança da conta">{u.nome}</a>
+      {mfaDisponivel(u) ? <a href="/conta/seguranca" title="Segurança da conta">{u.nome}</a> : <span>{u.nome}</span>}
       <form action={sair}><button className="sec">Sair</button></form>
     </header>
   );

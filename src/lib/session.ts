@@ -47,3 +47,6 @@ export async function exigirUsuario(papel?: 'admin' | 'cliente') {
   if (papel && u.papel !== papel) redirect(u.papel === 'admin' ? '/admin' : '/cliente');
   return u;
 }
+
+/** Verificação em duas etapas para clientes: desligada por escolha do escritório (MFA_CLIENTES=1 religa). Quem já ativou continua vendo e usando. */
+export const mfaDisponivel = (u: { papel: string; mfa_ativo: boolean }) => u.papel === 'admin' || u.mfa_ativo || process.env.MFA_CLIENTES === '1';
