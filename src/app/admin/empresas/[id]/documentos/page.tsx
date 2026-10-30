@@ -1,16 +1,16 @@
 import { notFound } from 'next/navigation';
 import { exigirUsuario } from '@/lib/session';
 import { obterEmpresa } from '@/lib/services/empresas';
-import { listarAvulsos, listarExigencias, listarModelos, situacaoCompetencia, historicoVersoes } from '@/lib/services/documentos';
+import { listarAvulsos, listarExigencias, situacaoCompetencia, historicoVersoes } from '@/lib/services/documentos';
 import { AppError } from '@/lib/errors';
 import { Avisos, CompetenciaSeletor, ROTULO, Topo, competenciaDe } from '../../../../components';
 import { CamposExigencia } from '../../../FormExigencia';
-import { acaoAplicarModelo, acaoAtivarExigencia, acaoConferir, acaoCriarExigencia, acaoCriarModelo, acaoEditarExigencia, acaoEnviarPeloEscritorio, acaoRemoverAvulsoAdmin } from '../../../docs-actions';
+import { acaoAtivarExigencia, acaoConferir, acaoCriarExigencia, acaoEditarExigencia, acaoEnviarPeloEscritorio, acaoRemoverAvulsoAdmin } from '../../../docs-actions';
 
 export default async function DocsEmpresa({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ competencia?: string; erro?: string; ok?: string }> }) {
   const u = await exigirUsuario('admin'); const { id } = await params; const sp = await searchParams; const comp = competenciaDe(sp.competencia);
   let e; try { e = await obterEmpresa(u, id); } catch (x) { if (x instanceof AppError) notFound(); throw x; }
-  const [exigencias, modelos, s, avulsos] = await Promise.all([listarExigencias(u, id), listarModelos(u), situacaoCompetencia(u, id, comp), listarAvulsos(u, id, comp)]);
+  const [exigencias, s, avulsos] = await Promise.all([listarExigencias(u, id), situacaoCompetencia(u, id, comp), listarAvulsos(u, id, comp)]);
   const hist = new Map(await Promise.all(s.itens.filter((i) => i.arquivo_id).map(async (i) => [i.exigencia_id, await historicoVersoes(u, id, i.exigencia_id, comp)] as const)));
   const ind = s.indicadores;
   return (<><Topo u={u} /><main>
@@ -44,8 +44,5 @@ export default async function DocsEmpresa({ params, searchParams }: { params: Pr
         <form action={acaoAtivarExigencia}><input type="hidden" name="id" value={x.id} /><input type="hidden" name="empresaId" value={id} /><input type="hidden" name="ativo" value={String(!x.ativo)} /><button className="sec">{x.ativo ? 'Desativar (mantém histórico)' : 'Reativar'}</button></form></details>))}
       {!exigencias.length && <p className="soon">Nenhum documento configurado.</p>}</div>
     <div className="card"><h2>Novo documento exigido</h2><form action={acaoCriarExigencia}><input type="hidden" name="empresaId" value={id} /><CamposExigencia /><p><button>Adicionar</button></p></form></div>
-    <div className="card"><h2>Modelos</h2>
-      <form action={acaoCriarModelo} className="row"><input type="hidden" name="empresaId" value={id} /><div style={{ flex: 1 }}><label>Salvar documentos ativos desta empresa como modelo</label><input name="nome" placeholder="Cliente com Banrisul + Nubank" required /></div><button>Criar modelo</button></form>
-      {modelos.length > 0 && <form action={acaoAplicarModelo} className="row"><input type="hidden" name="empresaIds" value={id} /><input type="hidden" name="voltar" value={`/admin/empresas/${id}/documentos`} /><div style={{ flex: 1 }}><label>Aplicar modelo a esta empresa (não sobrescreve o que já existe)</label><select name="modeloId">{modelos.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}</select></div><button>Aplicar</button></form>}</div>
   </main></>);
 }
