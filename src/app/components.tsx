@@ -65,3 +65,16 @@ export function competenciaDe(c?: string) {
 }
 
 export { saudacaoDoHorario } from '@/lib/format';
+
+/** Link das avaliações da Contvoo no Google (pode ser trocado pela variável GOOGLE_AVALIACAO_URL no Render). */
+export const linkAvaliacaoGoogle = () => process.env.GOOGLE_AVALIACAO_URL || 'https://www.google.com/search?q=contvoo+contabilidade#lrd=0x951965dbc3fd42bd:0x5d83972fd11b5c3b,3,,,,';
+/** Convite para o cliente avaliar a Contvoo no Google (abre em outra aba). */
+export function ConviteAvaliacao() {
+  return (
+    <div className="avaliacao">
+      <div className="estrelas" aria-hidden="true">★★★★★</div>
+      <div className="txt"><strong>Gosta do atendimento da Contvoo?</strong><span>Sua avaliação no Google leva 1 minuto e ajuda outras empresas a nos conhecerem.</span></div>
+      <a className="btn" href={linkAvaliacaoGoogle()} target="_blank" rel="noopener noreferrer">Avaliar no Google</a>
+    </div>
+  );
+}

@@ -4,7 +4,7 @@ import { exigirUsuario } from '@/lib/session';
 import { listarEmpresas } from '@/lib/services/empresas';
 import { resumoCliente } from '@/lib/services/hub';
 import { AppError } from '@/lib/errors';
-import { Atalho, Avisos, CompetenciaSeletor, Topo, competenciaDe, saudacaoDoHorario } from '../../components';
+import { Atalho, Avisos, CompetenciaSeletor, ConviteAvaliacao, Topo, competenciaDe, saudacaoDoHorario } from '../../components';
 
 const CONC = { revisao: 'Em preenchimento', enviada: 'Enviada ao escritório', devolvida: 'Devolvida: o escritório pediu correções', concluida: 'Concluída pelo escritório' } as const;
 
@@ -31,5 +31,6 @@ export default async function ClienteHub({ params, searchParams }: { params: Pro
       <Atalho href={`/cliente/${empresaId}/pendencias`} icone="conversa" titulo="Pendências" desc="Solicitações do escritório"
         info={p.aguardando ? `${p.aguardando} aguardando você` : p.abertas ? `${p.abertas} em andamento` : 'Nenhuma pendência'} alerta={p.aguardando > 0} ok={!p.abertas} />
     </div>
+    <ConviteAvaliacao />
   </main></>);
 }
