@@ -26,6 +26,7 @@ export async function criarEmpresa(actor: Actor, input: EmpresaInput) {
         [d.razaoSocial, d.nomeFantasia, d.cnpj, d.emailContato, d.responsavelId, d.inicioUso]);
       const id = r.rows[0].id as string;
       await registrar(c, { usuarioId: actor.id, empresaId: id, acao: 'empresa.criar', entidade: 'empresa', entidadeId: id, detalhes: { cnpj: d.cnpj } });
+      await (await import('./conciliacao')).garantirPlanoGenerico(c, id); // toda empresa nova já nasce com o plano genérico de categorias
       return id;
     } catch (e: any) {
       if (e.code === '23505') throw new AppError('Já existe uma empresa cadastrada com esse CNPJ.', 'conflito');

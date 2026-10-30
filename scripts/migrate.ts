@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import pg from 'pg';
 import { configPg } from '../src/lib/db';
 import { prepararArmazenamento } from '../src/lib/storage';
+import { garantirPlanoGenerico } from '../src/lib/services/conciliacao';
 
 export async function migrate(url = process.env.DATABASE_URL) {
   const c = new pg.Client(configPg(url));
@@ -22,6 +23,7 @@ export async function migrate(url = process.env.DATABASE_URL) {
       } catch (e) { await c.query('ROLLBACK'); throw e; }
     }
     await protegerApiSupabase(c);
+    await garantirPlanoGenerico(c); // plano genérico de categorias em todas as empresas (idempotente)
   } finally { await c.end(); }
 }
 

@@ -2,7 +2,7 @@
 import { redirect } from 'next/navigation';
 import { exigirUsuario } from '@/lib/session';
 import { executar, mensagemDeErro } from '@/lib/actions-util';
-import { classificarEmLote, concluirConciliacao, confirmarLinhas, definirContaPlanoAtiva, devolverParaCorrecao, editarLinha, enviarParaConferencia, importarPlano, limparCorrecao, pedirCorrecao, reabrirConciliacao, reclassificarNaoRevisadas, salvarContaPlano } from '@/lib/services/conciliacao';
+import { classificarEmLote, concluirConciliacao, confirmarLinhas, definirContaPlanoAtiva, devolverParaCorrecao, editarLinha, enviarParaConferencia, importarPlano, limparCorrecao, pedirCorrecao, reabrirConciliacao, reclassificarNaoRevisadas, salvarContaPlano, marcarSemNota } from '@/lib/services/conciliacao';
 
 type R = { ok: true } | { ok: false; erro: string };
 const rodar = async (fn: () => Promise<unknown>): Promise<R> => { try { await fn(); return { ok: true }; } catch (e) { return { ok: false, erro: mensagemDeErro(e) }; } };
@@ -10,7 +10,8 @@ const rodar = async (fn: () => Promise<unknown>): Promise<R> => { try { await fn
 /* chamadas da tabela interativa (retornam resultado; a tela atualiza sem recarregar tudo) */
 export async function acaoClassificarLote(ids: number[], contaCodigo: number): Promise<R> { const u = await exigirUsuario(); return rodar(() => classificarEmLote(u, ids, contaCodigo)); }
 export async function acaoConfirmarLinhas(ids: number[]): Promise<R> { const u = await exigirUsuario(); return rodar(() => confirmarLinhas(u, ids)); }
-export async function acaoEditarLinha(id: number, d: { contaCodigo?: number | null; complemento?: string; observacao?: string }): Promise<R> { const u = await exigirUsuario(); return rodar(() => editarLinha(u, id, d)); }
+export async function acaoEditarLinha(id: number, d: { contaCodigo?: number | null; complemento?: string; observacao?: string; notaFiscal?: string; semNota?: boolean }): Promise<R> { const u = await exigirUsuario(); return rodar(() => editarLinha(u, id, d)); }
+export async function acaoSemNota(ids: number[]): Promise<R> { const u = await exigirUsuario(); return rodar(() => marcarSemNota(u, ids)); }
 
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? '');
 const baseDe = (papel: string, e: string) => (papel === 'admin' ? `/admin/empresas/${e}/extratos` : `/cliente/${e}/extratos`);

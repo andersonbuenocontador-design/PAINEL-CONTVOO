@@ -136,3 +136,4 @@
 .conc a{color:var(--accent)}
 .conc a.btn{color:var(--ink)}
 .conc a.btn.pri{color:var(--on-accent)}
+.conc td.nota{white-space:nowrap;font-size:12px}.conc .falta-nota{color:var(--erro,#b42318);font-weight:600}

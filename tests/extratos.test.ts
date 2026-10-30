@@ -6,6 +6,8 @@ import { criarUsuario } from '../src/lib/services/usuarios';
 import * as X from '../src/lib/services/extratos';
 import * as K from '../src/lib/services/conciliacao';
 import type { Actor } from '../src/lib/errors';
+import { PLANO_GENERICO } from '../src/lib/plano-generico';
+const cod = (ref: string) => PLANO_GENERICO.find((c) => c.referencia === ref)!.codigo;
 
 const C = '2026-10';
 const fx = (n: string) => readFileSync('tests/fixtures/extratos/' + n);
@@ -133,8 +135,10 @@ describe('plano de contas por cliente', () => {
   it('importa do relatório do Domínio, reimporta sem duplicar e cada cliente só tem o seu', async () => {
     const r = await K.importarPlano(admin, empA, PLANO);
     expect(r).toEqual({ lidas: 6, novas: 0, atualizadas: 6 });
-    expect((await K.listarPlano(ua, empA)).map((c) => c.codigo).sort((a, b) => a - b)).toEqual([11, 21, 22, 23, 31, 41]);
-    expect(await K.listarPlano(ub, empB)).toEqual([]);
+    const plano = await K.listarPlano(ua, empA);
+    expect(plano.filter((c) => c.codigo < 90000).map((c) => c.codigo).sort((a, b) => a - b)).toEqual([11, 21, 22, 23, 31, 41]); // plano do Domínio
+    expect(plano.filter((c) => c.codigo >= 90001)).toHaveLength(86); // + plano genérico de categorias, em toda empresa
+    expect((await K.listarPlano(ub, empB)).filter((c) => c.codigo < 90000)).toEqual([]); // empresa B não recebe o plano do Domínio da A
     await expect(K.importarPlano(admin, empB, 'texto sem contas')).rejects.toThrow(/Não encontrei contas/);
   });
   it('admin cria, edita e desativa conta; desativada não classifica', async () => {
@@ -156,9 +160,10 @@ describe('classificação automática (motor do Conciliador) e revisão', () => 
     await importar(ua, empA, contaA, 'a.csv', arq);
     const ls = await K.listarConciliacao(ua, empA, C);
     const tar = ls.find((l) => /TARIFA/.test(l.descricao_original))!, en = ls.find((l) => /ENERGIA/.test(l.descricao_original))!, pix = ls.find((l) => /PIX/.test(l.descricao_original))!;
-    expect(tar).toMatchObject({ conta_codigo: 21, confianca: 'A', conta_nome: 'TARIFAS BANCARIAS', revisado: false });
-    expect(en).toMatchObject({ conta_codigo: 23, confianca: 'M' }); expect(en.motivo).toMatch(/palavra-chave/);
-    expect(pix).toMatchObject({ conta_codigo: null, confianca: 'B' }); expect(pix.motivo).toMatch(/manualmente/);
+    // com o plano genérico (toda empresa tem), a sugestão usa as categorias que o cliente vê
+    expect(tar).toMatchObject({ conta_codigo: cod('FIN001'), confianca: 'A', conta_nome: 'Tarifas bancárias', conta_grupo: 'Despesas financeiras', revisado: false });
+    expect(en).toMatchObject({ conta_codigo: cod('DES003'), confianca: 'M', conta_nome: 'Energia elétrica' }); expect(en.motivo).toMatch(/energia/i);
+    expect(pix).toMatchObject({ conta_codigo: null, confianca: 'B' }); expect(pix.motivo).toMatch(/Não reconheci/);
     expect(K.resumoLinhas(ls)).toEqual({ linhas: 3, alta: 1, media: 1, baixa: 1, naoRev: 2 });
   });
   it('OK confirma e ensina: o mês seguinte já vem em Alta pelo histórico; sem conta não confirma', async () => {
@@ -176,7 +181,7 @@ describe('classificação automática (motor do Conciliador) e revisão', () => 
     const id = await X.criarPrevia(ua, { empresaId: empA, contaId: contaA, competencia: '2026-11', nome: 'n.csv', dados: nov }); await X.confirmarImportacao(ua, id);
     const ln = await K.listarConciliacao(ua, empA, '2026-11');
     expect(ln.every((l) => l.confianca === 'A' && l.origem === 'historico')).toBe(true);
-    expect(ln.map((l) => l.conta_codigo).sort()).toEqual([23, 31]);
+    expect(ln.map((l) => l.conta_codigo).sort((a, b) => a! - b!)).toEqual([31, cod('DES003')]);
     // outra empresa não herda o aprendizado
     await K.importarPlano(admin, empB, PLANO);
     await importar(ub, empB, contaB, 'b.csv', Buffer.from('Data;Histórico;Valor\n03/10/2026;PIX CLIENTE ZZ;90,00\n'));
@@ -208,6 +213,12 @@ describe('fluxo: enviar, conferir, devolver, concluir', () => {
     await expect(K.enviarParaConferencia(ua, empA, C)).rejects.toThrow(/1 movimentação\(ões\) sem conta/);
     const [tar, pix] = await ids();
     await K.classificarEmLote(ua, [pix], 31);
+    await expect(K.enviarParaConferencia(ua, empA, C)).rejects.toThrow(/Falta informar a nota fiscal em 2 lançamento/);
+    await expect(K.editarLinha(ua, tar, { notaFiscal: '12<34>' })).rejects.toThrow(/número da nota/);
+    await K.editarLinha(ua, tar, { notaFiscal: '1234' });
+    await expect(K.enviarParaConferencia(ua, empA, C)).rejects.toThrow(/Falta informar a nota fiscal em 1 lançamento/);
+    await K.marcarSemNota(ua, [pix]);
+    expect((await K.listarConciliacao(ua, empA, C)).map((l) => [l.nota_fiscal, l.sem_nota])).toEqual([['1234', false], [null, true]]);
     await K.enviarParaConferencia(ua, empA, C);
     expect((await K.obterConciliacao(ua, empA, C)).status).toBe('enviada');
     await expect(K.enviarParaConferencia(ua, empA, C)).rejects.toThrow(/já foi enviada/);
@@ -222,7 +233,7 @@ describe('fluxo: enviar, conferir, devolver, concluir', () => {
   });
   it('devolver exige linhas marcadas ou mensagem; cliente corrige, a marca some e só então reenvia', async () => {
     await importar(ua, empA, contaA, 'a.csv', arq);
-    const [tar, pix] = await ids(); await K.classificarEmLote(ua, [tar, pix], 21);
+    const [tar, pix] = await ids(); await K.classificarEmLote(ua, [tar, pix], 21); await K.marcarSemNota(ua, [tar, pix]);
     await expect(K.devolverParaCorrecao(admin, empA, C, 'x')).rejects.toThrow(/enviou para conferência/);
     await K.enviarParaConferencia(ua, empA, C);
     await expect(K.devolverParaCorrecao(admin, empA, C, '  ')).rejects.toThrow(/Marque as movimentações/);
@@ -244,7 +255,7 @@ describe('fluxo: enviar, conferir, devolver, concluir', () => {
   });
   it('concluir só do enviado; concluída bloqueia o cliente; reabrir libera; cliente não usa ações do escritório', async () => {
     await importar(ua, empA, contaA, 'a.csv', arq);
-    const todos = await ids(); await K.classificarEmLote(ua, todos, 21);
+    const todos = await ids(); await K.classificarEmLote(ua, todos, 21); await K.marcarSemNota(ua, todos);
     await expect(K.concluirConciliacao(admin, empA, C)).rejects.toThrow(/enviada pelo cliente/);
     await K.enviarParaConferencia(ua, empA, C);
     await expect(K.concluirConciliacao(ua, empA, C)).rejects.toMatchObject({ code: 'proibido' });
@@ -278,7 +289,7 @@ describe('conferência de saldos e fila do escritório', () => {
   });
   it('fila: enviadas primeiro, com contagens por empresa', async () => {
     await importar(ua, empA, contaA, 'a.csv', Buffer.from('Data;Histórico;Valor\n02/10/2026;TARIFA MENSAL;-39,90\n04/10/2026;PIX CLIENTE ZZ;150,00\n'));
-    const [a, b] = (await K.listarConciliacao(ua, empA, C)).map((l) => l.id); await K.classificarEmLote(ua, [a, b], 21); await K.enviarParaConferencia(ua, empA, C);
+    const [a, b] = (await K.listarConciliacao(ua, empA, C)).map((l) => l.id); await K.classificarEmLote(ua, [a, b], 21); await K.marcarSemNota(ua, [a, b]); await K.enviarParaConferencia(ua, empA, C);
     await K.pedirCorrecao(admin, [b], 'conferir');
     const fila = await K.listarConciliacoesEscritorio(admin, C);
     expect(fila[0]).toMatchObject({ id: empA, status: 'enviada', linhas: 2, sem_conta: 0, correcoes: 1 });

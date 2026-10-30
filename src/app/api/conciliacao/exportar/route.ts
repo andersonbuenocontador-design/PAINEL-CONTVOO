@@ -13,10 +13,10 @@ export async function GET(req: Request) {
     competenciaSchema.parse(comp);
     const emp = await obterEmpresa(u, empresaId); const ls = await listarConciliacao(u, empresaId, comp);
     const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet('Conciliação');
-    ws.columns = [{ header: 'Data', key: 'd', width: 12 }, { header: 'Banco', key: 'b', width: 16 }, { header: 'Descrição do banco', key: 'o', width: 44 }, { header: 'Código da conta', key: 'c', width: 14 }, { header: 'Conta contábil', key: 'n', width: 36 },
-      { header: 'Classificação', key: 'k', width: 16 }, { header: 'Complemento', key: 'p', width: 36 }, { header: 'Entrada', key: 'e', width: 14 }, { header: 'Saída', key: 's', width: 14 }, { header: 'Confiança', key: 'f', width: 11 }, { header: 'Revisado', key: 'r', width: 10 }, { header: 'Motivo / observação', key: 'm', width: 50 }];
+    ws.columns = [{ header: 'Data', key: 'd', width: 12 }, { header: 'Banco', key: 'b', width: 16 }, { header: 'Descrição do banco', key: 'o', width: 44 }, { header: 'Grupo', key: 'g', width: 24 }, { header: 'Categoria', key: 'n', width: 36 },
+      { header: 'Nota fiscal', key: 'nf', width: 14 }, { header: 'Complemento', key: 'p', width: 36 }, { header: 'Entrada', key: 'e', width: 14 }, { header: 'Saída', key: 's', width: 14 }, { header: 'Confiança', key: 'f', width: 11 }, { header: 'Revisado', key: 'r', width: 10 }, { header: 'Motivo / observação', key: 'm', width: 50 }];
     ws.getRow(1).font = { bold: true };
-    for (const l of ls) ws.addRow({ d: new Date(l.data + 'T00:00:00Z'), b: l.banco, o: l.descricao_original, c: l.conta_codigo ?? '', n: l.conta_nome ?? '', k: l.classificacao ?? '', p: l.complemento ?? '', e: l.valor > 0 ? l.valor / 100 : null, s: l.valor < 0 ? Math.abs(l.valor) / 100 : null,
+    for (const l of ls) ws.addRow({ d: new Date(l.data + 'T00:00:00Z'), b: l.banco, o: l.descricao_original, g: l.conta_grupo ?? '', n: l.conta_nome ?? '', nf: l.nota_fiscal ?? (l.sem_nota ? 'Sem nota' : ''), p: l.complemento ?? '', e: l.valor > 0 ? l.valor / 100 : null, s: l.valor < 0 ? Math.abs(l.valor) / 100 : null,
       f: ({ A: 'Alta', M: 'Média', B: 'Baixa' })[l.confianca], r: l.revisado ? 'Sim' : 'Não', m: [l.motivo, l.observacao].filter(Boolean).join(' ') });
     const sd = wb.addWorksheet('Conferência de saldos');
     sd.columns = [{ header: 'Conta', key: 'c', width: 28 }, { header: 'Saldo inicial', key: 'i', width: 16 }, { header: 'Entradas', key: 'e', width: 16 }, { header: 'Saídas', key: 's', width: 16 }, { header: 'Saldo final calculado', key: 'k', width: 20 }, { header: 'Saldo final do extrato', key: 'x', width: 22 }, { header: 'Situação', key: 'u', width: 48 }];

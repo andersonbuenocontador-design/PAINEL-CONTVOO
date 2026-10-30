@@ -32,16 +32,16 @@ fs.writeFileSync('/tmp/e2e/out.csv', 'Data;Histórico;Valor\n02/10/2026;TARIFA M
   ok(!adm.url().includes('/importacao/') && await adm.locator('.aviso.info:has-text("3 lançamento(s)")').count() === 1, 'escritório envia extrato e ele vai direto para a conciliação (sem prévia)');
   await cli.goto(`${B}/cliente/${idAlfa}/extratos?competencia=${C}`);
   ok(await cli.locator('button:has-text("Para revisar (2)")').count() > 0, 'tela do conciliador: "Para revisar (2)"');
-  ok(await cli.locator('tr:has-text("ENERGIA") td.conta:has-text("ENERGIA ELETRICA")').count() > 0 && await cli.locator('tr:has-text("ENERGIA") .chip:has-text("Média")').count() > 0, 'energia sugerida em Média com a conta do plano do cliente');
+  ok(await cli.locator('tr:has-text("ENERGIA") td.conta:has-text("Energia elétrica")').count() > 0 && await cli.locator('tr:has-text("ENERGIA") td.conta:has-text("(23)")').count() === 0 && await cli.locator('tr:has-text("ENERGIA") .chip:has-text("Média")').count() > 0, 'energia sugerida em Média com a categoria genérica, sem código');
   ok(await cli.locator('tr:has-text("PIX") .prefixo:has-text("REVISAR")').count() > 0, 'sem natureza: REVISAR / Baixa');
   await cli.screenshot({ path: '/tmp/e2e/conc1.png', fullPage: true });
-  await cli.click('tr:has-text("PIX CLIENTE")'); await cli.locator('tr.editor select').selectOption({ label: 'RECEITA DE VENDAS (31)' }); await cli.locator('tr.editor button:has-text("Salvar")').click();
+  await cli.click('tr:has-text("PIX CLIENTE")'); await cli.locator('tr.editor select').selectOption({ label: 'Recebimento de clientes' }); await cli.locator('tr.editor button:has-text("Salvar")').click();
   await cli.waitForSelector('button:has-text("Para revisar (1)")'); ok(true, 'editar a linha: conta escolhida confirma e sai de "Para revisar"');
   await cli.locator('tr:has-text("ENERGIA") button:has-text("OK")').click(); await cli.waitForSelector('button:has-text("Para revisar (0)")'); ok(true, 'OK confirma a classificação');
   await cli.click('button:has-text("Todas (3)")'); ok(await cli.locator('tbody tr.clicavel').count() === 3 && await cli.locator('.rev').count() === 2, 'todas as linhas; 2 revisadas (✓)');
   await cli.locator('thead input[type=checkbox]').check(); ok(await cli.locator('text=3 selecionado(s)').count() > 0, 'seleção em lote');
-  await cli.locator('select[aria-label="Conta para classificar"]').selectOption({ label: 'DESPESAS GERAIS (99)' }); await cli.click('button:has-text("Classificar e confirmar")');
-  await cli.waitForFunction(() => [...document.querySelectorAll('td.conta')].filter((t) => t.textContent.includes('DESPESAS GERAIS')).length === 3, null, { timeout: 15000 }).then(() => ok(true, 'lote aplicou a conta nas 3 linhas'), () => ok(false, 'lote aplicou a conta nas 3 linhas'));
+  await cli.locator('select[aria-label="Conta para classificar"]').selectOption({ label: 'Outras despesas da empresa' }); await cli.click('button:has-text("Classificar e confirmar")');
+  await cli.waitForFunction(() => [...document.querySelectorAll('td.conta')].filter((t) => t.textContent.includes('Outras despesas da empresa')).length === 3, null, { timeout: 15000 }).then(() => ok(true, 'lote aplicou a conta nas 3 linhas'), () => ok(false, 'lote aplicou a conta nas 3 linhas'));
   await cli.fill('input[type=search]', 'tarifa'); ok(await cli.locator('tbody tr.clicavel').count() === 1, 'busca filtra a tabela');
   await cli.screenshot({ path: '/tmp/e2e/conc2.png', fullPage: true });
   const ex = await cli.request.get(`${B}/api/conciliacao/exportar?empresaId=${idAlfa}&competencia=${C}`);
@@ -49,6 +49,12 @@ fs.writeFileSync('/tmp/e2e/out.csv', 'Data;Histórico;Valor\n02/10/2026;TARIFA M
   ok(await cli.locator('text=Sem dados para conferir').count() > 0 && await cli.locator('text=Conferência da competência').count() > 0, 'cartão de conferência mostra "sem dados" quando o arquivo não traz saldos');
   // --- fluxo: enviar -> escritório confere e devolve -> cliente corrige -> reenvia -> escritório conclui
   const URLP = `${B}/cliente/${idAlfa}/extratos?competencia=${C}`; const URLA = `${B}/admin/empresas/${idAlfa}/extratos?competencia=${C}`;
+  await cli.goto(URLP); await cli.click('button:has-text("Concluir e enviar ao escritório")'); await cli.waitForSelector('.aviso.erro:has-text("Falta informar a nota fiscal em 3")');
+  ok(await cli.locator('button:has-text("Falta nota (3)")').count() === 1, 'sem nota informada não envia: aviso e filtro "Falta nota (3)"');
+  await cli.click('button:has-text("Todas (3)")'); await cli.click('tbody tr.clicavel >> nth=0'); await cli.locator('tr.editor input[placeholder="Ex.: 1234"]').fill('5678'); await cli.locator('tr.editor button:has-text("Salvar")').click();
+  await cli.waitForSelector('button:has-text("Falta nota (2)")'); ok(await cli.locator('td.nota:has-text("NF 5678")').count() === 1, 'número da nota informado na linha');
+  await cli.click('button:has-text("Falta nota (2)")'); await cli.locator('thead input[type=checkbox]').check(); await cli.click('button:has-text("Marcar como sem nota")');
+  await cli.waitForSelector('button:has-text("Falta nota")', { state: 'detached' }); ok(await cli.locator('td.nota:has-text("Sem nota")').count() >= 0, 'demais marcadas como "Sem nota" em lote');
   await cli.goto(URLP); await cli.click('button:has-text("Concluir e enviar ao escritório")'); await cli.waitForSelector('.chip:has-text("Enviada ao escritório")');
   ok(await cli.locator('tbody input[type=checkbox]').count() === 0 && await cli.locator('summary:has-text("Enviar extrato")').count() === 0, 'enviada: cliente fica em somente leitura (sem seleção nem envio de extrato)');
   await adm.goto(`${B}/admin/conciliacoes?competencia=${C}`); ok(await adm.locator('tr:has-text("Empresa Alfa") :text("Aguardando conferência")').count() > 0, 'fila do escritório mostra a Alfa aguardando conferência');
@@ -60,7 +66,7 @@ fs.writeFileSync('/tmp/e2e/out.csv', 'Data;Histórico;Valor\n02/10/2026;TARIFA M
   ok(true, 'escritório pediu correção na linha e devolveu a competência');
   await cli.goto(URLP); ok(await cli.locator('text=O escritório devolveu esta competência').count() > 0 && await cli.locator('text=Ajuste a linha marcada.').count() > 0 && await cli.locator('text=Correção pedida: Esta tarifa é outra despesa').count() > 0, 'cliente vê a mensagem e o motivo exato na linha');
   await cli.click('button:has-text("Concluir e enviar ao escritório")'); await cli.waitForSelector('.msg-err, .aviso.erro:has-text("correção pedida")'); ok(true, 'não deixa reenviar com correção pendente');
-  await cli.click('tbody tr.clicavel >> nth=0'); await cli.locator('tr.editor select').selectOption({ label: 'TARIFAS BANCARIAS (21)' }); await cli.locator('tr.editor button:has-text("Salvar")').click();
+  await cli.click('tbody tr.clicavel >> nth=0'); await cli.locator('tr.editor select').selectOption({ label: 'Tarifas bancárias' }); await cli.locator('tr.editor button:has-text("Salvar")').click();
   await cli.waitForSelector('button:has-text("Correção pedida")', { state: 'detached' }); ok(true, 'corrigir a linha limpa o pedido de correção');
   await cli.click('button:has-text("Concluir e enviar ao escritório")'); await cli.waitForSelector('.chip:has-text("Enviada ao escritório")'); ok(true, 'cliente reenvia ao escritório');
   await adm.goto(URLA); await adm.click('button:has-text("Aprovar e concluir")'); await adm.waitForSelector('.chip.status-concluida'); ok(true, 'escritório aprova e conclui');
@@ -72,6 +78,6 @@ fs.writeFileSync('/tmp/e2e/out.csv', 'Data;Histórico;Valor\n02/10/2026;TARIFA M
   ok((await bet.goto(`${B}/cliente/${idAlfa}/extratos`)).status() === 404, 'Beta: 404 nos extratos da Alfa');
   ok((await bet.request.get(`${B}/api/conciliacao/exportar?empresaId=${idAlfa}&competencia=${C}`)).status() === 404, 'Beta: 404 no Excel da Alfa');
   await cli.goto(`${B}/admin/empresas/${idAlfa}/plano`); ok(!cli.url().includes('/plano'), 'cliente não abre o plano de contas (admin)');
-  await adm.goto(`${B}/admin/empresas/${idAlfa}/extratos?competencia=${C}`); await adm.click('button:has-text("Todas (3)")'); ok(await adm.locator('td.conta:has-text("DESPESAS GERAIS")').count() === 2 && await adm.locator('td.conta:has-text("TARIFAS BANCARIAS")').count() === 1, 'escritório vê as mesmas linhas, com a correção do cliente');
+  await adm.goto(`${B}/admin/empresas/${idAlfa}/extratos?competencia=${C}`); await adm.click('button:has-text("Todas (3)")'); ok(await adm.locator('td.conta:has-text("Outras despesas da empresa")').count() === 2 && await adm.locator('td.conta:has-text("Tarifas bancárias")').count() === 1, 'escritório vê as mesmas linhas, com a correção do cliente');
   await br.close();
 })().catch(e => { console.error(e); process.exit(1); });

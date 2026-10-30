@@ -7,6 +7,7 @@ import { Core, Local } from '../pdf/core';
 import { competenciaSchema } from './documentos';
 import { obterEmpresa } from './empresas';
 import { registrar } from './auditoria';
+import { servePara, sugerirGenerico } from '../regras-generico';
 
 type Runner = Pick<pg.PoolClient, 'query'>;
 export { chaveNormalizada };
@@ -19,8 +20,8 @@ const contaSchema = z.object({
 });
 export async function listarPlano(actor: Actor, empresaId: string, incluirInativas = false) {
   const e = await obterEmpresa(actor, empresaId);
-  return (await query(`SELECT id,codigo,classificacao,nome,ativo FROM plano_contas WHERE empresa_id=$1 ${incluirInativas ? '' : 'AND ativo'} ORDER BY classificacao, codigo`, [e.id])).rows as
-    { id: string; codigo: number; classificacao: string; nome: string; ativo: boolean }[];
+  return (await query(`SELECT id,codigo,classificacao,nome,ativo,grupo,descricao,tipo,generico FROM plano_contas WHERE empresa_id=$1 ${incluirInativas ? '' : 'AND ativo'} ORDER BY generico DESC, codigo`, [e.id])).rows as
+    { id: string; codigo: number; classificacao: string; nome: string; ativo: boolean; grupo: string | null; descricao: string | null; tipo: 'C' | 'D' | 'T' | 'CD' | null; generico: boolean }[];
 }
 export async function salvarContaPlano(actor: Actor, empresaId: string, input: z.input<typeof contaSchema>) {
   exigirAdmin(actor); await obterEmpresa(actor, empresaId);
@@ -64,24 +65,33 @@ export async function importarPlano(actor: Actor, empresaId: string, texto: stri
 type LinhaMotor = { id: number; descricao: string; valor: number; chave: string; banco: string };
 export async function classificarLinhasAutomatico(r: Runner, empresaId: string, linhas: LinhaMotor[]) {
   if (!linhas.length) return;
-  const contas: [number, string, string][] = (await r.query('SELECT codigo,classificacao,nome FROM plano_contas WHERE empresa_id=$1 AND ativo', [empresaId])).rows.map((x) => [x.codigo, x.classificacao, x.nome]);
-  const porCod = new Set(contas.map((c) => c[0]));
-  const plano = Local.prepararPlano(contas, Core);
+  const todas = (await r.query('SELECT codigo,classificacao,nome,tipo,generico FROM plano_contas WHERE empresa_id=$1 AND ativo', [empresaId])).rows as { codigo: number; classificacao: string; nome: string; tipo: string | null; generico: boolean }[];
+  // com o plano genérico, as sugestões usam só as categorias que o cliente enxerga (o plano do Domínio fica para o escritório)
+  const usarGenerico = todas.some((c) => c.generico);
+  const visiveis = usarGenerico ? todas.filter((c) => c.generico) : todas;
+  const tipoDe = new Map(todas.map((c) => [c.codigo, c.tipo]));
+  const porCod = new Set(todas.map((c) => c.codigo));
+  const plano = Local.prepararPlano(visiveis.map((c) => [c.codigo, c.classificacao, c.nome]), Core);
+  const cnpj = usarGenerico ? (await r.query('SELECT cnpj FROM empresas WHERE id=$1', [empresaId])).rows[0]?.cnpj as string | undefined : undefined;
   const dic = new Map<string, number>((await r.query('SELECT chave,sentido,conta_codigo FROM dicionario_classificacao WHERE empresa_id=$1', [empresaId])).rows.map((x) => [`${x.chave}|${x.sentido}`, x.conta_codigo]));
   for (const l of linhas) {
     const sentido = l.valor > 0 ? 'C' : 'D';
     let conta: number | null = null, conf = 'B', motivo = '', origem = 'regra';
     const hit = l.chave ? dic.get(`${l.chave}|${sentido}`) : undefined;
+    const sugestao = usarGenerico ? sugerirGenerico(l.descricao, l.valor, cnpj) : null;
     if (hit && porCod.has(hit)) { conta = hit; conf = 'A'; origem = 'historico'; motivo = 'Igual a lançamento já confirmado deste cliente.'; }
+    else if (sugestao && porCod.has(sugestao.codigo)) { conta = sugestao.codigo; conf = sugestao.conf; motivo = sugestao.motivo; }
     else {
       let cl: { c?: number | null; n?: string; m?: string; r?: string };
       try { cl = Local.classificar({ historico: l.descricao, complemento: '', tipo: sentido, valor: Math.abs(l.valor) / 100, bn: l.banco }, plano, Core); }
       catch { cl = { c: null, n: 'B', r: 'Não foi possível classificar automaticamente.' }; }
       conf = ({ A: 'A', M: 'M', B: 'B' } as Record<string, string>)[cl.n ?? 'B'] ?? 'B';
-      if (cl.c != null && porCod.has(cl.c)) conta = cl.c;
+      if (cl.c != null && porCod.has(cl.c) && servePara(tipoDe.get(cl.c), sentido)) conta = cl.c;
+      else if (cl.c != null && porCod.has(cl.c)) { conf = 'B'; motivo = 'Sugestão descartada: a categoria não combina com ' + (sentido === 'C' ? 'uma entrada' : 'uma saída') + '. '; }
       else if (cl.c != null) { conf = 'B'; motivo = `O código ${cl.c} não existe no plano deste cliente. `; }
       if (conta == null && conf === 'A') conf = 'M';
-      motivo += cl.m || cl.r || '';
+      if (conta == null && usarGenerico) motivo = (motivo + 'Não reconheci este lançamento: escolha a categoria ou marque "Não sei identificar".').trim();
+      else motivo += cl.m || cl.r || '';
     }
     await r.query('UPDATE movimentacoes SET conta_codigo=$2,confianca=$3,motivo=$4,origem=$5 WHERE id=$1 AND NOT revisado', [l.id, conta, conf, motivo.trim() || null, origem]);
   }
@@ -108,13 +118,13 @@ export type LinhaConciliacao = {
   id: number; data: string; descricao_original: string; valor: number; documento: string | null; banco: string; conta_bancaria_id: string;
   conta_codigo: number | null; conta_nome: string | null; classificacao: string | null; complemento: string | null;
   confianca: 'A' | 'M' | 'B'; motivo: string | null; observacao: string | null; origem: string; revisado: boolean; revisado_por: string | null;
-  correcao_pedida: boolean; correcao_motivo: string | null;
+  correcao_pedida: boolean; correcao_motivo: string | null; conta_grupo: string | null; nota_fiscal: string | null; sem_nota: boolean;
 };
 export async function listarConciliacao(actor: Actor, empresaId: string, competencia: string): Promise<LinhaConciliacao[]> {
   const e = await obterEmpresa(actor, empresaId); competenciaSchema.parse(competencia);
   return (await query(
     `SELECT m.id,m.data::text data,m.descricao_original,m.valor_centavos::text valor,m.documento,cb.banco,cb.id conta_bancaria_id,m.conta_codigo,p.nome conta_nome,p.classificacao,
-            m.complemento,m.confianca,m.motivo,m.observacao,m.origem,m.revisado,u.nome revisado_por,m.correcao_pedida,m.correcao_motivo
+            m.complemento,m.confianca,m.motivo,m.observacao,m.origem,m.revisado,u.nome revisado_por,m.correcao_pedida,m.correcao_motivo,p.grupo conta_grupo,m.nota_fiscal,m.sem_nota
        FROM movimentacoes m JOIN contas_bancarias cb ON cb.id=m.conta_id
        LEFT JOIN plano_contas p ON p.empresa_id=m.empresa_id AND p.codigo=m.conta_codigo LEFT JOIN usuarios u ON u.id=m.revisado_por
       WHERE m.empresa_id=$1 AND m.competencia=$2 ORDER BY m.data, m.id`, [e.id, competencia])).rows.map((r) => ({ ...r, id: Number(r.id), valor: Number(r.valor) }));
@@ -153,10 +163,12 @@ export async function enviarParaConferencia(actor: Actor, empresaId: string, com
   await tx(async (c) => {
     const st = await travarConciliacao(c, e.id, competencia);
     if (st !== 'revisao' && st !== 'devolvida') throw new AppError(st === 'enviada' ? 'Esta competência já foi enviada ao escritório.' : 'Esta competência já foi concluída.');
-    const s = (await c.query(`SELECT count(*)::int total, count(*) FILTER (WHERE conta_codigo IS NULL)::int sem_conta, count(*) FILTER (WHERE correcao_pedida)::int correcoes FROM movimentacoes WHERE empresa_id=$1 AND competencia=$2`, [e.id, competencia])).rows[0];
+    const s = (await c.query(`SELECT count(*)::int total, count(*) FILTER (WHERE conta_codigo IS NULL)::int sem_conta, count(*) FILTER (WHERE correcao_pedida)::int correcoes,
+        count(*) FILTER (WHERE nota_fiscal IS NULL AND NOT sem_nota)::int sem_nota_informada FROM movimentacoes WHERE empresa_id=$1 AND competencia=$2`, [e.id, competencia])).rows[0];
     if (!s.total) throw new AppError('Não há movimentações importadas nesta competência.');
     if (s.sem_conta) throw new AppError(`Ainda há ${s.sem_conta} movimentação(ões) sem conta contábil. Classifique todas antes de enviar.`);
     if (s.correcoes) throw new AppError(`Ainda há ${s.correcoes} movimentação(ões) com correção pedida pelo escritório. Ajuste-as antes de enviar de novo.`);
+    if (s.sem_nota_informada) throw new AppError(`Falta informar a nota fiscal em ${s.sem_nota_informada} lançamento(s): digite o número da nota ou marque "Sem nota". Use o filtro "Falta nota" para encontrá-los.`);
     await c.query(`UPDATE conciliacoes SET status='enviada',enviada_em=now(),enviada_por=$3,mensagem=NULL,atualizado_por=$3,atualizado_em=now() WHERE empresa_id=$1 AND competencia=$2`, [e.id, competencia, actor.id]);
     await registrar(c, { usuarioId: actor.id, empresaId: e.id, acao: 'conciliacao.enviar', entidade: 'conciliacao', entidadeId: `${e.id}:${competencia}`, detalhes: { competencia, movimentacoes: s.total } });
   });
@@ -293,13 +305,44 @@ export async function confirmarLinhas(actor: Actor, idsIn: number[]) {
   return ls.length;
 }
 /** Editor da linha: complemento e observação (e, se informada, a conta). */
-export async function editarLinha(actor: Actor, id: number, input: { contaCodigo?: number | null; complemento?: string; observacao?: string }) {
-  const d = z.object({ contaCodigo: z.number().int().positive().nullish(), complemento: z.string().max(300).optional(), observacao: z.string().max(1000).optional() }).parse(input);
+const notaSchema = z.string().trim().max(60, 'Número da nota muito longo.').regex(/^[\w./ -]*$/, 'Use só números, letras, ponto, barra ou hífen no número da nota.');
+export async function editarLinha(actor: Actor, id: number, input: { contaCodigo?: number | null; complemento?: string; observacao?: string; notaFiscal?: string; semNota?: boolean }) {
+  const d = z.object({ contaCodigo: z.number().int().positive().nullish(), complemento: z.string().max(300).optional(), observacao: z.string().max(1000).optional(), notaFiscal: notaSchema.optional(), semNota: z.boolean().optional() }).parse(input);
   const [l] = await linhasAcessiveis(actor, [id], { paraEditar: true });
   await tx(async (c) => {
     await c.query('UPDATE movimentacoes SET complemento=$2, observacao=$3 WHERE id=$1', [id, d.complemento?.trim() || null, d.observacao?.trim() || null]);
+    if (d.notaFiscal !== undefined || d.semNota !== undefined) {
+      const nota = d.semNota ? null : d.notaFiscal || null; // número informado tira o "sem nota"; "sem nota" apaga o número
+      await c.query('UPDATE movimentacoes SET nota_fiscal=$2, sem_nota=$3 WHERE id=$1', [id, nota, !!d.semNota && !nota]);
+    }
     if (actor.papel === 'cliente') await c.query('UPDATE movimentacoes SET correcao_pedida=false WHERE id=$1', [id]);
     await registrar(c, { usuarioId: actor.id, empresaId: l.empresaId, acao: 'conciliacao.editar', entidade: 'movimentacao', entidadeId: String(id) });
   });
   if (d.contaCodigo && d.contaCodigo !== l.conta) await classificarEmLote(actor, [id], d.contaCodigo);
+}
+
+/* ================= Plano genérico de categorias (todas as empresas) ================= */
+/** Garante o plano genérico na(s) empresa(s): insere as categorias que faltarem, sem mexer nas existentes nem no plano do Domínio. */
+export async function garantirPlanoGenerico(r: Runner, empresaId?: string) {
+  const { PLANO_GENERICO } = await import('../plano-generico');
+  const empresas = empresaId ? [empresaId] : (await r.query('SELECT id FROM empresas')).rows.map((x) => x.id as string);
+  const col = (k: keyof (typeof PLANO_GENERICO)[number]) => PLANO_GENERICO.map((c) => c[k]);
+  for (const e of empresas) {
+    await r.query(
+      `INSERT INTO plano_contas(empresa_id,codigo,classificacao,nome,grupo,descricao,tipo,generico)
+       SELECT $1, * , true FROM unnest($2::int[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[])
+       ON CONFLICT (empresa_id,codigo) DO NOTHING`,
+      [e, col('codigo'), col('classificacao'), col('nome'), col('grupo'), col('descricao'), col('tipo')]);
+  }
+  return empresas.length;
+}
+
+/** Marca vários lançamentos como "sem nota" de uma vez (o número, se houver, é apagado). */
+export async function marcarSemNota(actor: Actor, idsIn: number[]) {
+  const ls = await linhasAcessiveis(actor, idsIn, { paraEditar: true });
+  await tx(async (c) => {
+    await c.query('UPDATE movimentacoes SET nota_fiscal=NULL, sem_nota=true WHERE id = ANY($1)', [ls.map((l) => l.id)]);
+    for (const emp of new Set(ls.map((l) => l.empresaId))) await registrar(c, { usuarioId: actor.id, empresaId: emp, acao: 'conciliacao.sem_nota', entidade: 'movimentacao', detalhes: { linhas: ls.filter((l) => l.empresaId === emp).length } });
+  });
+  return ls.length;
 }

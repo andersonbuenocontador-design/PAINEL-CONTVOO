@@ -105,7 +105,7 @@ export async function ExtratosPagina({ u, empresaId, comp, sp, base, voltar }: {
           <td>{i.status === 'previa' && <a href={`${base}/importacao/${i.id}`}>Abrir prévia</a>}</td></tr>))}</tbody></table></>}</details>}
 
       <div id="lancamentos" />
-      <ConciliacaoTabela key={sp.conta ?? 'todas'} linhas={linhas} plano={plano.map((c) => ({ codigo: c.codigo, classificacao: c.classificacao, nome: c.nome }))} bancos={[...porConta.entries()].map(([id, g]) => ({ id, nome: g.conta ? `${g.nome} · cc ${g.conta}` : g.nome }))} admin={admin} somenteLeitura={somenteLeitura} bancoInicial={sp.conta && porConta.has(sp.conta) ? sp.conta : undefined} />
+      <ConciliacaoTabela key={sp.conta ?? 'todas'} linhas={linhas} plano={(admin || !plano.some((c) => c.generico) ? plano : plano.filter((c) => c.generico)).map((c) => ({ codigo: c.codigo, classificacao: c.classificacao, nome: c.nome, grupo: c.grupo, descricao: c.descricao, tipo: c.tipo }))} bancos={[...porConta.entries()].map(([id, g]) => ({ id, nome: g.conta ? `${g.nome} · cc ${g.conta}` : g.nome }))} admin={admin} somenteLeitura={somenteLeitura} bancoInicial={sp.conta && porConta.has(sp.conta) ? sp.conta : undefined} />
     </div></main></>);
 }
 
