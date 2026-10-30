@@ -35,6 +35,15 @@ if (bancoOk && (email || senha)) {
     } finally { await c.end(); }
   } catch (e) { problemas.push(diagnosticar(e, 'admin')); }
 }
+if (bancoOk && !email && !senha) {
+  // Sem as variáveis do 1º administrador: avisa se ainda não existe nenhum (ninguém conseguiria entrar).
+  try {
+    const c = new pg.Client(configPg()); await c.connect();
+    try { if (!(await c.query(`SELECT 1 FROM usuarios WHERE papel='admin' AND ativo LIMIT 1`)).rowCount) problemas.push('admin: nenhum administrador cadastrado ainda. No Render, crie SEED_ADMIN_EMAIL (seu e-mail) e SEED_ADMIN_PASSWORD (senha provisória, 10+ caracteres).'); }
+    finally { await c.end(); }
+  } catch (e) { problemas.push(diagnosticar(e, 'banco')); }
+}
+if (process.env.RENDER && !(process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY)) problemas.push('armazenamento: faltam SUPABASE_URL e SUPABASE_SECRET_KEY no Render; sem elas os documentos ficam no disco do Render, que é apagado a cada publicação.');
 if (problemas.length) {
   writeFileSync(caminhoDiagnostico(), JSON.stringify({ problema: problemas.join(' | '), em: new Date().toISOString() }));
   console.error('PROBLEMA DE CONFIGURAÇÃO:', problemas.join(' | '));
