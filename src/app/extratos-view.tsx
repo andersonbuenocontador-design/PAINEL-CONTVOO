@@ -10,6 +10,7 @@ import type { UsuarioSessao } from '@/lib/services/usuarios';
 import { obterEmpresa } from '@/lib/services/empresas';
 import { listarContas, listarImportacoes, obterPrevia } from '@/lib/services/extratos';
 import { puxarExtratosDosDocumentos } from '@/lib/services/extratos';
+import { query } from '@/lib/db';
 import { bancosConciliacao, conferenciaSaldos, listarConciliacao, listarPlano, obterConciliacao, resumoLinhas } from '@/lib/services/conciliacao';
 import { ConciliacaoTabela } from './ConciliacaoTabela';
 import './conciliacao.css';
@@ -27,6 +28,8 @@ export async function ExtratosPagina({ u, empresaId, comp, sp, base, voltar }: {
   // puxa sozinho os extratos dos documentos anexados (Documentos do mês e Outros documentos) que ainda não foram lidos
   const puxados = await puxarExtratosDosDocumentos(u, empresaId).catch(() => []);
   const outrosMeses = [...new Set(puxados.filter((r) => r.competencia !== comp && r.gravadas > 0).map((r) => r.competencia))];
+  // mês sem lançamentos: mostra em quais meses estão os extratos desta empresa (ex.: extrato de julho anexado com outubro aberto)
+  const mesesComExtrato = (await query(`SELECT competencia, count(*)::int n FROM movimentacoes WHERE empresa_id=$1 GROUP BY 1 ORDER BY 1 DESC LIMIT 6`, [empresaId])).rows as { competencia: string; n: number }[];
   const [contasTodas, linhas, plano, bancosImp, imps, conc, saldos] = await Promise.all([
     listarContas(u, empresaId), listarConciliacao(u, empresaId, comp), listarPlano(u, empresaId), bancosConciliacao(u, empresaId, comp), listarImportacoes(u, empresaId, comp), obterConciliacao(u, empresaId, comp), conferenciaSaldos(u, empresaId, comp),
   ]);
@@ -59,6 +62,7 @@ export async function ExtratosPagina({ u, empresaId, comp, sp, base, voltar }: {
           {admin && status !== 'revisao' && <form action={acaoReabrirConciliacao}><input type="hidden" name="empresaId" value={empresaId} /><input type="hidden" name="competencia" value={comp} /><button className="btn">Reabrir para o cliente</button></form>}</div></div>
       {sp.erro && <div className="aviso erro" role="alert">{sp.erro}</div>}{sp.ok && <div className="aviso info">{sp.ok}</div>}
       {puxados.some((r) => r.competencia === comp && r.gravadas > 0) && <div className="aviso info">Extratos anexados nos documentos foram trazidos para esta conciliação: {puxados.filter((r) => r.competencia === comp).map((r) => `${r.gravadas} lançamento(s) do ${r.banco ?? 'banco'}`).join(', ')}.</div>}
+      {linhas.length === 0 && mesesComExtrato.some((m) => m.competencia !== comp) && <div className="aviso">Não há lançamentos em {mes}/{ano}. Os extratos desta empresa estão em: {mesesComExtrato.filter((m) => m.competencia !== comp).map((m, i) => <span key={m.competencia}>{i ? ', ' : ''}<a href={`${base}?competencia=${m.competencia}`}><strong>{m.competencia.slice(5)}/{m.competencia.slice(0, 4)}</strong></a> ({m.n} lançamentos)</span>)}.</div>}
       {outrosMeses.length > 0 && <div className="aviso">Também encontrei extratos de outro mês nos documentos: {outrosMeses.map((m, i) => <span key={m}>{i ? ', ' : ''}<a href={`${base}?competencia=${m}`}>{m.slice(5)}/{m.slice(0, 4)}</a></span>)}.</div>}
       {!admin && !somenteLeitura && <div className="aviso info">Os extratos entram aqui sozinhos: anexe o PDF ou OFX do banco em <a href={`${voltar.split('?')[0]}/documentos?competencia=${comp}`}>Documentos do mês</a>.</div>}
       {!plano.length && <div className="aviso">O escritório ainda não cadastrou o plano de contas desta empresa. Sem ele, os lançamentos ficam para classificar manualmente.{u.papel === 'admin' && <> <a href={`/admin/empresas/${empresaId}/plano`}>Cadastrar plano de contas</a></>}</div>}
