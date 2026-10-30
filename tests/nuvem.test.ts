@@ -88,3 +88,14 @@ describe('e-mail pela API do Brevo', () => {
   });
   it('sem configuração, nenhum provedor', () => { vi.stubEnv('EMAIL_PROVIDER', ''); expect(provedorPadrao()).toBeNull(); });
 });
+
+describe('conferência das variáveis (sem mostrar valores)', () => {
+  afterEach(() => vi.unstubAllEnvs());
+  it('aponta ausente, vazia, curta, espaço e nome parecido', async () => {
+    const { conferirVariaveis } = await import('../src/lib/diagnostico');
+    vi.stubEnv('V_VAZIA', ''); vi.stubEnv('V_CURTA', 'abc'); vi.stubEnv('V_ESPACO', ' valor '); vi.stubEnv('v_parecida ', 'x'); vi.stubEnv('V_OK', 'segredo-bem-longo');
+    const r = conferirVariaveis([{ nome: 'V_AUSENTE' }, { nome: 'V_VAZIA' }, { nome: 'V_CURTA', min: 10 }, { nome: 'V_ESPACO' }, { nome: 'V_PARECIDA' }, { nome: 'V_OK', min: 10 }]);
+    expect(r).toEqual(['V_AUSENTE não está cadastrada', 'V_VAZIA está vazia', 'V_CURTA tem 3 caractere(s); precisa de 10 ou mais', 'V_ESPACO tem espaço no começo ou no fim do valor', 'V_PARECIDA está cadastrada com o nome diferente "v_parecida " (confira espaços/maiúsculas)']);
+    expect(r.join(' ')).not.toContain('segredo');
+  });
+});

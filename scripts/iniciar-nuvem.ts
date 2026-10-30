@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs';
 import pg from 'pg';
 import { configPg } from '../src/lib/db';
 import { prepararArmazenamento } from '../src/lib/storage';
-import { caminhoDiagnostico, diagnosticar } from '../src/lib/diagnostico';
+import { caminhoDiagnostico, conferirVariaveis, diagnosticar } from '../src/lib/diagnostico';
 import { migrate } from './migrate';
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 
@@ -18,7 +18,9 @@ try { console.log('armazenamento:', await prepararArmazenamento()); } catch (e) 
 const { SEED_ADMIN_EMAIL: email, SEED_ADMIN_PASSWORD: senha } = process.env;
 if (bancoOk && (email || senha)) {
   try {
-    if (!email || !senha || senha.length < 10) throw new Error('SEED_ADMIN_EMAIL e SEED_ADMIN_PASSWORD (mín. 10 caracteres) precisam estar preenchidos no Render.');
+    const erradas = conferirVariaveis([{ nome: 'SEED_ADMIN_EMAIL' }, { nome: 'SEED_ADMIN_PASSWORD', min: 10 }]);
+    if (erradas.length) throw new Error(`SEED_ADMIN no Render: ${erradas.join('; ')}.`);
+    if (!email || !senha) throw new Error("SEED_ADMIN incompleto");
     const c = new pg.Client(configPg()); await c.connect();
     try {
       const r = await c.query(`INSERT INTO usuarios(nome,email,senha_hash,papel,deve_trocar_senha) VALUES ('Administrador',$1,$2,'admin',true) ON CONFLICT DO NOTHING RETURNING id`,
@@ -39,11 +41,11 @@ if (bancoOk && !email && !senha) {
   // Sem as variáveis do 1º administrador: avisa se ainda não existe nenhum (ninguém conseguiria entrar).
   try {
     const c = new pg.Client(configPg()); await c.connect();
-    try { if (!(await c.query(`SELECT 1 FROM usuarios WHERE papel='admin' AND ativo LIMIT 1`)).rowCount) problemas.push('admin: nenhum administrador cadastrado ainda. No Render, crie SEED_ADMIN_EMAIL (seu e-mail) e SEED_ADMIN_PASSWORD (senha provisória, 10+ caracteres).'); }
+    try { if (!(await c.query(`SELECT 1 FROM usuarios WHERE papel='admin' AND ativo LIMIT 1`)).rowCount) problemas.push(`admin: nenhum administrador cadastrado ainda. No Render: ${conferirVariaveis([{ nome: 'SEED_ADMIN_EMAIL' }, { nome: 'SEED_ADMIN_PASSWORD', min: 10 }]).join('; ')}.`); }
     finally { await c.end(); }
   } catch (e) { problemas.push(diagnosticar(e, 'banco')); }
 }
-if (process.env.RENDER && !(process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY)) problemas.push('armazenamento: faltam SUPABASE_URL e SUPABASE_SECRET_KEY no Render; sem elas os documentos ficam no disco do Render, que é apagado a cada publicação.');
+if (process.env.RENDER && !(process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY)) problemas.push(`armazenamento: ${conferirVariaveis([{ nome: 'SUPABASE_URL' }, { nome: 'SUPABASE_SECRET_KEY' }]).join('; ') || 'variáveis do Supabase incompletas'} (sem elas os documentos ficam no disco do Render, que é apagado a cada publicação).`);
 if (problemas.length) {
   writeFileSync(caminhoDiagnostico(), JSON.stringify({ problema: problemas.join(' | '), em: new Date().toISOString() }));
   console.error('PROBLEMA DE CONFIGURAÇÃO:', problemas.join(' | '));

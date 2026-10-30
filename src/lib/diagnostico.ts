@@ -29,3 +29,18 @@ export function problemaNoInicio(): string | null {
   try { return existsSync(arquivo()) ? (JSON.parse(readFileSync(arquivo(), 'utf8')).problema ?? null) : null; } catch { return null; }
 }
 export const caminhoDiagnostico = arquivo;
+
+/** Explica, sem mostrar valores, o que há de errado com variáveis obrigatórias: ausente, vazia, curta ou com nome digitado diferente. */
+export function conferirVariaveis(nomes: { nome: string; min?: number }[]): string[] {
+  const out: string[] = [];
+  for (const { nome, min } of nomes) {
+    const v = process.env[nome];
+    if (v === undefined) {
+      const parecida = Object.keys(process.env).find((k) => k !== nome && k.trim().replace(/[\s-]/g, '_').toUpperCase() === nome);
+      out.push(parecida ? `${nome} está cadastrada com o nome diferente "${parecida}" (confira espaços/maiúsculas)` : `${nome} não está cadastrada`);
+    } else if (!v.trim()) out.push(`${nome} está vazia`);
+    else if (v !== v.trim()) out.push(`${nome} tem espaço no começo ou no fim do valor`);
+    else if (min && v.length < min) out.push(`${nome} tem ${v.length} caractere(s); precisa de ${min} ou mais`);
+  }
+  return out;
+}
