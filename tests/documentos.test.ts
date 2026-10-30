@@ -2,6 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { getPool, query } from '../src/lib/db';
 import { criarEmpresa } from '../src/lib/services/empresas';
 import { criarUsuario } from '../src/lib/services/usuarios';
+import { baixarAvulso, enviarAvulsos, listarAvulsos, removerAvulso } from '../src/lib/services/documentos';
 import { aplicarModelo, aplicaNaCompetencia, baixarArquivo, conferirArquivo, criarExigencia, criarModeloDeEmpresa, definirExigenciaAtiva, enviarArquivo, historicoVersoes, situacaoCompetencia, visaoGeral } from '../src/lib/services/documentos';
 import type { Actor } from '../src/lib/errors';
 
@@ -11,7 +12,7 @@ const C = '2026-10';
 
 beforeEach(async () => {
   for (const t of ['no_update', 'no_truncate']) await query(`ALTER TABLE auditoria DISABLE TRIGGER auditoria_${t}`);
-  await query('TRUNCATE dicionario_classificacao, conciliacoes, plano_contas, movimentacoes, importacoes, contas_bancarias, arquivos, exigencias, modelo_itens, modelos_documento, usuario_empresas, empresas, usuarios, auditoria CASCADE');
+  await query('TRUNCATE documentos_avulsos, dicionario_classificacao, conciliacoes, plano_contas, movimentacoes, importacoes, contas_bancarias, arquivos, exigencias, modelo_itens, modelos_documento, usuario_empresas, empresas, usuarios, auditoria CASCADE');
   for (const t of ['no_update', 'no_truncate']) await query(`ALTER TABLE auditoria ENABLE TRIGGER auditoria_${t}`);
   admin = { id: (await query(`INSERT INTO usuarios(nome,email,senha_hash,papel) VALUES ('Admin','admin@x.com','x','admin') RETURNING id`)).rows[0].id, papel: 'admin' };
   empA = await criarEmpresa(admin, { razaoSocial: 'Empresa A Ltda', cnpj: '11.222.333/0001-81' });
@@ -128,3 +129,42 @@ describe('modelos', () => {
   });
 });
 afterAll(async () => { await getPool().end(); });
+
+describe('outros documentos (PDFs avulsos)', () => {
+  const pdf = (n: string) => ({ nome: n, dados: Buffer.from('%PDF-1.7 ' + n) });
+  it('cliente envia vários PDFs com descrição; escritório vê e baixa', async () => {
+    const ids = await enviarAvulsos(ua, { empresaId: empA, competencia: C, descricao: 'notas de compra', arquivos: [pdf('a.pdf'), pdf('B.PDF')] });
+    expect(ids).toHaveLength(2);
+    const l = await listarAvulsos(admin, empA, C);
+    expect(l.map((d) => d.nome_original).sort()).toEqual(['B.PDF', 'a.pdf']); expect(l[0].descricao).toBe('notas de compra');
+    expect((await baixarAvulso(admin, ids[0])).dados.toString()).toContain('%PDF');
+    expect((await listarAvulsos(ua, empA, C)).find((d) => d.id === ids[0])?.visto_em).toBeTruthy();
+    expect(await listarAvulsos(ua, empA, '2026-09')).toHaveLength(0);
+  });
+  it('só aceita PDF verdadeiro e respeita limites', async () => {
+    await expect(enviarAvulsos(ua, { empresaId: empA, competencia: C, arquivos: [{ nome: 'x.docx', dados: Buffer.from('PK..') }] })).rejects.toThrow(/não é PDF/);
+    await expect(enviarAvulsos(ua, { empresaId: empA, competencia: C, arquivos: [{ nome: 'falso.pdf', dados: Buffer.from('MZ executavel') }] })).rejects.toThrow(/não é um PDF válido/);
+    await expect(enviarAvulsos(ua, { empresaId: empA, competencia: C, arquivos: [] })).rejects.toThrow(/ao menos um/);
+    await expect(enviarAvulsos(ua, { empresaId: empA, competencia: C, arquivos: Array.from({ length: 11 }, (_, i) => pdf(`${i}.pdf`)) })).rejects.toThrow(/no máximo 10/);
+    await expect(enviarAvulsos(ua, { empresaId: empA, competencia: C, arquivos: [{ nome: 'g.pdf', dados: Buffer.concat([Buffer.from('%PDF'), Buffer.alloc(20 * 1024 * 1024)]) }] })).rejects.toThrow(/20 MB/);
+    expect(await listarAvulsos(admin, empA, C)).toHaveLength(0);
+  });
+  it('cliente de outra empresa não vê, não baixa, não envia', async () => {
+    const [id] = await enviarAvulsos(ua, { empresaId: empA, competencia: C, arquivos: [pdf('a.pdf')] });
+    await expect(listarAvulsos(ub, empA, C)).rejects.toMatchObject({ code: 'nao_encontrado' });
+    await expect(baixarAvulso(ub, id)).rejects.toMatchObject({ code: 'nao_encontrado' });
+    await expect(removerAvulso(ub, id)).rejects.toMatchObject({ code: 'nao_encontrado' });
+    await expect(enviarAvulsos(ub, { empresaId: empA, competencia: C, arquivos: [pdf('b.pdf')] })).rejects.toMatchObject({ code: 'nao_encontrado' });
+  });
+  it('cliente retira só antes de o escritório abrir; escritório retira sempre', async () => {
+    const [a, b] = await enviarAvulsos(ua, { empresaId: empA, competencia: C, arquivos: [pdf('a.pdf'), pdf('b.pdf')] });
+    await removerAvulso(ua, a);
+    await baixarAvulso(admin, b);
+    await expect(removerAvulso(ua, b)).rejects.toThrow(/já abriu/);
+    await removerAvulso(admin, b);
+    expect(await listarAvulsos(ua, empA, C)).toHaveLength(0);
+    await expect(baixarAvulso(admin, a)).rejects.toMatchObject({ code: 'nao_encontrado' });
+    const acoes = (await query(`SELECT acao FROM auditoria WHERE entidade='documento_avulso' ORDER BY id`)).rows.map((r) => r.acao);
+    expect(acoes).toEqual(['avulso.enviar', 'avulso.enviar', 'avulso.remover', 'avulso.baixar', 'avulso.remover']);
+  });
+});

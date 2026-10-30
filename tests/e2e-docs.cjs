@@ -45,7 +45,7 @@ const trocar = async (p, atual, nova) => { await p.waitForURL('**/trocar-senha')
   // aprova
   await adm.goto(`${B}/admin/empresas/${idAlfa}/documentos?competencia=${C}`); await adm.click('button:has-text("Aprovar")'); await adm.waitForURL(/ok=/);
   await cli.goto(`${B}/cliente/${idAlfa}?competencia=${C}`); ok(await cli.locator('text=competência concluída').count() > 0 && await cli.locator('text=(100%)').count() > 0, 'aprovado: 100% e competência concluída');
-  ok(await cli.locator('input[type=file]').count() === 0, 'cliente não pode reenviar após aprovação');
+  ok(await cli.locator('input[type=file][name=arquivo]').count() === 0, 'cliente não pode reenviar após aprovação');
   await adm.goto(`${B}/admin?competencia=${C}`); ok(await adm.locator('tr:has-text("Empresa Alfa") td:has-text("100%")').count() > 0, 'visão geral mostra Alfa 100%');
   await adm.goto(`${B}/admin/empresas/${idAlfa}/documentos?competencia=2026-09`); ok(await adm.locator('span.tag:has-text("Pendente")').count() > 0, 'outra competência segue pendente');
   await br.close();

@@ -8,10 +8,11 @@ export function mensagemDeErro(e: unknown): string {
   console.error(e);
   return 'Não foi possível concluir a operação. Tente novamente.';
 }
-/** Executa a ação e volta para `voltar` com ?erro= ou ?ok= (mensagens simples, sem dados sensíveis). */
+/** Executa a ação e volta para `voltar` com ?erro= ou ?ok= (mensagens simples, sem dados sensíveis). Um #âncora em `voltar` fica no fim do endereço. */
 export async function executar(voltar: string, ok: string, fn: () => Promise<unknown>): Promise<never> {
+  const [base, ancora] = voltar.split('#'); const sep = base.includes('?') ? '&' : '?'; const fim = ancora ? `#${ancora}` : '';
   let destino: string;
-  try { await fn(); destino = `${voltar}${voltar.includes('?') ? '&' : '?'}ok=${encodeURIComponent(ok)}`; }
-  catch (e) { destino = `${voltar}${voltar.includes('?') ? '&' : '?'}erro=${encodeURIComponent(mensagemDeErro(e))}`; }
+  try { await fn(); destino = `${base}${sep}ok=${encodeURIComponent(ok)}${fim}`; }
+  catch (e) { destino = `${base}${sep}erro=${encodeURIComponent(mensagemDeErro(e))}${fim}`; }
   redirect(destino);
 }

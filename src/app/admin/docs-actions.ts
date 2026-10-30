@@ -1,7 +1,7 @@
 'use server';
 import { exigirUsuario } from '@/lib/session';
 import { executar } from '@/lib/actions-util';
-import { aplicarModelo, conferirArquivo, criarExigencia, criarModeloDeEmpresa, definirExigenciaAtiva, editarExigencia, enviarArquivo } from '@/lib/services/documentos';
+import { aplicarModelo, conferirArquivo, criarExigencia, criarModeloDeEmpresa, definirExigenciaAtiva, editarExigencia, enviarArquivo, removerAvulso } from '@/lib/services/documentos';
 import { AppError } from '@/lib/errors';
 
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? '');
@@ -40,4 +40,8 @@ export async function acaoEnviarPeloEscritorio(fd: FormData) {
     const f = fd.get('arquivo'); if (!(f instanceof File) || !f.size) throw new AppError('Selecione um arquivo.');
     await enviarArquivo(a, { empresaId: e, exigenciaId: s(fd, 'exigenciaId'), competencia: c, nome: f.name, dados: Buffer.from(await f.arrayBuffer()) });
   });
+}
+export async function acaoRemoverAvulsoAdmin(fd: FormData) {
+  const a = await exigirUsuario('admin'); const e = s(fd, 'empresaId'); const c = s(fd, 'competencia');
+  await executar(`/admin/empresas/${e}/documentos?competencia=${c}#outros`, 'Arquivo retirado.', () => removerAvulso(a, s(fd, 'id')));
 }

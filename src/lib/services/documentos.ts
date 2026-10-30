@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { getPool, query, tx } from '../db';
 import { Actor, AppError, exigirAdmin } from '../errors';
-import { gravar, ler } from '../storage';
+import { apagar, gravar, ler } from '../storage';
 import { obterEmpresa } from './empresas';
 import { registrar } from './auditoria';
 
@@ -223,4 +223,74 @@ export async function conferirArquivo(actor: Actor, arquivoId: string, decisao: 
     await c.query(`UPDATE arquivos SET situacao=$2, motivo_rejeicao=$3, conferido_por=$4, conferido_em=now() WHERE id=$1`, [arquivoId, decisao, decisao === 'rejeitado' ? m : null, actor.id]);
     await registrar(c, { usuarioId: actor.id, empresaId: a.empresa_id, acao: `arquivo.${decisao}`, entidade: 'arquivo', entidadeId: arquivoId, detalhes: decisao === 'rejeitado' ? { motivo: m } : {} });
   });
+}
+
+// --- Outros documentos (PDFs avulsos enviados pelo cliente) ---
+export const MAX_AVULSOS_POR_ENVIO = 10;
+
+/** Um ou mais PDFs de uma vez, com descrição opcional. Só PDF de verdade (assinatura %PDF), até 20 MB no total por envio. */
+export async function enviarAvulsos(actor: Actor, p: { empresaId: string; competencia: string; descricao?: string; arquivos: { nome: string; dados: Buffer }[] }) {
+  const emp = await obterEmpresa(actor, p.empresaId);
+  competenciaSchema.parse(p.competencia);
+  const arqs = p.arquivos.filter((a) => a.dados.length);
+  if (!arqs.length) throw new AppError('Selecione ao menos um PDF.');
+  if (arqs.length > MAX_AVULSOS_POR_ENVIO) throw new AppError(`Envie no máximo ${MAX_AVULSOS_POR_ENVIO} arquivos por vez.`);
+  if (arqs.reduce((t, a) => t + a.dados.length, 0) > TAMANHO_MAX) throw new AppError('Os arquivos somam mais de 20 MB. Envie em partes.');
+  for (const a of arqs) {
+    if ((a.nome.split('.').pop() ?? '').toLowerCase() !== 'pdf') throw new AppError(`"${nomeSeguro(a.nome)}" não é PDF. Aqui só são aceitos arquivos PDF.`);
+    if (!assinaturaOk('pdf', a.dados)) throw new AppError(`"${nomeSeguro(a.nome)}" não é um PDF válido.`);
+  }
+  const descricao = (p.descricao ?? '').trim().slice(0, 200) || null;
+  const ids: string[] = [];
+  for (const a of arqs) {
+    const chave = `${emp.id}/avulsos/${randomUUID()}`;
+    await gravar(chave, a.dados);
+    ids.push(await tx(async (c) => {
+      const r = await c.query(
+        `INSERT INTO documentos_avulsos(empresa_id,competencia,descricao,nome_original,chave_storage,tamanho,sha256,enviado_por) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+        [emp.id, p.competencia, descricao, nomeSeguro(a.nome), chave, a.dados.length, createHash('sha256').update(a.dados).digest('hex'), actor.id]);
+      await registrar(c, { usuarioId: actor.id, empresaId: emp.id, acao: 'avulso.enviar', entidade: 'documento_avulso', entidadeId: r.rows[0].id, detalhes: { competencia: p.competencia } });
+      return r.rows[0].id as string;
+    }));
+  }
+  return ids;
+}
+
+export async function listarAvulsos(actor: Actor, empresaId: string, competencia: string) {
+  const emp = await obterEmpresa(actor, empresaId); competenciaSchema.parse(competencia);
+  return (await query(
+    `SELECT d.id,d.descricao,d.nome_original,d.tamanho,d.enviado_em,d.visto_em,d.descartado_em,u.nome enviado_por
+       FROM documentos_avulsos d JOIN usuarios u ON u.id=d.enviado_por
+      WHERE d.empresa_id=$1 AND d.competencia=$2 AND d.removido_em IS NULL ORDER BY d.enviado_em DESC`, [emp.id, competencia])).rows as
+    { id: string; descricao: string | null; nome_original: string; tamanho: string; enviado_em: Date; visto_em: Date | null; descartado_em: Date | null; enviado_por: string }[];
+}
+
+async function obterAvulso(actor: Actor, id: string) {
+  if (!z.string().uuid().safeParse(id).success) throw new AppError('Arquivo não encontrado.', 'nao_encontrado');
+  const d = (await query('SELECT * FROM documentos_avulsos WHERE id=$1 AND removido_em IS NULL', [id])).rows[0];
+  if (!d) throw new AppError('Arquivo não encontrado.', 'nao_encontrado');
+  await obterEmpresa(actor, d.empresa_id); // mesma regra de acesso da empresa; mesma resposta se não for sua
+  return d;
+}
+/** Download. O 1º download do escritório marca como "visto" (a partir daí o cliente não remove mais). */
+export async function baixarAvulso(actor: Actor, id: string) {
+  const d = await obterAvulso(actor, id);
+  if (d.descartado_em) throw new AppError('Este arquivo foi descartado conforme a política de retenção de dados.', 'nao_encontrado');
+  const dados = await ler(d.chave_storage);
+  await tx(async (c) => {
+    if (actor.papel === 'admin' && !d.visto_em) await c.query('UPDATE documentos_avulsos SET visto_em=now(), visto_por=$2 WHERE id=$1 AND visto_em IS NULL', [d.id, actor.id]);
+    await registrar(c, { usuarioId: actor.id, empresaId: d.empresa_id, acao: 'avulso.baixar', entidade: 'documento_avulso', entidadeId: d.id });
+  });
+  return { dados, nome: d.nome_original as string };
+}
+/** Cliente retira um envio errado enquanto o escritório ainda não abriu; o escritório pode retirar sempre. O conteúdo é apagado; o registro fica na auditoria. */
+export async function removerAvulso(actor: Actor, id: string) {
+  const d = await obterAvulso(actor, id);
+  if (actor.papel === 'cliente' && d.visto_em) throw new AppError('O escritório já abriu este arquivo. Para retirá-lo, fale com o escritório.');
+  await tx(async (c) => {
+    const r = await c.query('UPDATE documentos_avulsos SET removido_em=now() WHERE id=$1 AND removido_em IS NULL' + (actor.papel === 'cliente' ? ' AND visto_em IS NULL' : ''), [d.id]);
+    if (!r.rowCount) throw new AppError('O escritório já abriu este arquivo. Para retirá-lo, fale com o escritório.');
+    await registrar(c, { usuarioId: actor.id, empresaId: d.empresa_id, acao: 'avulso.remover', entidade: 'documento_avulso', entidadeId: d.id, detalhes: { nome: d.nome_original } });
+  });
+  await apagar(d.chave_storage);
 }

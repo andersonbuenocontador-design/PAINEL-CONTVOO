@@ -1,16 +1,16 @@
 import { notFound } from 'next/navigation';
 import { exigirUsuario } from '@/lib/session';
 import { obterEmpresa } from '@/lib/services/empresas';
-import { listarExigencias, listarModelos, situacaoCompetencia, historicoVersoes } from '@/lib/services/documentos';
+import { listarAvulsos, listarExigencias, listarModelos, situacaoCompetencia, historicoVersoes } from '@/lib/services/documentos';
 import { AppError } from '@/lib/errors';
 import { Avisos, CompetenciaSeletor, ROTULO, Topo, competenciaDe } from '../../../../components';
 import { CamposExigencia } from '../../../FormExigencia';
-import { acaoAplicarModelo, acaoAtivarExigencia, acaoConferir, acaoCriarExigencia, acaoCriarModelo, acaoEditarExigencia, acaoEnviarPeloEscritorio } from '../../../docs-actions';
+import { acaoAplicarModelo, acaoAtivarExigencia, acaoConferir, acaoCriarExigencia, acaoCriarModelo, acaoEditarExigencia, acaoEnviarPeloEscritorio, acaoRemoverAvulsoAdmin } from '../../../docs-actions';
 
 export default async function DocsEmpresa({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ competencia?: string; erro?: string; ok?: string }> }) {
   const u = await exigirUsuario('admin'); const { id } = await params; const sp = await searchParams; const comp = competenciaDe(sp.competencia);
   let e; try { e = await obterEmpresa(u, id); } catch (x) { if (x instanceof AppError) notFound(); throw x; }
-  const [exigencias, modelos, s] = await Promise.all([listarExigencias(u, id), listarModelos(u), situacaoCompetencia(u, id, comp)]);
+  const [exigencias, modelos, s, avulsos] = await Promise.all([listarExigencias(u, id), listarModelos(u), situacaoCompetencia(u, id, comp), listarAvulsos(u, id, comp)]);
   const hist = new Map(await Promise.all(s.itens.filter((i) => i.arquivo_id).map(async (i) => [i.exigencia_id, await historicoVersoes(u, id, i.exigencia_id, comp)] as const)));
   const ind = s.indicadores;
   return (<><Topo u={u} /><main>
@@ -30,6 +30,13 @@ export default async function DocsEmpresa({ params, searchParams }: { params: Pr
             <form action={acaoEnviarPeloEscritorio} style={{ marginTop: 6 }}><input type="hidden" name="empresaId" value={id} /><input type="hidden" name="competencia" value={comp} /><input type="hidden" name="exigenciaId" value={i.exigencia_id} /><input type="file" name="arquivo" required /><button className="sec">Anexar pelo escritório</button></form></td></tr>))}
         {!s.itens.length && <tr><td colSpan={3} className="soon">Nenhum documento exigido nesta competência.</td></tr>}
       </tbody></table></div>
+    <div className="card" id="outros"><h2>Outros documentos enviados pelo cliente ({avulsos.length})</h2>
+      {avulsos.length ? <table><thead><tr><th>Arquivo</th><th>Enviado</th><th></th></tr></thead><tbody>
+        {avulsos.map((d) => (<tr key={d.id}>
+          <td>{d.descartado_em ? <span className="soon">{d.nome_original} (descartado)</span> : <a href={`/api/avulsos/${d.id}`}>{d.nome_original}</a>} {!d.visto_em && !d.descartado_em && <span className="tag">Novo</span>}{d.descricao && <div className="soon">{d.descricao}</div>}</td>
+          <td>{d.enviado_por} · {new Date(d.enviado_em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</td>
+          <td><form action={acaoRemoverAvulsoAdmin}><input type="hidden" name="empresaId" value={id} /><input type="hidden" name="competencia" value={comp} /><input type="hidden" name="id" value={d.id} /><button className="sec">Retirar</button></form></td></tr>))}
+      </tbody></table> : <p className="soon">Nenhum PDF avulso nesta competência.</p>}</div>
     <div className="card"><h2>Documentos exigidos desta empresa</h2>
       {exigencias.map((x) => (<details key={x.id} style={{ borderBottom: '1px solid var(--bd)', padding: '8px 0' }}>
         <summary><strong>{x.nome}</strong>{x.instituicao && ` — ${x.instituicao}`} · {x.frequencia} · {x.formatos.join('/').toUpperCase()}{!x.obrigatorio && ' · opcional'} {!x.ativo && <span className="tag off">inativo</span>}</summary>
