@@ -31,6 +31,8 @@ fs.writeFileSync('/tmp/e2e/out.csv', 'Data;Histórico;Valor\n02/10/2026;TARIFA M
   await adm.goto(`${B}/admin/empresas/${idAlfa}/extratos?competencia=${C}`); await adm.setInputFiles('input[name=arquivo]', '/tmp/e2e/out.csv'); await adm.click('button:has-text("Ler extrato")'); await adm.waitForURL(/ok=/);
   ok(!adm.url().includes('/importacao/') && await adm.locator('.aviso.info:has-text("3 lançamento(s)")').count() === 1, 'escritório envia extrato e ele vai direto para a conciliação (sem prévia)');
   await cli.goto(`${B}/cliente/${idAlfa}/extratos?competencia=${C}`);
+  ok(await cli.locator('.guiada h2:has-text("Vamos organizar")').count() === 1, 'cliente abre no modo guiado');
+  await cli.click('button:has-text("Ver em tabela")'); await cli.waitForSelector('table'); ok(true, 'cliente troca para a tabela (fica lembrado)');
   ok(await cli.locator('button:has-text("Para revisar (2)")').count() > 0, 'tela do conciliador: "Para revisar (2)"');
   ok(await cli.locator('tr:has-text("ENERGIA") td.conta:has-text("Energia elétrica")').count() > 0 && await cli.locator('tr:has-text("ENERGIA") td.conta:has-text("(23)")').count() === 0 && await cli.locator('tr:has-text("ENERGIA") .chip:has-text("Média")').count() > 0, 'energia sugerida em Média com a categoria genérica, sem código');
   ok(await cli.locator('tr:has-text("PIX") .prefixo:has-text("REVISAR")').count() > 0, 'sem natureza: REVISAR / Baixa');

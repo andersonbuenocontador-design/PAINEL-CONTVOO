@@ -137,3 +137,27 @@
 .conc a.btn{color:var(--ink)}
 .conc a.btn.pri{color:var(--on-accent)}
 .conc td.nota{white-space:nowrap;font-size:12px}.conc .falta-nota{color:var(--erro,#b42318);font-weight:600}
+/* ---------- conciliação guiada (cliente) ---------- */
+.conc .guiada{display:grid;gap:12px}
+.conc .guiada-topo{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}.conc .guiada-topo h2{margin:0 0 4px;font-size:1.25rem}.conc .guiada-topo p{margin:0}
+.conc .progresso{height:12px;background:#e6ebf2;border-radius:99px;overflow:hidden}.conc .progresso>div{height:100%;background:linear-gradient(90deg,#14b8a6,#0f766e);border-radius:99px;transition:width .35s ease}
+.conc .guiada-meta{display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:14px}.conc .conquista{background:#fff7e0;border:1px solid #f5d77a;color:#7a5a00;border-radius:99px;padding:2px 10px;font-size:12px;font-weight:600}
+.conc .guiada-aviso{animation:aparece .25s ease}@keyframes aparece{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.conc .cartao-guiado{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px 24px;box-shadow:0 8px 28px #0b2a4a12;display:grid;gap:12px;max-width:860px;width:100%;margin:0 auto}
+.conc .guiada-contador{font-size:13px;color:var(--ink-2,#667085);display:flex;gap:10px;flex-wrap:wrap;align-items:center}.conc .tag-correcao{background:#fef3f2;color:#b42318;border-radius:6px;padding:2px 8px;font-weight:600}
+.conc .guiada-frase{font-size:1.35rem;margin:0}.conc .val-ent{color:#0f766e}.conc .val-sai{color:#b42318}
+.conc .guiada-desc{margin:0;font-family:var(--mono,monospace);font-size:13px;background:#f6f8fb;border-radius:8px;padding:8px 10px;color:#344054;word-break:break-word}
+.conc .sugestao{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;border:2px solid #99e2d6;background:#effbf8;border-radius:12px;padding:12px 14px}
+.conc .sugestao>div:first-child{display:grid;gap:2px}.conc .sugestao strong{font-size:1.1rem}.conc .sugestao .motivo{font-size:12px}
+.conc .btn.grande{padding:10px 18px;font-size:15px}
+.conc .guiada-pergunta{font-weight:600;margin:4px 0 0}.conc .guiada-pergunta span{font-weight:500}
+.conc .rapidas{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.conc .btn.rapida{justify-content:flex-start;text-align:left;padding:10px 12px;white-space:normal}.conc .btn.rapida.nao-sei{border-style:dashed}
+.conc kbd{font-family:var(--mono,monospace);font-size:11px;background:#eef2f7;border:1px solid #d5dce6;border-bottom-width:2px;border-radius:4px;padding:0 5px;color:#475467;margin:0 2px}
+.conc .btn.pri kbd{background:#ffffff26;border-color:#ffffff55;color:#fff}
+.conc .campo.outra select{max-width:420px}
+.conc .nota-passo{display:grid;gap:8px;background:#f8fafc;border-radius:12px;padding:12px 14px}
+.conc .guiada-rodape{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:10px;font-size:13px}
+.conc .btn.link{background:none;border:0;color:var(--accent,#0f766e);padding:4px 6px;box-shadow:none}.conc .btn.link:disabled{color:#98a2b3}
+.conc .cartao-guiado.pausa,.conc .cartao-guiado.fim{text-align:center;justify-items:center}
+@media (max-width:640px){.conc .cartao-guiado{padding:16px}.conc .guiada-frase{font-size:1.15rem}.conc kbd{display:none}}

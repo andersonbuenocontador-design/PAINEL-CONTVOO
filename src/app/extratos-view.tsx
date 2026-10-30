@@ -13,6 +13,7 @@ import { puxarExtratosDosDocumentos } from '@/lib/services/extratos';
 import { query } from '@/lib/db';
 import { bancosConciliacao, conferenciaSaldos, listarConciliacao, listarPlano, obterConciliacao, resumoLinhas } from '@/lib/services/conciliacao';
 import { ConciliacaoTabela } from './ConciliacaoTabela';
+import { ConciliacaoCliente } from './ConciliacaoCliente';
 import './conciliacao.css';
 import { AppError } from '@/lib/errors';
 import { brl, dataBr } from '@/lib/format';
@@ -39,10 +40,12 @@ export async function ExtratosPagina({ u, empresaId, comp, sp, base, voltar }: {
   const brl2 = (c: number | null) => (c == null ? '—' : (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
   const contas = contasTodas.filter((c) => c.ativo);
   const rs = resumoLinhas(linhas);
+  const planoTela = (admin || !plano.some((c) => c.generico) ? plano : plano.filter((c) => c.generico)).map((c) => ({ codigo: c.codigo, classificacao: c.classificacao, nome: c.nome, grupo: c.grupo, descricao: c.descricao, tipo: c.tipo }));
   const [ano, mes] = comp.split('-');
   type Res = { periodo: string[] | null; entradas: number; saidas: number; saldoFinalInformado: number | null; conferenciaSaldo?: { saldoAnterior: number | null; saldoFinalInformado: number | null; confere: boolean | null; diferenca: number | null } | null };
   const porConta = new Map<string, { nome: string; conta: string | null; itens: typeof bancosImp }>();
   for (const b of bancosImp) { const g = porConta.get(b.conta_bancaria_id) ?? { nome: b.banco, conta: b.conta, itens: [] as typeof bancosImp }; g.itens.push(b); porConta.set(b.conta_bancaria_id, g); }
+  const bancosTela = [...porConta.entries()].map(([id, g]) => ({ id, nome: g.conta ? `${g.nome} · cc ${g.conta}` : g.nome }));
   const dm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
   const n2 = (c: number | null | undefined) => (c == null ? '—' : (c / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
   return (<>
@@ -69,6 +72,8 @@ export async function ExtratosPagina({ u, empresaId, comp, sp, base, voltar }: {
       {status === 'devolvida' && <div className="aviso erro" role="alert"><strong>O escritório devolveu esta competência para correção.</strong>{conc.mensagem && <> Mensagem: {conc.mensagem}</>} {nCorrecoes > 0 ? `${nCorrecoes} movimentação(ões) estão marcadas com o que precisa ser ajustado (filtro "Correção pedida").` : ''} Depois de ajustar, envie de novo ao escritório.</div>}
       {status === 'enviada' && <div className="aviso info">{admin ? 'O cliente enviou esta competência para conferência. Marque as linhas que precisam de ajuste e devolva, ou aprove.' : 'Competência enviada ao escritório. Aguardando conferência; a edição fica bloqueada até a devolução ou conclusão.'}</div>}
       {status === 'concluida' && <div className="aviso info">Competência concluída pelo escritório.</div>}
+      {!admin && <ConciliacaoCliente key={sp.conta ?? 'todas'} linhas={linhas} plano={planoTela} bancos={bancosTela} somenteLeitura={somenteLeitura} bancoInicial={sp.conta && porConta.has(sp.conta) ? sp.conta : undefined} mes={comp}
+            podeEnviar={status === 'revisao' || status === 'devolvida'} enviar={<form action={acaoEnviarConferencia}><input type="hidden" name="empresaId" value={empresaId} /><input type="hidden" name="competencia" value={comp} /><button className="btn pri">Concluir e enviar ao escritório</button></form>} />}
       <div className="painel"><h2>Conferência da competência</h2>
         <div className="grid2"><div><div className="eyebrow">Movimentações</div><strong>{linhas.length}</strong></div><div><div className="eyebrow">Classificadas (com conta)</div><strong>{linhas.length - semConta}</strong></div>
           <div><div className="eyebrow">Sem conta</div><strong>{semConta}</strong></div><div><div className="eyebrow">Revisadas (OK)</div><strong>{linhas.filter((l) => l.revisado).length}</strong></div>
@@ -105,7 +110,7 @@ export async function ExtratosPagina({ u, empresaId, comp, sp, base, voltar }: {
           <td>{i.status === 'previa' && <a href={`${base}/importacao/${i.id}`}>Abrir prévia</a>}</td></tr>))}</tbody></table></>}</details>}
 
       <div id="lancamentos" />
-      <ConciliacaoTabela key={sp.conta ?? 'todas'} linhas={linhas} plano={(admin || !plano.some((c) => c.generico) ? plano : plano.filter((c) => c.generico)).map((c) => ({ codigo: c.codigo, classificacao: c.classificacao, nome: c.nome, grupo: c.grupo, descricao: c.descricao, tipo: c.tipo }))} bancos={[...porConta.entries()].map(([id, g]) => ({ id, nome: g.conta ? `${g.nome} · cc ${g.conta}` : g.nome }))} admin={admin} somenteLeitura={somenteLeitura} bancoInicial={sp.conta && porConta.has(sp.conta) ? sp.conta : undefined} />
+      {admin && <ConciliacaoTabela key={sp.conta ?? 'todas'} linhas={linhas} plano={planoTela} bancos={bancosTela} admin={admin} somenteLeitura={somenteLeitura} bancoInicial={sp.conta && porConta.has(sp.conta) ? sp.conta : undefined} />}
     </div></main></>);
 }
 

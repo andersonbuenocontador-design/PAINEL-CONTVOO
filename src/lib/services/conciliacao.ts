@@ -8,6 +8,9 @@ import { competenciaSchema } from './documentos';
 import { obterEmpresa } from './empresas';
 import { registrar } from './auditoria';
 import { servePara, sugerirGenerico } from '../regras-generico';
+import { PLANO_GENERICO } from '../plano-generico';
+/** Categoria "Não sei identificar" (vai para a revisão do escritório e não ensina o sistema). */
+export const CODIGO_NAO_SEI = PLANO_GENERICO.find((c) => c.referencia === 'OUT006')!.codigo;
 
 type Runner = Pick<pg.PoolClient, 'query'>;
 export { chaveNormalizada };
@@ -118,13 +121,13 @@ export type LinhaConciliacao = {
   id: number; data: string; descricao_original: string; valor: number; documento: string | null; banco: string; conta_bancaria_id: string;
   conta_codigo: number | null; conta_nome: string | null; classificacao: string | null; complemento: string | null;
   confianca: 'A' | 'M' | 'B'; motivo: string | null; observacao: string | null; origem: string; revisado: boolean; revisado_por: string | null;
-  correcao_pedida: boolean; correcao_motivo: string | null; conta_grupo: string | null; nota_fiscal: string | null; sem_nota: boolean;
+  correcao_pedida: boolean; correcao_motivo: string | null; conta_grupo: string | null; nota_fiscal: string | null; sem_nota: boolean; chave: string | null;
 };
 export async function listarConciliacao(actor: Actor, empresaId: string, competencia: string): Promise<LinhaConciliacao[]> {
   const e = await obterEmpresa(actor, empresaId); competenciaSchema.parse(competencia);
   return (await query(
     `SELECT m.id,m.data::text data,m.descricao_original,m.valor_centavos::text valor,m.documento,cb.banco,cb.id conta_bancaria_id,m.conta_codigo,p.nome conta_nome,p.classificacao,
-            m.complemento,m.confianca,m.motivo,m.observacao,m.origem,m.revisado,u.nome revisado_por,m.correcao_pedida,m.correcao_motivo,p.grupo conta_grupo,m.nota_fiscal,m.sem_nota
+            m.complemento,m.confianca,m.motivo,m.observacao,m.origem,m.revisado,u.nome revisado_por,m.correcao_pedida,m.correcao_motivo,p.grupo conta_grupo,m.nota_fiscal,m.sem_nota,m.chave_normalizada chave
        FROM movimentacoes m JOIN contas_bancarias cb ON cb.id=m.conta_id
        LEFT JOIN plano_contas p ON p.empresa_id=m.empresa_id AND p.codigo=m.conta_codigo LEFT JOIN usuarios u ON u.id=m.revisado_por
       WHERE m.empresa_id=$1 AND m.competencia=$2 ORDER BY m.data, m.id`, [e.id, competencia])).rows.map((r) => ({ ...r, id: Number(r.id), valor: Number(r.valor) }));
@@ -136,7 +139,9 @@ export async function bancosConciliacao(actor: Actor, empresaId: string, compete
   const e = await obterEmpresa(actor, empresaId); competenciaSchema.parse(competencia);
   return (await query(
     `SELECT i.id, cb.id conta_bancaria_id, cb.banco, cb.conta, i.nome_arquivo, i.resumo FROM importacoes i JOIN contas_bancarias cb ON cb.id=i.conta_id
-      WHERE i.empresa_id=$1 AND i.competencia=$2 AND i.status='confirmada' ORDER BY i.confirmada_em`, [e.id, competencia])).rows;
+      WHERE i.empresa_id=$1 AND i.competencia=$2 AND i.status='confirmada'
+        AND EXISTS (SELECT 1 FROM movimentacoes m WHERE m.importacao_id=i.id) -- reenvio que não trouxe nada novo não aparece de novo
+      ORDER BY i.confirmada_em`, [e.id, competencia])).rows;
 }
 export type StatusConc = 'revisao' | 'enviada' | 'devolvida' | 'concluida';
 export type Conciliacao = { status: StatusConc; mensagem: string | null; enviadaEm: string | null; devolvidaEm: string | null; concluidaEm: string | null };
@@ -269,7 +274,7 @@ async function linhasAcessiveis(actor: Actor, idsIn: number[], opts: { paraEdita
   return rows.map((r) => ({ id: Number(r.id), competencia: r.competencia as string, empresaId: r.empresa_id as string, valor: Number(r.valor), chave: r.chave as string, conta: r.conta_codigo as number | null }));
 }
 async function aprender(c: Runner, empresaId: string, chave: string, valor: number, conta: number) {
-  if (!chave) return;
+  if (!chave || conta === CODIGO_NAO_SEI) return; // "Não sei identificar" não vira regra para os próximos meses
   await c.query(
     `INSERT INTO dicionario_classificacao(empresa_id,chave,sentido,conta_codigo) VALUES ($1,$2,$3,$4)
      ON CONFLICT (empresa_id,chave,sentido) DO UPDATE SET conta_codigo=EXCLUDED.conta_codigo, vezes=dicionario_classificacao.vezes+1, atualizado_em=now()`, [empresaId, chave, valor > 0 ? 'C' : 'D', conta]);
