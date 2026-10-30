@@ -25,19 +25,25 @@ afterAll(() => getPool().end());
 describe('cobrar envio de documentos (Entregas do mês)', () => {
   it('cria solicitação no painel do cliente com o que falta, sem duplicar', async () => {
     await enviarArquivo(ua, { empresaId: empA, exigenciaId: ex1, competencia: C, nome: 'e.pdf', dados: PDF });
-    const id = await cobrarDocumentos(admin, empA, C);
+    const { id } = await cobrarDocumentos(admin, empA, C);
     const p = (await listarPendencias(ua, empA)).find((x) => x.id === id)!;
     expect(p.descricao).toContain('Faltam documentos de 10/2026'); expect(p.descricao).toContain('• Folha de pagamento'); expect(p.descricao).not.toContain('Extrato');
     expect(p.situacao).toBe('aberta'); expect((await resumoPendencias(ua, empA)).aguardando).toBe(1);
     expect((await cobrancasAbertas(admin, C)).has(empA)).toBe(true);
-    await expect(cobrarDocumentos(admin, empA, C)).rejects.toThrow(/Já existe uma cobrança/);
+    // cobrar de novo: lembrete na MESMA solicitação, com a lista atualizada
+    const r2 = await cobrarDocumentos(admin, empA, C);
+    expect(r2).toEqual({ id, lembrete: true });
+    expect((await listarPendencias(admin, empA)).filter((x) => x.situacao === 'aberta')).toHaveLength(1);
+    const msgs = (await query('SELECT texto FROM pendencia_mensagens WHERE pendencia_id=$1 ORDER BY id', [id])).rows.map((m) => m.texto);
+    expect(msgs).toHaveLength(2); expect(msgs[1]).toMatch(/^Lembrete: ainda faltam documentos de 10\/2026:\n• Folha de pagamento/);
+    expect((await cobrancasAbertas(admin, C)).get(empA)?.lembretes).toBe(1);
     await expect(cobrarDocumentos(ua, empA, C)).rejects.toMatchObject({ code: 'proibido' });
   });
   it('documento recusado entra na cobrança com o motivo', async () => {
     const a = await enviarArquivo(ua, { empresaId: empA, exigenciaId: ex1, competencia: C, nome: 'e.pdf', dados: PDF });
     await enviarArquivo(ua, { empresaId: empA, exigenciaId: ex2, competencia: C, nome: 'f.pdf', dados: PDF });
     await conferirArquivo(admin, a, 'rejeitado', 'ilegível');
-    const id = await cobrarDocumentos(admin, empA, C);
+    const { id } = await cobrarDocumentos(admin, empA, C);
     expect((await listarPendencias(admin, empA)).find((x) => x.id === id)!.descricao).toContain('• Extrato — Banrisul (recusado: ilegível; envie de novo)');
   });
   it('encerra sozinha quando o cliente envia tudo; nada a cobrar quando completo', async () => {

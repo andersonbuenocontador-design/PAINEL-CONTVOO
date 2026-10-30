@@ -8,25 +8,41 @@ import { registrar } from './auditoria';
 type Runner = Pick<pg.PoolClient, 'query'>;
 const ABERTA = `origem='cobranca_documentos' AND situacao IN ('aberta','respondida')`;
 
-/** Cobranças em andamento por empresa, para a tela Entregas do mês. */
+/** Cobranças em andamento por empresa, para a tela Entregas do mês: quando foi cobrado e o último lembrete. */
 export async function cobrancasAbertas(actor: Actor, competencia: string) {
   exigirAdmin(actor); competenciaSchema.parse(competencia);
-  const { rows } = await query(`SELECT DISTINCT ON (empresa_id) empresa_id, criado_em FROM pendencias WHERE competencia=$1 AND ${ABERTA} ORDER BY empresa_id, criado_em DESC`, [competencia]);
-  return new Map(rows.map((r) => [r.empresa_id as string, r.criado_em as Date]));
+  const { rows } = await query(
+    `SELECT DISTINCT ON (p.empresa_id) p.empresa_id, p.id, p.criado_em, (SELECT max(m.criado_em) FROM pendencia_mensagens m WHERE m.pendencia_id=p.id) ultimo, (SELECT count(*)::int FROM pendencia_mensagens m WHERE m.pendencia_id=p.id) msgs
+       FROM pendencias p WHERE p.competencia=$1 AND ${ABERTA} ORDER BY p.empresa_id, p.criado_em DESC`, [competencia]);
+  return new Map(rows.map((r) => [r.empresa_id as string, { id: r.id as string, criado_em: r.criado_em as Date, ultimo: r.ultimo as Date, lembretes: Math.max(0, (r.msgs as number) - 1) }]));
 }
 
-/** Botão "Cobrar envio": cria no painel do cliente uma solicitação com a lista do que falta (pendente ou recusado). */
+/** Texto da cobrança: o que falta no mês (pendente ou recusado, com o motivo). */
+export function textoCobranca(competencia: string, faltam: { nome: string; instituicao: string | null; situacao: string; motivo_rejeicao: string | null }[], lembrete = false) {
+  const [ano, mes] = competencia.split('-');
+  const lista = faltam.map((i) => `• ${i.nome}${i.instituicao ? ` — ${i.instituicao}` : ''}${i.situacao === 'rejeitado' ? ` (recusado${i.motivo_rejeicao ? `: ${i.motivo_rejeicao}` : ''}; envie de novo)` : ''}`).join('\n');
+  return `${lembrete ? 'Lembrete: ainda faltam' : 'Faltam'} documentos de ${mes}/${ano}:\n${lista}\n\nEnvie pelo cartão "Documentos do mês" do painel.`;
+}
+
+/** Botão "Cobrar envio": 1ª vez cria no painel do cliente uma solicitação com a lista do que falta;
+ *  nas seguintes, manda um lembrete na mesma solicitação (lista atualizada) e ela volta a "aguardando o cliente". */
 export async function cobrarDocumentos(actor: Actor, empresaId: string, competencia: string) {
   exigirAdmin(actor); competenciaSchema.parse(competencia);
   const s = await situacaoCompetencia(actor, empresaId, competencia);
   const faltam = s.itens.filter((i) => i.obrigatorio && (i.situacao === 'pendente' || i.situacao === 'rejeitado'));
   if (!faltam.length) throw new AppError('Esta empresa já enviou todos os documentos do mês.');
-  if ((await query(`SELECT 1 FROM pendencias WHERE empresa_id=$1 AND competencia=$2 AND ${ABERTA}`, [empresaId, competencia])).rowCount) throw new AppError('Já existe uma cobrança em andamento para este mês.');
-  const [ano, mes] = competencia.split('-');
-  const lista = faltam.map((i) => `• ${i.nome}${i.instituicao ? ` — ${i.instituicao}` : ''}${i.situacao === 'rejeitado' ? ` (recusado${i.motivo_rejeicao ? `: ${i.motivo_rejeicao}` : ''}; envie de novo)` : ''}`).join('\n');
-  const id = await criarPendencia(actor, empresaId, { categoria: 'documento', competencia, descricao: `Faltam documentos de ${mes}/${ano}:\n${lista}\n\nEnvie pelo cartão "Documentos do mês" do painel.` });
+  const aberta = (await query(`SELECT id FROM pendencias WHERE empresa_id=$1 AND competencia=$2 AND ${ABERTA} ORDER BY criado_em DESC LIMIT 1`, [empresaId, competencia])).rows[0];
+  if (aberta) {
+    await tx(async (c) => {
+      await c.query('INSERT INTO pendencia_mensagens(pendencia_id,usuario_id,texto) VALUES ($1,$2,$3)', [aberta.id, actor.id, textoCobranca(competencia, faltam, true)]);
+      await c.query(`UPDATE pendencias SET situacao='aberta', atualizado_em=now() WHERE id=$1`, [aberta.id]);
+      await registrar(c, { usuarioId: actor.id, empresaId, acao: 'pendencia.lembrete_cobranca', entidade: 'pendencia', entidadeId: aberta.id, detalhes: { competencia, faltam: faltam.length } });
+    });
+    return { id: aberta.id as string, lembrete: true };
+  }
+  const id = await criarPendencia(actor, empresaId, { categoria: 'documento', competencia, descricao: textoCobranca(competencia, faltam) });
   await query(`UPDATE pendencias SET origem='cobranca_documentos' WHERE id=$1`, [id]);
-  return id;
+  return { id, lembrete: false };
 }
 
 /** Chamado quando o cliente envia um documento: se nada mais falta no mês, a cobrança se resolve sozinha. */

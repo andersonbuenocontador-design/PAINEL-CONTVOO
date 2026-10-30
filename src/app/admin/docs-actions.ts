@@ -1,7 +1,8 @@
 'use server';
+import { redirect } from 'next/navigation';
 import { exigirUsuario } from '@/lib/session';
 import { cobrarDocumentos } from '@/lib/services/cobranca';
-import { executar } from '@/lib/actions-util';
+import { executar, mensagemDeErro } from '@/lib/actions-util';
 import { aplicarModelo, conferirArquivo, criarExigencia, criarModeloDeEmpresa, definirExigenciaAtiva, editarExigencia, enviarArquivo, removerAvulso } from '@/lib/services/documentos';
 import { AppError } from '@/lib/errors';
 
@@ -47,6 +48,9 @@ export async function acaoRemoverAvulsoAdmin(fd: FormData) {
   await executar(`/admin/empresas/${e}/documentos?competencia=${c}#outros`, 'Arquivo retirado.', () => removerAvulso(a, s(fd, 'id')));
 }
 export async function acaoCobrarDocumentos(fd: FormData) {
-  const a = await exigirUsuario('admin'); const e = s(fd, 'empresaId'); const c = s(fd, 'competencia');
-  await executar(`/admin/entregas?competencia=${c}`, 'Cobrança enviada ao painel do cliente.', () => cobrarDocumentos(a, e, c));
+  const a = await exigirUsuario('admin'); const e = s(fd, 'empresaId'); const c = s(fd, 'competencia'); const volta = `/admin/entregas?competencia=${c}`;
+  let destino: string;
+  try { const r = await cobrarDocumentos(a, e, c); destino = `${volta}&ok=${encodeURIComponent(r.lembrete ? 'Lembrete enviado ao painel do cliente.' : 'Cobrança enviada ao painel do cliente.')}`; }
+  catch (x) { destino = `${volta}&erro=${encodeURIComponent(mensagemDeErro(x))}`; }
+  redirect(destino);
 }

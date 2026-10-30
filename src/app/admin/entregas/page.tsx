@@ -24,9 +24,9 @@ export default async function Entregas({ searchParams }: { searchParams: Promise
     </div>
     <div className="card"><table><thead><tr><th>Empresa</th><th>Exigidos</th><th>Enviados</th><th>Aprovados</th><th>Rejeitados</th><th>Pendentes</th><th>%</th><th></th></tr></thead><tbody>
       {v.map((e) => { const estado = !e.exigidos ? 'cinza' : e.pendentes || e.rejeitados ? 'vermelho' : 'verde'; return (<tr key={e.id} className={`entrega-${estado}`}><td><Link href={`/admin/empresas/${e.id}`} title="Usuários, documentos, sócios e retiradas da empresa">{e.razao_social}</Link>{novos.get(e.id) ? <> <Link href={`/admin/empresas/${e.id}/documentos#outros`} className="tag" title="PDFs enviados pelo cliente que ainda não foram abertos">{novos.get(e.id)} PDF novo{novos.get(e.id)! > 1 ? 's' : ''}</Link></> : null}</td><td>{e.exigidos}</td><td>{e.enviados}</td><td>{e.aprovados}</td><td>{e.rejeitados}</td><td>{e.pendentes}</td><td>{e.percentual}%</td><td><div className="acoes-entrega"><Link href={`/admin/empresas/${e.id}/documentos?competencia=${comp}`}>Conferir</Link>
-          {estado === 'vermelho' && (cobradas.get(e.id)
-            ? <span className="soon" title="A solicitação está no painel do cliente e se encerra sozinha quando ele enviar tudo">Cobrado em {new Date(cobradas.get(e.id)!).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</span>
-            : <form action={acaoCobrarDocumentos}><input type="hidden" name="empresaId" value={e.id} /><input type="hidden" name="competencia" value={comp} /><button className="danger">Cobrar envio</button></form>)}</div></td></tr>); })}
+          {estado === 'vermelho' && (() => { const cb = cobradas.get(e.id); const dt = (d: Date) => new Date(d).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }); return (<>
+            {cb && <span className="cobrado" title={`1ª cobrança em ${dt(cb.criado_em)}. A solicitação está no painel do cliente e se encerra sozinha quando ele enviar tudo.`}><strong>Cobrado {cb.lembretes + 1}x</strong> · último em {dt(cb.ultimo)}</span>}
+            <form action={acaoCobrarDocumentos}><input type="hidden" name="empresaId" value={e.id} /><input type="hidden" name="competencia" value={comp} /><button className="danger">{cb ? 'Cobrar de novo' : 'Cobrar envio'}</button></form></>); })()}</div></td></tr>); })}
       {!v.length && <tr><td colSpan={8} className="soon">Nenhuma empresa ativa.</td></tr>}</tbody></table></div>
   </main></>);
 }
