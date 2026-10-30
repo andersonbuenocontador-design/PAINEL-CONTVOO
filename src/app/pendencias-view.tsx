@@ -34,7 +34,7 @@ export async function PendenciasPagina({ u, empresaId, sp, voltar }: { u: Usuari
     </details>);
   return (<><Topo u={u} /><main><p><a href={voltar}>← {admin ? 'Empresa' : e.razao_social}</a></p>
     <h1>{admin ? `Pendências — ${e.razao_social}` : 'Pendências do escritório'}</h1><Avisos erro={sp.erro} ok={sp.ok} />
-    {admin && (<div className="card"><h2>Nova solicitação ao cliente</h2><form action={acaoCriarPendencia}><input type="hidden" name="empresaId" value={empresaId} /><div className="grid">
+    {admin && (<div className="card" id="nova"><h2>Nova solicitação ao cliente</h2><form action={acaoCriarPendencia}><input type="hidden" name="empresaId" value={empresaId} /><div className="grid">
       <div><label>Categoria *</label><select name="categoria">{Object.entries(CATEGORIAS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
       <div><label>Competência (opcional)</label><input name="competencia" type="month" defaultValue={competenciaDe()} /></div>
       <div><label>Prazo (opcional)</label><input name="prazo" type="date" /></div>

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { exigirUsuario } from '@/lib/session';
 import { CATEGORIAS, listarPendenciasEscritorio, type FiltroPend } from '@/lib/services/pendencias';
 import { SIT_PEND } from '@/lib/exportar';
+import { listarEmpresas } from '@/lib/services/empresas';
 import { Topo } from '../../components';
 
 type SP = { situacao?: string; categoria?: string; vencidas?: string; busca?: string; competencia?: string };
@@ -9,9 +10,12 @@ export default async function Pendencias({ searchParams }: { searchParams: Promi
   const u = await exigirUsuario('admin'); const sp = await searchParams;
   const f: FiltroPend = { situacao: (sp.situacao ?? 'em_andamento') as FiltroPend['situacao'], categoria: (sp.categoria || undefined) as FiltroPend['categoria'], vencidas: sp.vencidas === '1', busca: sp.busca, competencia: sp.competencia || undefined };
   if (sp.situacao === 'todas') f.situacao = undefined;
-  const lista = await listarPendenciasEscritorio(u, f);
+  const [lista, empresas] = await Promise.all([listarPendenciasEscritorio(u, f), listarEmpresas(u)]);
   const qs = new URLSearchParams(Object.entries({ situacao: sp.situacao === 'todas' ? '' : (sp.situacao ?? 'em_andamento'), categoria: sp.categoria ?? '', vencidas: sp.vencidas ?? '', busca: sp.busca ?? '', competencia: sp.competencia ?? '' }).filter(([, v]) => v)).toString();
   return (<><Topo u={u} /><main><h1>Pendências de todas as empresas</h1>
+    <form method="get" action="/admin/pendencias/nova" className="card row" id="nova-solicitacao"><div style={{ flex: 1, minWidth: 240 }}><label htmlFor="empresaId">Nova solicitação para</label>
+      <select id="empresaId" name="empresaId" required defaultValue=""><option value="" disabled>Escolha a empresa…</option>{empresas.filter((e) => e.situacao === 'ativa').map((e) => <option key={e.id} value={e.id}>{e.razao_social}</option>)}</select></div>
+      <button>Criar solicitação</button></form>
     <form method="get" className="card"><div className="grid">
       <div><label>Situação</label><select name="situacao" defaultValue={sp.situacao ?? 'em_andamento'}><option value="em_andamento">Em andamento</option><option value="aberta">Aguardando o cliente</option><option value="respondida">Aguardando o escritório</option><option value="resolvida">Resolvidas</option><option value="cancelada">Canceladas</option><option value="todas">Todas</option></select></div>
       <div><label>Categoria</label><select name="categoria" defaultValue={sp.categoria ?? ''}><option value="">Todas</option>{Object.entries(CATEGORIAS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>

@@ -18,7 +18,7 @@ export default async function EmpresaDetalhe({ params, searchParams }: { params:
   const voltar = `/admin/empresas/${id}`;
   return (<><Topo u={u} /><main>
     <h1>{e.razao_social} <span className={`tag ${e.situacao === 'inativa' ? 'off' : ''}`}>{e.situacao}</span></h1><Avisos erro={erro} ok={ok} />
-    <p><a className="btn" href={`/admin/empresas/${id}/documentos`}>Documentos e conferência</a> <a className="btn sec" href={`/admin/empresas/${id}/extratos`}>Extratos e contas bancárias</a> <a className="btn sec" href={`/admin/empresas/${id}/informes`}>Sócios e retiradas</a> <a className="btn sec" href={`/admin/empresas/${id}/pendencias`}>Pendências</a></p>
+    <p><a className="btn" href={`/admin/empresas/${id}/documentos`}>Documentos e conferência</a> <a className="btn sec" href={`/admin/empresas/${id}/informes`}>Sócios e retiradas</a></p>
     <div className="card"><h2>Dados da empresa</h2>
       <form action={acaoEditarEmpresa}><input type="hidden" name="id" value={id} /><div className="grid">
         <div><label>Razão social *</label><input name="razaoSocial" defaultValue={e.razao_social} required /></div>

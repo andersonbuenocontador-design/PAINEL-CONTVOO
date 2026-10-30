@@ -38,6 +38,8 @@ const sql = (q) => execSync(`PGPASSWORD=painel_dev psql -q -t -A -h localhost -U
   await adm.goto(`${B}/admin/usuarios`); ok(await adm.locator('button:has-text("E-mails:")').count() === 0, 'botão de preferência de e-mail foi retirado');
 
 
+  await adm.goto(`${B}/admin/pendencias`); await adm.selectOption('#empresaId', { label: 'Empresa Alfa Ltda' }); await adm.click('button:has-text("Criar solicitação")'); await adm.waitForURL(/\/admin\/empresas\/[0-9a-f-]{36}\/pendencias/);
+  ok(await adm.locator('#nova h2:has-text("Nova solicitação ao cliente")').count() === 1, 'Pendências → "Nova solicitação para" leva ao formulário da empresa');
   await adm.goto(`${B}/admin/relatorios`); ok(await adm.locator('h2:has-text("Pendências")').count() > 0, 'relatório geral exibe indicadores');
   const rg = await adm.request.get(`${B}/api/relatorios/geral?competencia=2026-10`); ok(rg.status() === 200 && (await rg.body()).slice(0, 2).toString() === 'PK', 'relatório geral (Excel)');
   ok((await cli.request.get(`${B}/api/relatorios/geral?competencia=2026-10`)).status() === 403, 'cliente não baixa o relatório geral');
