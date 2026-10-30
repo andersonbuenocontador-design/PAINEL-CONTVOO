@@ -2,7 +2,10 @@
 // contagens e erros técnicos mascarados (sem nomes de clientes, CPFs, valores ou senhas). Saída: anotações ::notice::.
 import pg from 'pg';
 import { configPg } from '../src/lib/db';
-const c = new pg.Client(configPg()); await c.connect();
+import { diagnosticar } from '../src/lib/diagnostico';
+process.on('uncaughtException', (e) => { console.log(`::error title=Diagnóstico falhou::${diagnosticar(e, 'banco')}`); process.exit(1); });
+const c = new pg.Client(configPg());
+try { await c.connect(); } catch (e) { console.log(`::error title=Sem conexão com o banco::${diagnosticar(e, 'banco')}`); process.exit(1); }
 const q = async (sql: string) => (await c.query(sql)).rows;
 const secao = (titulo: string, linhas: string[]) => console.log(`::notice title=${titulo}::${(linhas.length ? linhas : ['(nada)']).join('%0A').replace(/\r?\n/g, ' ')}`);
 const dt = (d: Date) => new Date(d).toISOString().slice(0, 16).replace('T', ' ');
