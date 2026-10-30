@@ -23,7 +23,7 @@ if (bancoOk && (email || senha)) {
     if (!email || !senha) throw new Error("SEED_ADMIN incompleto");
     const c = new pg.Client(configPg()); await c.connect();
     try {
-      const r = await c.query(`INSERT INTO usuarios(nome,email,senha_hash,papel,deve_trocar_senha) VALUES ('Administrador',$1,$2,'admin',true) ON CONFLICT DO NOTHING RETURNING id`,
+      const r = await c.query(`INSERT INTO usuarios(nome,email,senha_hash,papel,deve_trocar_senha) VALUES ('Contvoo Contabilidade',$1,$2,'admin',true) ON CONFLICT DO NOTHING RETURNING id`,
         [email.toLowerCase(), await bcrypt.hash(senha, 12)]);
       if (r.rowCount) console.log('admin: criado (troca de senha no 1º acesso)');
       else if (process.env.REDEFINIR_SENHA_ADMIN === '1') {

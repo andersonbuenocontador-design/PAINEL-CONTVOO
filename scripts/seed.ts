@@ -9,7 +9,7 @@ if (!email || !senha || senha.length < 10) { console.error('Defina SEED_ADMIN_EM
 const c = new pg.Client(configPg(DATABASE_URL));
 await c.connect();
 const r = await c.query(
-  `INSERT INTO usuarios(nome,email,senha_hash,papel,deve_trocar_senha) VALUES ('Administrador',$1,$2,'admin',true) ON CONFLICT DO NOTHING RETURNING id`,
+  `INSERT INTO usuarios(nome,email,senha_hash,papel,deve_trocar_senha) VALUES ('Contvoo Contabilidade',$1,$2,'admin',true) ON CONFLICT DO NOTHING RETURNING id`,
   [email.toLowerCase(), await bcrypt.hash(senha, 12)]);
 console.log(r.rowCount ? 'Administrador criado (será exigida troca de senha no primeiro acesso).' : 'Administrador já existe; nada alterado.');
 await c.end();

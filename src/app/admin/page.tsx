@@ -9,7 +9,7 @@ export default async function AdminHub({ searchParams }: { searchParams: Promise
   const u = await exigirUsuario('admin'); const comp = competenciaDe((await searchParams).competencia); const c = `?competencia=${comp}`;
   const r = await resumoEscritorio(u, comp); const [ano, mes] = comp.split('-');
   return (<><Topo u={u} /><main>
-    <div className="saudacao"><div><h1>Olá, {u.nome.split(' ')[0]}</h1><p className="soon" style={{ margin: '4px 0 0' }}>Competência {mes}/{ano}</p></div><CompetenciaSeletor atual={comp} mini /></div>
+    <div className="saudacao"><div><h1>{u.nome === 'Administrador' || u.nome.startsWith('Contvoo') ? 'Contvoo Contabilidade' : `Olá, ${u.nome.split(' ')[0]}`}</h1><p className="soon" style={{ margin: '4px 0 0' }}>Competência {mes}/{ano}</p></div><CompetenciaSeletor atual={comp} mini /></div>
     <div className="hub">
       <Atalho href={`/admin/entregas${c}`} icone="entrega" titulo="Entregas do mês" desc="Empresas, documentos e cadastro de novas empresas"
         info={[r.a_conferir ? `${plural(r.a_conferir, 'documento', 'documentos')} para conferir` : `${r.entregasConcluidas} de ${r.empresas} empresas concluídas`, r.pdfs_novos ? plural(r.pdfs_novos, 'PDF novo', 'PDFs novos') : ''].filter(Boolean).join(' · ')}

@@ -6,15 +6,16 @@ import { mfaDisponivel } from '@/lib/session';
 /** Topo enxuto: marca (leva à tela inicial), nome e Sair. A navegação fica nos cartões da tela inicial. */
 export function Topo({ u }: { u: UsuarioSessao }) {
   const inicio = u.papel === 'admin' ? '/admin' : '/cliente';
+  const nome = u.papel === 'admin' && u.nome === 'Administrador' ? 'Contvoo Contabilidade' : u.nome;
   return (
     <header className="top">
       <Link href={inicio} className="marca-topo" title="Voltar à tela inicial">
         <img src="/logo-contvoo.png" alt="Contvoo Contabilidade" height={30} style={{ display: 'block' }} />
-        <strong>Painel do Cliente</strong>
+        <strong>{u.papel === 'admin' ? 'Painel Contvoo' : 'Painel do Cliente'}</strong>
       </Link>
       <span className="espaco" />
       <Link href={inicio} className="inicio-topo">Início</Link>
-      {mfaDisponivel(u) ? <a href="/conta/seguranca" title="Segurança da conta" className="nome-topo">{u.nome}</a> : <span className="nome-topo">{u.nome}</span>}
+      {mfaDisponivel(u) ? <a href="/conta/seguranca" title="Segurança da conta" className="nome-topo">{nome}</a> : <span className="nome-topo">{nome}</span>}
       <form action={sair}><button className="sec">Sair</button></form>
     </header>
   );
