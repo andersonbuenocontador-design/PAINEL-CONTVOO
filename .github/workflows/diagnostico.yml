@@ -1,0 +1,18 @@
+# Diagnóstico do site (manual): lê o banco de produção e mostra situações, contagens e erros técnicos mascarados no resumo da execução.
+# Não mostra nomes de clientes, CPFs, valores nem senhas. Precisa do segredo DATABASE_URL.
+name: Diagnóstico
+on:
+  workflow_dispatch:
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - name: Ler situação do site
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npx tsx scripts/diagnostico.ts
