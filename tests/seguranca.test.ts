@@ -28,7 +28,7 @@ describe('TOTP (RFC 6238) e criptografia', () => {
   });
   it('cifra e decifra; adulteração é detectada; cada cifragem é diferente', () => {
     const a = cifrar('SEGREDO123'); expect(a).not.toContain('SEGREDO123'); expect(decifrar(a)).toBe('SEGREDO123'); expect(cifrar('SEGREDO123')).not.toBe(a);
-    const [v, iv, tag, ct] = a.split('.'); expect(() => decifrar([v, iv, tag, ct.slice(0, -2) + 'AA'].join('.'))).toThrow(); expect(() => decifrar('lixo')).toThrow();
+    const [v, iv, tag, ct] = a.split('.'); expect(() => decifrar([v, iv, tag, ct.slice(0, -2) + (ct.endsWith('AA') ? 'BB' : 'AA')].join('.'))).toThrow(); expect(() => decifrar('lixo')).toThrow();
   });
 });
 

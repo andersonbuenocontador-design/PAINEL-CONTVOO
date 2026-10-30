@@ -45,7 +45,7 @@ export default async function ClienteEmpresa({ params, searchParams }: { params:
           <td>{!d.visto_em && <form action={acaoRemoverAvulso}><input type="hidden" name="empresaId" value={empresaId} /><input type="hidden" name="competencia" value={comp} /><input type="hidden" name="id" value={d.id} /><button className="sec">Retirar</button></form>}</td></tr>))}
       </tbody></table>}</div>
     <div className="card"><h2>Extratos bancários</h2><p>Envie os extratos do mês e identifique cada entrada e saída.</p><a className="btn" href={`/cliente/${empresaId}/extratos?competencia=${comp}`}>Abrir extratos de {mes}/{ano}</a></div>
-    <div className="card"><h2>Informes de lucros e retiradas</h2><p>Consulte e baixe os informes dos sócios disponibilizados pelo escritório.</p><a className="btn" href={`/cliente/${empresaId}/informes`}>Abrir informes</a></div>
+    <div className="card"><h2>Retiradas dos sócios</h2><p>Informe o pró-labore, os lucros e outras retiradas de cada sócio em {mes}/{ano}.</p><a className="btn" href={`/cliente/${empresaId}/informes?competencia=${comp}`}>Informar retiradas de {mes}/{ano}</a></div>
     <div className="card"><h2>Pendências do escritório</h2><p>{pend.abertas ? `${pend.abertas} em andamento${pend.aguardando ? ` · ${pend.aguardando} aguardando você` : ''}.` : 'Nenhuma pendência em andamento.'}</p><a className="btn" href={`/cliente/${empresaId}/pendencias`}>Abrir pendências</a></div>
   </main></>);
 }

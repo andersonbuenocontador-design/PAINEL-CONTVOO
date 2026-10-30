@@ -26,7 +26,7 @@ export async function acaoCriarModelo(fd: FormData) {
   await executar(`/admin/empresas/${e}/documentos`, 'Modelo criado.', () => criarModeloDeEmpresa(a, s(fd, 'nome'), e));
 }
 export async function acaoAplicarModelo(fd: FormData) {
-  const a = await exigirUsuario('admin'); const voltar = s(fd, 'voltar') || '/admin/modelos';
+  const a = await exigirUsuario('admin'); const voltar = s(fd, 'voltar') || '/admin';
   await executar(voltar, 'Modelo aplicado. Documentos que a empresa já tinha foram mantidos, sem sobrescrever.', () => aplicarModelo(a, s(fd, 'modeloId'), fd.getAll('empresaIds').map(String).filter(Boolean)));
 }
 export async function acaoConferir(fd: FormData) {

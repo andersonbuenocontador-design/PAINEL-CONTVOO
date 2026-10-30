@@ -29,6 +29,8 @@ O usuário pediu "sem banco de dados local". Escolheu **adaptar o código atual*
 
 ## Decisões do dono em 30/10/2026
 - **Sem e-mail**: avisos desligados. `enfileirar` não gera nada sem provedor configurado; página `/admin/notificacoes` redireciona; botão "E-mails: sim/não" e menu Notificações removidos. `agendador.yml` virou "Manter site ativo" (1×/dia, só `/api/saude`; mantém o Supabase grátis ativo). Código de e-mail (Brevo/SMTP) segue pronto se um dia quiserem.
+- **Retiradas dos sócios** (aba antes "Informes"): o CLIENTE lança data/sócio/tipo (pró-labore, lucros, outras)/valor por mês e envia ao escritório (ou "não houve retiradas"); enviado trava para o cliente; escritório vê em Empresa → Sócios e retiradas, baixa Excel e pode devolver. Migração 011 (`retiradas`, `retiradas_envios`), `src/lib/services/retiradas.ts`. Informes enviados pelo escritório continuam no fim da aba, só se existirem.
+- **Aba Modelos fora do menu** (`/admin/modelos` redireciona; o cartão Modelos na página de documentos da empresa continua).
 - **Painel de Auditoria fora do menu** (`/admin/auditoria` redireciona); a tabela `auditoria` continua gravando tudo.
 - **2FA oculto para clientes** (`MFA_CLIENTES=1` religa); administradores mantêm.
 - **Outros documentos (PDF)**: cliente envia PDFs avulsos (tabela `documentos_avulsos`, migração 010, `/api/avulsos/[id]`).

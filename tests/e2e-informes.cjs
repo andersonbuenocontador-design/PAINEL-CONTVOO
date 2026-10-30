@@ -33,7 +33,7 @@ fs.writeFileSync('/tmp/e2e/inf1.pdf', '%PDF-1.4 informe do socio um'); fs.writeF
   for (const [s, file] of [['Socio Um', '/tmp/e2e/inf1.pdf'], ['Socio Dois', '/tmp/e2e/inf2.pdf']]) {
     await adm.goto(pagina); const g = adm.locator('form:has(button:has-text("Enviar informe"))'); await g.locator('select[name=socioId]').selectOption({ label: s }); await g.locator('input[type=file]').setInputFiles(file); await g.locator('button').click(); await adm.waitForSelector('.msg-ok:has-text("disponibilizado")');
   }
-  ok(await adm.locator('tbody tr').count() === 2, 'dois informes cadastrados e disponibilizados');
+  ok(await adm.locator('.card:has(h2:has-text("Informes cadastrados")) tbody tr').count() === 2, 'dois informes cadastrados e disponibilizados');
   // cliente 1
   const c1 = await ctx(); await login(c1, 'u1@alfa.com', 'Provisoria#Sol2026'); await trocar(c1, 'Provisoria#Sol2026', 'SenhaU1#2026!!');
   await c1.goto(`${B}/cliente/${E}/informes`);

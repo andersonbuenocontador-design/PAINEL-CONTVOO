@@ -9,7 +9,7 @@ export function Topo({ u }: { u: UsuarioSessao }) {
       <img src="/logo-contvoo.png" alt="Contvoo Contabilidade" height={34} style={{ display: 'block' }} />
       <strong>Painel do Cliente</strong>
       <nav>
-        {u.papel === 'admin' ? (<><Link href="/admin">Início</Link><Link href="/admin/empresas">Empresas</Link><Link href="/admin/conciliacoes">Conciliações</Link><Link href="/admin/pendencias">Pendências</Link><Link href="/admin/relatorios">Relatórios</Link><Link href="/admin/modelos">Modelos</Link><Link href="/admin/usuarios">Usuários</Link><Link href="/admin/lgpd">LGPD</Link></>) : (<Link href="/cliente">Minhas empresas</Link>)}
+        {u.papel === 'admin' ? (<><Link href="/admin">Início</Link><Link href="/admin/empresas">Empresas</Link><Link href="/admin/conciliacoes">Conciliações</Link><Link href="/admin/pendencias">Pendências</Link><Link href="/admin/relatorios">Relatórios</Link><Link href="/admin/usuarios">Usuários</Link><Link href="/admin/lgpd">LGPD</Link></>) : (<Link href="/cliente">Minhas empresas</Link>)}
       </nav>
       {mfaDisponivel(u) ? <a href="/conta/seguranca" title="Segurança da conta">{u.nome}</a> : <span>{u.nome}</span>}
       <form action={sair}><button className="sec">Sair</button></form>

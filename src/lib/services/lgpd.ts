@@ -52,6 +52,7 @@ export async function exportarDadosUsuario(actor: Actor, usuarioId: string) {
     empresas: await q(`SELECT e.razao_social,e.cnpj,ue.criado_em vinculado_em FROM usuario_empresas ue JOIN empresas e ON e.id=ue.empresa_id WHERE ue.usuario_id=$1`),
     sociosAutorizados: await q(`SELECT s.nome socio,e.razao_social empresa,su.criado_em FROM socio_usuarios su JOIN socios s ON s.id=su.socio_id JOIN empresas e ON e.id=s.empresa_id WHERE su.usuario_id=$1`),
     arquivosEnviados: await q(`SELECT nome_original,competencia,enviado_em FROM arquivos WHERE enviado_por=$1 ORDER BY enviado_em DESC LIMIT 1000`),
+    retiradasLancadas: await q(`SELECT competencia,data,socio_nome,tipo,valor,criado_em,removido_em FROM retiradas WHERE criado_por=$1 ORDER BY criado_em DESC LIMIT 1000`),
     outrosDocumentosEnviados: await q(`SELECT nome_original,descricao,competencia,enviado_em,removido_em FROM documentos_avulsos WHERE enviado_por=$1 ORDER BY enviado_em DESC LIMIT 1000`),
     extratosImportados: await q(`SELECT nome_arquivo,competencia,status,criado_em FROM importacoes WHERE criado_por=$1 ORDER BY criado_em DESC LIMIT 1000`),
     informesBaixados: await q(`SELECT a.criado_em,i.ano_calendario FROM informe_acessos a JOIN informes i ON i.id=a.informe_id WHERE a.usuario_id=$1 ORDER BY a.id DESC LIMIT 1000`),
