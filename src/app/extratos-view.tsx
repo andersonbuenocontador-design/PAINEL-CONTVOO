@@ -85,9 +85,9 @@ export async function ExtratosPagina({ u, empresaId, comp, sp, base, voltar }: {
           <form action={acaoCriarConta}><input type="hidden" name="empresaId" value={empresaId} /><div className="grid2">
             <label className="campo">Banco *<input name="banco" required placeholder="Banrisul" /></label><label className="campo">Apelido<input name="apelido" /></label>
             <label className="campo">Agência<input name="agencia" /></label><label className="campo">Conta<input name="conta" /></label></div><p><button className="btn">Adicionar conta</button></p></form></div>)}
-        {!contas.length ? <p className="muted">Nenhuma conta bancária cadastrada para esta empresa. {u.papel === 'cliente' ? 'Peça ao escritório para cadastrar.' : 'Cadastre acima.'}</p> : (
+        {(
           <form action={acaoEnviarExtrato}><input type="hidden" name="empresaId" value={empresaId} /><input type="hidden" name="competencia" value={comp} />
-            <h3>Enviar extrato de {mes}/{ano}</h3><div className="grid2"><label className="campo">Conta<select name="contaId">{contas.map((c) => <option key={c.id} value={c.id}>{c.banco}{c.apelido ? ` — ${c.apelido}` : ''}{c.conta ? ` (${c.conta})` : ''}</option>)}</select></label>
+            <h3>Enviar extrato de {mes}/{ano}</h3><div className="grid2"><label className="campo">Conta<select name="contaId" defaultValue=""><option value="">Detectar pelo extrato (recomendado)</option>{contas.map((c) => <option key={c.id} value={c.id}>{c.banco}{c.apelido ? ` — ${c.apelido}` : ''}{c.conta ? ` (${c.conta})` : ''}</option>)}</select></label>
               <label className="campo">Arquivo (OFX, CSV, Excel ou PDF com texto)<input type="file" name="arquivo" accept=".ofx,.csv,.xlsx,.pdf" required /></label></div>
             <p className="muted">Você verá uma prévia para conferir antes de gravar. Prefira OFX quando o banco oferecer.</p><button className="btn pri">Ler extrato</button></form>)}
         {imps.length > 0 && <><h3>Importações da competência</h3><table><tbody>{imps.map((i) => (<tr key={i.id}><td>{i.banco} · {i.nome_arquivo}</td><td><span className="chip neutro">{i.status === 'previa' ? 'aguardando confirmação' : 'importada'}</span></td>

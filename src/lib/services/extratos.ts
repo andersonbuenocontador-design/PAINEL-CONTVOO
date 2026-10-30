@@ -44,6 +44,28 @@ export async function listarContas(actor: Actor, empresaId: string, apenasAtivas
   return (await query(`SELECT id,banco,apelido,agencia,conta,ativo FROM contas_bancarias WHERE empresa_id=$1 ${apenasAtivas ? 'AND ativo' : ''} ORDER BY ativo DESC, banco, conta`, [e.id])).rows;
 }
 
+/** "Detectar pelo extrato": usa a conta da empresa com o mesmo número (e banco); se não houver, cadastra com o que o extrato informa. */
+const digitos = (v?: string | null) => (v ?? '').replace(/\D/g, '').replace(/^0+/, '');
+export async function contaDoExtrato(actor: Actor, empresaId: string, info?: { banco?: string; agencia?: string; conta?: string }) {
+  await obterEmpresa(actor, empresaId); // cliente só na própria empresa
+  const banco = (info?.banco && info.banco !== 'BANCO' ? info.banco : '').trim();
+  const numero = digitos(info?.conta);
+  const contas = (await query('SELECT id,banco,conta,ativo FROM contas_bancarias WHERE empresa_id=$1', [empresaId])).rows as { id: string; banco: string; conta: string | null; ativo: boolean }[];
+  const igual = (c: { banco: string; conta: string | null }) => numero && digitos(c.conta) === numero && (!banco || !c.banco || c.banco.toUpperCase().includes(banco.toUpperCase()) || banco.toUpperCase().includes(c.banco.toUpperCase()));
+  const achada = contas.find((c) => c.ativo && igual(c)) ?? contas.find(igual);
+  if (achada) { if (!achada.ativo) throw new AppError(`A conta ${achada.banco} ${achada.conta ?? ''} está desativada. Fale com o escritório.`); return achada.id; }
+  if (!numero) {
+    const ativas = contas.filter((c) => c.ativo);
+    if (ativas.length === 1) return ativas[0].id;
+    throw new AppError('Não consegui identificar a conta pelo extrato. Escolha a conta na lista (ou peça ao escritório para cadastrá-la).');
+  }
+  return tx(async (c) => {
+    const r = await c.query('INSERT INTO contas_bancarias(empresa_id,banco,agencia,conta) VALUES ($1,$2,$3,$4) RETURNING id', [empresaId, banco || 'Banco não identificado', info?.agencia || null, info?.conta || null]);
+    await registrar(c, { usuarioId: actor.id, empresaId, acao: 'conta.criar_pelo_extrato', entidade: 'conta', entidadeId: r.rows[0].id, detalhes: { banco: banco || null } });
+    return r.rows[0].id as string;
+  });
+}
+
 /* ---------- Importação com prévia ---------- */
 export type LinhaPrevia = Movimento & { duplicada: 'certa' | 'possivel' | null; foraPeriodo: boolean };
 
@@ -52,12 +74,12 @@ export async function criarPrevia(actor: Actor, p: { empresaId: string; contaId:
   const emp = await obterEmpresa(actor, p.empresaId);
   competenciaSchema.parse(p.competencia);
   await exigirEditavel(actor, emp.id, p.competencia);
-  const conta = (await query('SELECT id FROM contas_bancarias WHERE id=$1 AND empresa_id=$2 AND ativo', [p.contaId, emp.id])).rows[0];
-  if (!conta) throw new AppError('Conta bancária não encontrada.', 'nao_encontrado');
+  if (p.contaId && !(await query('SELECT 1 FROM contas_bancarias WHERE id=$1 AND empresa_id=$2 AND ativo', [p.contaId, emp.id])).rowCount) throw new AppError('Conta bancária não encontrada.', 'nao_encontrado');
   if (!p.dados.length) throw new AppError('O arquivo está vazio.');
   if (p.dados.length > TAMANHO_MAX) throw new AppError('Arquivo maior que 20 MB.');
   let ex;
   try { ex = await lerExtrato(p.nome, p.dados); } catch (e) { if (e instanceof ExtratoIlegivel) throw new AppError(e.message); throw e; }
+  const conta = { id: p.contaId || await contaDoExtrato(actor, emp.id, ex.conta) };
 
   const ids = ex.movimentos.map((m) => m.idExterno).filter((x): x is string => !!x);
   const jaId = new Set(ids.length ? (await query('SELECT id_externo FROM movimentacoes WHERE conta_id=$1 AND id_externo = ANY($2)', [conta.id, ids])).rows.map((r) => r.id_externo) : []);
