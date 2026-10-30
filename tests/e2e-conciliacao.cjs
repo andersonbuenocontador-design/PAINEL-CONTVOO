@@ -27,8 +27,10 @@ fs.writeFileSync('/tmp/e2e/out.csv', 'Data;Histórico;Valor\n02/10/2026;TARIFA M
   const cli = await (await br.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
   await login(cli, 'alfa@cliente.com', 'Provisoria#Sol2026'); await trocar(cli, 'Provisoria#Sol2026', 'Cavalo#Verde2026!'); await cli.waitForURL(/\/cliente\//);
   await cli.goto(`${B}/cliente/${idAlfa}/extratos?competencia=${C}`);
-  await cli.setInputFiles('input[type=file]', '/tmp/e2e/out.csv'); await cli.click('button:has-text("Ler extrato")'); await cli.waitForURL(/ok=/);
-  ok(!cli.url().includes('/importacao/') && await cli.locator('.aviso.info:has-text("3 lançamento(s)")').count() === 1, 'extrato vai direto para a conciliação (sem prévia)');
+  ok(await cli.locator('button:has-text("Ler extrato")').count() === 0 && await cli.locator('.aviso.info:has-text("Os extratos entram aqui sozinhos")').count() === 1, 'cliente não tem "Enviar extrato": a aba puxa dos documentos');
+  await adm.goto(`${B}/admin/empresas/${idAlfa}/extratos?competencia=${C}`); await adm.setInputFiles('input[name=arquivo]', '/tmp/e2e/out.csv'); await adm.click('button:has-text("Ler extrato")'); await adm.waitForURL(/ok=/);
+  ok(!adm.url().includes('/importacao/') && await adm.locator('.aviso.info:has-text("3 lançamento(s)")').count() === 1, 'escritório envia extrato e ele vai direto para a conciliação (sem prévia)');
+  await cli.goto(`${B}/cliente/${idAlfa}/extratos?competencia=${C}`);
   ok(await cli.locator('button:has-text("Para revisar (2)")').count() > 0, 'tela do conciliador: "Para revisar (2)"');
   ok(await cli.locator('tr:has-text("ENERGIA") td.conta:has-text("ENERGIA ELETRICA")').count() > 0 && await cli.locator('tr:has-text("ENERGIA") .chip:has-text("Média")').count() > 0, 'energia sugerida em Média com a conta do plano do cliente');
   ok(await cli.locator('tr:has-text("PIX") .prefixo:has-text("REVISAR")').count() > 0, 'sem natureza: REVISAR / Baixa');

@@ -1,5 +1,5 @@
-# Diagnóstico do site (manual): lê o banco de produção e mostra situações, contagens e erros técnicos mascarados no resumo da execução.
-# Não mostra nomes de clientes, CPFs, valores nem senhas. Precisa do segredo DATABASE_URL.
+# Diagnóstico do site (manual): consulta /api/diagnostico (protegido pelo CRON_SECRET) e mostra situações, contagens
+# e erros técnicos mascarados no resumo da execução. Não mostra nomes de clientes, CPFs, valores nem senhas.
 name: Diagnóstico
 on:
   workflow_dispatch:
@@ -8,11 +8,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with: { node-version: 22, cache: npm }
-      - run: npm ci --no-audit --no-fund
       - name: Ler situação do site
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: npx tsx scripts/diagnostico.ts
+          APP_URL: ${{ vars.APP_URL || secrets.APP_URL || 'https://painel-contvoo.onrender.com' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          [ -n "$CRON_SECRET" ] || { echo "::error::Falta o segredo CRON_SECRET no GitHub (o mesmo valor do Render → Environment)"; exit 1; }
+          for i in 1 2 3 4; do code=$(curl -sS -o diag.json -w '%{http_code}' --max-time 120 -H "Authorization: Bearer $CRON_SECRET" "${APP_URL%/}/api/diagnostico" || echo 000); [ "$code" = 200 ] && break; [ "$code" = 401 ] && break; sleep 30; done
+          [ "$code" = 401 ] && { echo "::error::O CRON_SECRET do GitHub está diferente do CRON_SECRET do Render"; exit 1; }
+          [ "$code" = 200 ] || { echo "::error::O site não respondeu (HTTP $code): $(head -c 200 diag.json)"; exit 1; }
+          node -e 'for (const s of JSON.parse(require("fs").readFileSync("diag.json","utf8"))) console.log(`::notice title=${s.titulo}::${s.linhas.join("%0A").replace(/\r?\n/g," ")}`)'

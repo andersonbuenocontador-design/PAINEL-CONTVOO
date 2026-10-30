@@ -4,6 +4,7 @@ import { query, tx } from '../db';
 import { Actor, AppError, exigirAdmin } from '../errors';
 import { ExtratoIlegivel, lerExtrato, type Movimento } from '../extrato-parser';
 import { competenciaSchema, TAMANHO_MAX } from './documentos';
+import { ler } from '../storage';
 import { obterEmpresa } from './empresas';
 import { registrar } from './auditoria';
 
@@ -209,3 +210,28 @@ export async function tentarImportarExtrato(actor: Actor, p: { empresaId: string
 /** Endereço da conciliação já mostrando só os lançamentos daquela conta. */
 export const urlConciliacao = (base: string, r: { competencia: string; contaId?: string }, msg: { ok?: string; erro?: string }) =>
   `${base}?competencia=${r.competencia}${r.contaId ? `&conta=${r.contaId}` : ''}${msg.erro ? `&erro=${encodeURIComponent(msg.erro)}` : ''}${msg.ok ? `&ok=${encodeURIComponent(msg.ok)}` : ''}#lancamentos`;
+
+/** Conciliação puxa sozinha os extratos dos documentos anexados (Documentos do mês e Outros documentos) ainda não verificados.
+ *  Cada arquivo é verificado uma vez; só vira lançamento o que for extrato de banco reconhecido. */
+export async function puxarExtratosDosDocumentos(actor: Actor, empresaId: string) {
+  const emp = await obterEmpresa(actor, empresaId);
+  const pend = (await query(
+    `SELECT 'arquivos' t, id, competencia, nome_original, chave_storage FROM arquivos
+      WHERE empresa_id=$1 AND extrato_verificado_em IS NULL AND situacao<>'substituido' AND descartado_em IS NULL AND nome_original ~* '\\.(pdf|ofx)$'
+     UNION ALL
+     SELECT 'documentos_avulsos', id, competencia, nome_original, chave_storage FROM documentos_avulsos
+      WHERE empresa_id=$1 AND extrato_verificado_em IS NULL AND removido_em IS NULL AND descartado_em IS NULL AND nome_original ~* '\\.(pdf|ofx)$'
+     LIMIT 20`, [emp.id])).rows as { t: 'arquivos' | 'documentos_avulsos'; id: string; competencia: string; nome_original: string; chave_storage: string }[];
+  const resultados: NonNullable<Awaited<ReturnType<typeof importarDireto>>>[] = [];
+  for (const a of pend) {
+    let dados: Buffer | null = null;
+    try { dados = await ler(a.chave_storage); } catch { continue; } // armazenamento fora do ar: tenta de novo na próxima vez
+    const r = await tentarImportarExtrato(actor, { empresaId: emp.id, competencia: a.competencia, nome: a.nome_original, dados });
+    await marcarExtratoVerificado(a.t, a.id);
+    if (r) resultados.push(r);
+  }
+  return resultados;
+}
+export async function marcarExtratoVerificado(tabela: 'arquivos' | 'documentos_avulsos', id: string) {
+  await query(`UPDATE ${tabela === 'arquivos' ? 'arquivos' : 'documentos_avulsos'} SET extrato_verificado_em=now() WHERE id=$1`, [id]);
+}

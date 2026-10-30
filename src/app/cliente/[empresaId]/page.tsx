@@ -24,8 +24,8 @@ export default async function ClienteHub({ params, searchParams }: { params: Pro
     <div className="hub">
       <Atalho href={`/cliente/${empresaId}/documentos${c}`} icone="docs" titulo="Documentos do mês" desc="Envie os documentos pedidos e outros PDFs"
         info={docsInfo} alerta={d.rejeitados > 0 || d.pendentes > 0} ok={d.concluida} />
-      <Atalho href={`/cliente/${empresaId}/extratos${c}`} icone="banco" titulo="Extratos e conciliação" desc="Envie o extrato e identifique entradas e saídas"
-        info={r.movimentacoes ? CONC[r.conciliacao] : 'Nenhum extrato enviado ainda'} alerta={r.conciliacao === 'devolvida' || (!r.movimentacoes)} ok={r.conciliacao === 'concluida'} />
+      <Atalho href={`/cliente/${empresaId}/extratos${c}`} icone="banco" titulo="Extratos e conciliação" desc="Identifique as entradas e saídas dos extratos anexados"
+        info={r.movimentacoes ? CONC[r.conciliacao] : 'Anexe o extrato em Documentos do mês'} alerta={r.conciliacao === 'devolvida' || (!r.movimentacoes)} ok={r.conciliacao === 'concluida'} />
       <Atalho href={`/cliente/${empresaId}/informes${c}`} icone="dinheiro" titulo="Retiradas dos sócios" desc="Pró-labore, lucros e outras retiradas"
         info={r.retiradas ? (r.retiradas.sem_retiradas ? 'Informado: sem retiradas ✓' : 'Enviadas ao escritório ✓') : 'Ainda não informadas'} alerta={!r.retiradas} ok={!!r.retiradas} />
       <Atalho href={`/cliente/${empresaId}/pendencias`} icone="conversa" titulo="Pendências" desc="Solicitações do escritório"

@@ -9,6 +9,7 @@ import { notFound } from 'next/navigation';
 import type { UsuarioSessao } from '@/lib/services/usuarios';
 import { obterEmpresa } from '@/lib/services/empresas';
 import { listarContas, listarImportacoes, obterPrevia } from '@/lib/services/extratos';
+import { puxarExtratosDosDocumentos } from '@/lib/services/extratos';
 import { bancosConciliacao, conferenciaSaldos, listarConciliacao, listarPlano, obterConciliacao, resumoLinhas } from '@/lib/services/conciliacao';
 import { ConciliacaoTabela } from './ConciliacaoTabela';
 import './conciliacao.css';
@@ -23,6 +24,9 @@ async function empresaOu404(u: UsuarioSessao, id: string) { try { return await o
 
 export async function ExtratosPagina({ u, empresaId, comp, sp, base, voltar }: { u: UsuarioSessao; empresaId: string; comp: string; sp: SP; base: string; voltar: string }) {
   const e = await empresaOu404(u, empresaId);
+  // puxa sozinho os extratos dos documentos anexados (Documentos do mês e Outros documentos) que ainda não foram lidos
+  const puxados = await puxarExtratosDosDocumentos(u, empresaId).catch(() => []);
+  const outrosMeses = [...new Set(puxados.filter((r) => r.competencia !== comp && r.gravadas > 0).map((r) => r.competencia))];
   const [contasTodas, linhas, plano, bancosImp, imps, conc, saldos] = await Promise.all([
     listarContas(u, empresaId), listarConciliacao(u, empresaId, comp), listarPlano(u, empresaId), bancosConciliacao(u, empresaId, comp), listarImportacoes(u, empresaId, comp), obterConciliacao(u, empresaId, comp), conferenciaSaldos(u, empresaId, comp),
   ]);
@@ -54,6 +58,9 @@ export async function ExtratosPagina({ u, empresaId, comp, sp, base, voltar }: {
               <label className="campo">Mensagem para o cliente<span className="dica">As linhas marcadas com "Pedir correção" aparecem para ele com o motivo.</span><textarea name="mensagem" rows={3} maxLength={1000} /></label><button className="btn perigo">Devolver ao cliente</button></form></details>}
           {admin && status !== 'revisao' && <form action={acaoReabrirConciliacao}><input type="hidden" name="empresaId" value={empresaId} /><input type="hidden" name="competencia" value={comp} /><button className="btn">Reabrir para o cliente</button></form>}</div></div>
       {sp.erro && <div className="aviso erro" role="alert">{sp.erro}</div>}{sp.ok && <div className="aviso info">{sp.ok}</div>}
+      {puxados.some((r) => r.competencia === comp && r.gravadas > 0) && <div className="aviso info">Extratos anexados nos documentos foram trazidos para esta conciliação: {puxados.filter((r) => r.competencia === comp).map((r) => `${r.gravadas} lançamento(s) do ${r.banco ?? 'banco'}`).join(', ')}.</div>}
+      {outrosMeses.length > 0 && <div className="aviso">Também encontrei extratos de outro mês nos documentos: {outrosMeses.map((m, i) => <span key={m}>{i ? ', ' : ''}<a href={`${base}?competencia=${m}`}>{m.slice(5)}/{m.slice(0, 4)}</a></span>)}.</div>}
+      {!admin && !somenteLeitura && <div className="aviso info">Os extratos entram aqui sozinhos: anexe o PDF ou OFX do banco em <a href={`${voltar.split('?')[0]}/documentos?competencia=${comp}`}>Documentos do mês</a>.</div>}
       {!plano.length && <div className="aviso">O escritório ainda não cadastrou o plano de contas desta empresa. Sem ele, os lançamentos ficam para classificar manualmente.{u.papel === 'admin' && <> <a href={`/admin/empresas/${empresaId}/plano`}>Cadastrar plano de contas</a></>}</div>}
       {status === 'devolvida' && <div className="aviso erro" role="alert"><strong>O escritório devolveu esta competência para correção.</strong>{conc.mensagem && <> Mensagem: {conc.mensagem}</>} {nCorrecoes > 0 ? `${nCorrecoes} movimentação(ões) estão marcadas com o que precisa ser ajustado (filtro "Correção pedida").` : ''} Depois de ajustar, envie de novo ao escritório.</div>}
       {status === 'enviada' && <div className="aviso info">{admin ? 'O cliente enviou esta competência para conferência. Marque as linhas que precisam de ajuste e devolva, ou aprove.' : 'Competência enviada ao escritório. Aguardando conferência; a edição fica bloqueada até a devolução ou conclusão.'}</div>}
@@ -77,7 +84,7 @@ export async function ExtratosPagina({ u, empresaId, comp, sp, base, voltar }: {
               <td>{cs?.confere === true ? <span className="conf-ok">✓</span> : cs?.confere === false ? <span className="conf-erro" title="Diferença">dif. {n2(cs.diferenca)}</span> : <span className="muted" title="O arquivo não traz saldo inicial e final">sem saldo</span>}</td></tr>); })}</tbody></table></div>
           <div className="muted" style={{ fontSize: 12 }}>{nl.length} lançamentos · {nl.filter((l) => l.confianca !== 'A').length} para revisar</div></div>); })}</div>}
 
-      {!somenteLeitura && <details className="painel" open={linhas.length === 0 || !!sp.erro}><summary><strong>Enviar extrato{u.papel === 'admin' ? ' e contas bancárias' : ''}</strong></summary>
+      {admin && !somenteLeitura && <details className="painel" open={linhas.length === 0 || !!sp.erro}><summary><strong>Enviar extrato e contas bancárias</strong></summary>
         {u.papel === 'admin' && (<div><h3>Contas bancárias da empresa</h3>
           <table><tbody>{contasTodas.map((c) => (<tr key={c.id}><td>{c.banco}{c.apelido && ` — ${c.apelido}`}<div className="muted">Ag. {c.agencia ?? '—'} · Conta {c.conta ?? '—'}</div></td><td>{!c.ativo && <span className="chip neutro">inativa</span>}</td>
             <td><form action={acaoAtivarConta}><input type="hidden" name="id" value={c.id} /><input type="hidden" name="empresaId" value={empresaId} /><input type="hidden" name="ativo" value={String(!c.ativo)} /><button className="btn peq">{c.ativo ? 'Desativar' : 'Reativar'}</button></form></td></tr>))}
