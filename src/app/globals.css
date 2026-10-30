@@ -48,3 +48,8 @@ tr.entrega-cinza td:first-child{box-shadow:inset 4px 0 0 #d0d5dd}
 .avaliacao .estrelas{font-size:1.6rem;letter-spacing:2px;color:#fbbc04;line-height:1}
 .avaliacao .txt{display:flex;flex-direction:column;gap:2px;flex:1;min-width:220px;position:relative;z-index:1}.avaliacao .txt span{opacity:.85;font-size:.92rem}
 .avaliacao .btn{background:#fff;color:#0b2a4a;font-weight:600;position:relative;z-index:1}.avaliacao .btn:hover{background:#eef3fb}
+/* linhas geométricas da marca no fundo das páginas internas (bem suaves, fixas, atrás do conteúdo) */
+body::before,body::after{content:"";position:fixed;z-index:-1;width:min(1000px,120vw);aspect-ratio:2000/772;background:url(/fundo-linhas-azul.webp) center/contain no-repeat;pointer-events:none}
+body::before{right:-14%;bottom:-8%;opacity:.12}
+body::after{left:-16%;top:70px;transform:rotate(180deg);opacity:.07}
+@media print{body::before,body::after{display:none}}
