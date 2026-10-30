@@ -62,7 +62,7 @@ describe('conexão com o banco na nuvem', () => {
   it('local sem TLS; nuvem com TLS (verificado só com o certificado)', () => {
     expect(configPg('postgres://u:p@localhost:5432/db').ssl).toBeUndefined();
     const n = configPg('postgresql://u:p@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require');
-    expect(n.ssl).toEqual({ rejectUnauthorized: false }); expect(n.connectionString).not.toContain('sslmode');
+    expect(n.ssl).toEqual({ rejectUnauthorized: false }); expect(n.connectionTimeoutMillis).toBe(15000); expect(n.connectionString).not.toContain('sslmode');
     vi.stubEnv('DATABASE_CA_CERT', '-----BEGIN CERTIFICATE-----\\nAAA\\n-----END CERTIFICATE-----');
     expect(configPg('postgresql://u:p@h.supabase.com:5432/postgres').ssl).toEqual({ ca: '-----BEGIN CERTIFICATE-----\nAAA\n-----END CERTIFICATE-----', rejectUnauthorized: true });
   });

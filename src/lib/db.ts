@@ -9,10 +9,11 @@ export function configPg(url = process.env.DATABASE_URL): pg.ClientConfig {
   if (!url) throw new Error('DATABASE_URL não configurada');
   let u: URL;
   try { u = new URL(url); } catch { throw new Error('DATABASE_URL inválida (se a senha do banco tiver símbolos como @ # / ?, troque por uma só com letras e números)'); }
-  if (local(u.hostname) || process.env.DATABASE_SSL === '0') return { connectionString: url };
+  const limites = { connectionTimeoutMillis: 15_000 }; // sem isso, um endereço errado deixa o site esperando para sempre
+  if (local(u.hostname) || process.env.DATABASE_SSL === '0') return { connectionString: url, ...limites };
   u.searchParams.delete('sslmode'); // o sslmode da URL sobrescreveria a configuração abaixo
   const ca = process.env.DATABASE_CA_CERT?.replace(/\\n/g, '\n');
-  return { connectionString: u.toString(), ssl: ca ? { ca, rejectUnauthorized: true } : { rejectUnauthorized: false } };
+  return { connectionString: u.toString(), ...limites, ssl: ca ? { ca, rejectUnauthorized: true } : { rejectUnauthorized: false } };
 }
 
 export function getPool(): pg.Pool {
