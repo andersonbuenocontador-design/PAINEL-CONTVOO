@@ -5,6 +5,7 @@ import { Actor, AppError, exigirAdmin } from '../errors';
 import { apagar, gravar, ler } from '../storage';
 import { obterEmpresa } from './empresas';
 import { registrar } from './auditoria';
+import { resolverCobrancaSeCompleto } from './cobranca';
 
 export const FREQUENCIAS = ['mensal', 'trimestral', 'anual', 'eventual'] as const;
 export const FORMATOS_PERMITIDOS = ['pdf', 'ofx', 'csv', 'xlsx', 'xls', 'zip', 'xml', 'jpg', 'png'] as const;
@@ -189,6 +190,7 @@ export async function enviarArquivo(actor: Actor, p: { empresaId: string; exigen
       `INSERT INTO arquivos(empresa_id,exigencia_id,competencia,versao,nome_original,chave_storage,tamanho,sha256,enviado_por) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
       [emp.id, ex.id, p.competencia, (atual?.versao ?? 0) + 1, nomeSeguro(p.nome), chave, p.dados.length, sha, actor.id]);
     await registrar(c, { usuarioId: actor.id, empresaId: emp.id, acao: 'arquivo.enviar', entidade: 'arquivo', entidadeId: r.rows[0].id, detalhes: { exigencia: ex.id, competencia: p.competencia, versao: (atual?.versao ?? 0) + 1 } });
+    await resolverCobrancaSeCompleto(c, actor, emp.id, p.competencia);
     return r.rows[0].id as string;
   });
 }

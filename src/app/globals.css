@@ -29,3 +29,8 @@ header.top .inicio-topo,header.top .nome-topo{font-weight:500;opacity:.9;font-si
 .comp-mini{display:flex;gap:8px;align-items:center}.comp-mini select{width:auto}
 @media (max-width:560px){header.top{padding:10px 14px;gap:10px}header.top .nome-topo{display:none}header.top .marca-topo strong{font-size:.95rem}.hub{grid-template-columns:1fr}}
 .saudacao h1.ola{font-size:1.9rem;font-weight:800}.empresa-sub{margin:6px 0 0;color:var(--mut);font-size:1rem}.empresa-sub strong{color:var(--tx)}
+tr.entrega-verde td{background:#ecfdf3}tr.entrega-verde td:first-child{box-shadow:inset 4px 0 0 var(--ok)}
+tr.entrega-vermelho td{background:#fef3f2}tr.entrega-vermelho td:first-child{box-shadow:inset 4px 0 0 var(--err)}
+tr.entrega-cinza td:first-child{box-shadow:inset 4px 0 0 #d0d5dd}
+.acoes-entrega{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.acoes-entrega button{padding:6px 12px;font-size:.88rem}
+.legenda{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:.88rem}.ponto{display:inline-block;width:10px;height:10px;border-radius:99px}.ponto.verde{background:var(--ok)}.ponto.vermelho{background:var(--err)}.ponto.cinza{background:#d0d5dd}

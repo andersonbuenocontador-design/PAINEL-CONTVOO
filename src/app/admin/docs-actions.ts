@@ -1,5 +1,6 @@
 'use server';
 import { exigirUsuario } from '@/lib/session';
+import { cobrarDocumentos } from '@/lib/services/cobranca';
 import { executar } from '@/lib/actions-util';
 import { aplicarModelo, conferirArquivo, criarExigencia, criarModeloDeEmpresa, definirExigenciaAtiva, editarExigencia, enviarArquivo, removerAvulso } from '@/lib/services/documentos';
 import { AppError } from '@/lib/errors';
@@ -44,4 +45,8 @@ export async function acaoEnviarPeloEscritorio(fd: FormData) {
 export async function acaoRemoverAvulsoAdmin(fd: FormData) {
   const a = await exigirUsuario('admin'); const e = s(fd, 'empresaId'); const c = s(fd, 'competencia');
   await executar(`/admin/empresas/${e}/documentos?competencia=${c}#outros`, 'Arquivo retirado.', () => removerAvulso(a, s(fd, 'id')));
+}
+export async function acaoCobrarDocumentos(fd: FormData) {
+  const a = await exigirUsuario('admin'); const e = s(fd, 'empresaId'); const c = s(fd, 'competencia');
+  await executar(`/admin/entregas?competencia=${c}`, 'Cobrança enviada ao painel do cliente.', () => cobrarDocumentos(a, e, c));
 }
