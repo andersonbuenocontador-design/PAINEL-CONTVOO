@@ -10,10 +10,11 @@ const num = (c: number) => (Math.abs(c) / 100).toLocaleString('pt-BR', { minimum
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
 type Filtro = { conf: 'revisar' | 'B' | 'M' | 'A' | 'todas' | 'correcao'; tipo: 'todos' | 'C' | 'D'; banco: string; q: string };
 
-export function ConciliacaoTabela({ linhas, plano, bancos, admin, somenteLeitura }: { linhas: Linha[]; plano: ContaPlano[]; bancos: { id: string; nome: string }[]; admin: boolean; somenteLeitura: boolean }) {
+export function ConciliacaoTabela({ linhas, plano, bancos, admin, somenteLeitura, bancoInicial }: { linhas: Linha[]; plano: ContaPlano[]; bancos: { id: string; nome: string }[]; admin: boolean; somenteLeitura: boolean; bancoInicial?: string }) {
   const pode = !somenteLeitura; const [motivoCorrecao, setMotivoCorrecao] = useState('');
   const router = useRouter(); const [pend, start] = useTransition();
-  const [F, setF] = useState<Filtro>({ conf: linhas.some((l) => l.correcao_pedida) ? 'correcao' : 'revisar', tipo: 'todos', banco: 'todos', q: '' });
+  // recém-enviado (bancoInicial): abre mostrando TODOS os lançamentos daquele extrato
+  const [F, setF] = useState<Filtro>({ conf: bancoInicial ? 'todas' : linhas.some((l) => l.correcao_pedida) ? 'correcao' : 'revisar', tipo: 'todos', banco: bancoInicial ?? 'todos', q: '' });
   const [sel, setSel] = useState<Set<number>>(new Set()); const [aberta, setAberta] = useState<number | null>(null);
   const [erro, setErro] = useState<string | null>(null); const [contaLote, setContaLote] = useState('');
   const rs = useMemo(() => ({ linhas: linhas.length, alta: linhas.filter((l) => l.confianca === 'A').length, media: linhas.filter((l) => l.confianca === 'M').length, baixa: linhas.filter((l) => l.confianca === 'B').length, naoRev: linhas.filter((l) => !l.revisado && l.confianca !== 'A').length, correcoes: linhas.filter((l) => l.correcao_pedida).length }), [linhas]);
@@ -33,7 +34,7 @@ export function ConciliacaoTabela({ linhas, plano, bancos, admin, somenteLeitura
     <div className="painel" style={{ padding: 12 }}>
       <div className="linha-flex">
         {rs.correcoes > 0 && chip('correcao', `Correção pedida (${rs.correcoes})`, 'baixa')}{chip('revisar', `Para revisar (${rs.naoRev})`, 'baixa')}{chip('B', `Baixa (${rs.baixa})`, 'baixa')}{chip('M', `Média (${rs.media})`, 'media')}{chip('A', `Alta (${rs.alta})`, 'alta')}{chip('todas', `Todas (${rs.linhas})`, 'neutro')}
-        {bancos.length > 1 && <select aria-label="Banco" value={F.banco} onChange={(e) => setF({ ...F, banco: e.target.value })} style={{ width: 'auto' }}><option value="todos">Todos os bancos</option>{bancos.map((b) => <option key={b.id} value={b.id}>{b.nome}</option>)}</select>}
+        {(bancos.length > 1 || bancoInicial) && <select aria-label="Banco" value={F.banco} onChange={(e) => setF({ ...F, banco: e.target.value })} style={{ width: 'auto' }}><option value="todos">Todos os bancos</option>{bancos.map((b) => <option key={b.id} value={b.id}>{b.nome}</option>)}</select>}
         <select aria-label="Tipo" value={F.tipo} onChange={(e) => setF({ ...F, tipo: e.target.value as Filtro['tipo'] })} style={{ width: 'auto' }}><option value="todos">Recebimentos e pagamentos</option><option value="C">Só recebimentos (entradas)</option><option value="D">Só pagamentos (saídas)</option></select>
         <input type="search" placeholder="Buscar conta, complemento, valor…" aria-label="Buscar" value={F.q} onChange={(e) => setF({ ...F, q: e.target.value })} style={{ width: 'auto', minWidth: 220 }} />
       </div>

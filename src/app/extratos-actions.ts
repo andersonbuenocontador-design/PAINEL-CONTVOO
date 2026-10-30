@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { exigirUsuario } from '@/lib/session';
 import { executar, mensagemDeErro } from '@/lib/actions-util';
 import { AppError } from '@/lib/errors';
-import { cancelarImportacao, confirmarImportacao, criarConta, criarPrevia, definirContaAtiva, importarDireto, resumoImportacao } from '@/lib/services/extratos';
+import { cancelarImportacao, confirmarImportacao, criarConta, criarPrevia, definirContaAtiva, importarDireto, resumoImportacao, urlConciliacao } from '@/lib/services/extratos';
 
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? '');
 const baseDe = (papel: string, empresaId: string) => (papel === 'admin' ? `/admin/empresas/${empresaId}/extratos` : `/cliente/${empresaId}/extratos`);
@@ -15,7 +15,7 @@ export async function acaoEnviarExtrato(fd: FormData) {
     const f = fd.get('arquivo');
     if (!(f instanceof File) || !f.size) throw new AppError('Selecione o arquivo do extrato.');
     const r = await importarDireto(u, { empresaId, contaId: s(fd, 'contaId'), competencia, nome: f.name, dados: Buffer.from(await f.arrayBuffer()) });
-    destino = `${base}?competencia=${r.competencia}&ok=${encodeURIComponent(resumoImportacao(r, competencia))}`;
+    destino = urlConciliacao(base, r, { ok: resumoImportacao(r, competencia) });
   } catch (e) { destino = `${base}?competencia=${competencia}&erro=${encodeURIComponent(mensagemDeErro(e))}`; }
   redirect(destino);
 }

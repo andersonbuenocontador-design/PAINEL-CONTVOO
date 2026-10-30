@@ -310,3 +310,17 @@ describe('envio direto para a conciliação (sem prévia)', () => {
     await expect(X.importarDireto(ub, { empresaId: empA, contaId: contaA, competencia: C, nome: 'x.csv', dados: csv(['05/10/2026;X;-1,00']) })).rejects.toMatchObject({ code: 'nao_encontrado' });
   });
 });
+
+describe('extrato reconhecido em qualquer envio', () => {
+  it('PDF/arquivo que não é extrato não gera lançamento nem conta', async () => {
+    expect(await X.tentarImportarExtrato(ua, { empresaId: empA, competencia: C, nome: 'nota.pdf', dados: Buffer.from('%PDF-1.4 nota fiscal') })).toBeNull();
+    expect(await X.tentarImportarExtrato(ua, { empresaId: empA, competencia: C, nome: 'planilha.csv', dados: csv(['05/10/2026;X;-1,00']) })).toBeNull();
+    expect((await query('SELECT count(*)::int n FROM movimentacoes WHERE empresa_id=$1', [empA])).rows[0].n).toBe(0);
+    expect((await query('SELECT count(*)::int n FROM contas_bancarias WHERE empresa_id=$1', [empA])).rows[0].n).toBe(1);
+  });
+  it('extrato OFX de banco é levado para a conciliação, com a conta para abrir filtrado', async () => {
+    const r = await X.tentarImportarExtrato(ua, { empresaId: empA, competencia: C, nome: 'a.ofx', dados: fx('exemplo_ofx_nao_oficial.ofx') });
+    expect(r?.gravadas).toBeGreaterThan(0); expect(r?.contaId).toBeTruthy();
+    expect(X.urlConciliacao('/cliente/x/extratos', r!, { ok: 'ok' })).toBe(`/cliente/x/extratos?competencia=${r!.competencia}&conta=${r!.contaId}&ok=ok#lancamentos`);
+  });
+});

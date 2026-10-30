@@ -180,8 +180,9 @@ export async function importarDireto(actor: Actor, p: { empresaId: string; conta
     prev = await obterPrevia(actor, id);
   }
   const r = await confirmarImportacao(actor, id, []);
+  const contaId = (await query('SELECT conta_id FROM importacoes WHERE id=$1', [id])).rows[0].conta_id as string;
   const res = prev.resumo as { duplicadasCertas: number; duplicadasPossiveis: number; foraPeriodo: number; conferenciaSaldo: { confere: boolean | null } | null };
-  return { competencia, gravadas: r.gravadas, jaExistiam: res.duplicadasCertas + res.duplicadasPossiveis, outroMes: res.foraPeriodo, banco: prev.conta?.banco as string | undefined, saldoConfere: res.conferenciaSaldo?.confere ?? null };
+  return { competencia, contaId, gravadas: r.gravadas, jaExistiam: res.duplicadasCertas + res.duplicadasPossiveis, outroMes: res.foraPeriodo, banco: prev.conta?.banco as string | undefined, saldoConfere: res.conferenciaSaldo?.confere ?? null };
 }
 
 /** Frase para o usuário depois do envio direto. */
@@ -195,3 +196,16 @@ export function resumoImportacao(r: Awaited<ReturnType<typeof importarDireto>>, 
   if (r.saldoConfere === false) partes.push('ATENÇÃO: o saldo do extrato não fechou; confira se faltou alguma página');
   return partes.join('; ') + '.';
 }
+
+/** O arquivo é extrato de um banco reconhecido? (layout de banco conhecido e com lançamentos). Evita tratar nota fiscal, recibo etc. como extrato. */
+export async function pareceExtratoBancario(nome: string, dados: Buffer) {
+  try { const ex = await lerExtrato(nome, dados); return !!ex.conta?.banco && ex.conta.banco !== 'BANCO' && ex.movimentos.length > 0; } catch { return false; }
+}
+/** Se o arquivo for extrato bancário, leva os lançamentos direto para a conciliação; senão devolve null sem efeito nenhum. */
+export async function tentarImportarExtrato(actor: Actor, p: { empresaId: string; competencia: string; nome: string; dados: Buffer }) {
+  if (!/\.(pdf|ofx)$/i.test(p.nome) || !(await pareceExtratoBancario(p.nome, p.dados))) return null;
+  try { return await importarDireto(actor, p); } catch { return null; }
+}
+/** Endereço da conciliação já mostrando só os lançamentos daquela conta. */
+export const urlConciliacao = (base: string, r: { competencia: string; contaId?: string }, msg: { ok?: string; erro?: string }) =>
+  `${base}?competencia=${r.competencia}${r.contaId ? `&conta=${r.contaId}` : ''}${msg.erro ? `&erro=${encodeURIComponent(msg.erro)}` : ''}${msg.ok ? `&ok=${encodeURIComponent(msg.ok)}` : ''}#lancamentos`;

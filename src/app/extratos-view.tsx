@@ -18,7 +18,7 @@ import { Avisos, Topo } from './components';
 import { acaoAtivarConta, acaoCancelarImportacao, acaoConfirmarImportacao, acaoCriarConta, acaoEnviarExtrato } from './extratos-actions';
 import { acaoConcluirConciliacao, acaoDevolverConciliacao, acaoEnviarConferencia, acaoReabrirConciliacao } from './conciliacao-actions';
 
-type SP = { competencia?: string; erro?: string; ok?: string; pendentes?: string };
+type SP = { competencia?: string; erro?: string; ok?: string; pendentes?: string; conta?: string };
 async function empresaOu404(u: UsuarioSessao, id: string) { try { return await obterEmpresa(u, id); } catch (e) { if (e instanceof AppError) notFound(); throw e; } }
 
 export async function ExtratosPagina({ u, empresaId, comp, sp, base, voltar }: { u: UsuarioSessao; empresaId: string; comp: string; sp: SP; base: string; voltar: string }) {
@@ -93,7 +93,8 @@ export async function ExtratosPagina({ u, empresaId, comp, sp, base, voltar }: {
         {imps.length > 0 && <><h3>Importações da competência</h3><table><tbody>{imps.map((i) => (<tr key={i.id}><td>{i.banco} · {i.nome_arquivo}</td><td><span className="chip neutro">{i.status === 'previa' ? 'aguardando confirmação' : 'importada'}</span></td>
           <td>{i.status === 'previa' && <a href={`${base}/importacao/${i.id}`}>Abrir prévia</a>}</td></tr>))}</tbody></table></>}</details>}
 
-      <ConciliacaoTabela linhas={linhas} plano={plano.map((c) => ({ codigo: c.codigo, classificacao: c.classificacao, nome: c.nome }))} bancos={[...porConta.entries()].map(([id, g]) => ({ id, nome: g.nome }))} admin={admin} somenteLeitura={somenteLeitura} />
+      <div id="lancamentos" />
+      <ConciliacaoTabela key={sp.conta ?? 'todas'} linhas={linhas} plano={plano.map((c) => ({ codigo: c.codigo, classificacao: c.classificacao, nome: c.nome }))} bancos={[...porConta.entries()].map(([id, g]) => ({ id, nome: g.conta ? `${g.nome} · cc ${g.conta}` : g.nome }))} admin={admin} somenteLeitura={somenteLeitura} bancoInicial={sp.conta && porConta.has(sp.conta) ? sp.conta : undefined} />
     </div></main></>);
 }
 
