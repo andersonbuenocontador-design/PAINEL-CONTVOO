@@ -1,6 +1,7 @@
 'use server';
 import { exigirUsuario } from '@/lib/session';
-import { executar } from '@/lib/actions-util';
+import { redirect } from 'next/navigation';
+import { executar, mensagemDeErro } from '@/lib/actions-util';
 import { criarEmpresa, editarEmpresa, definirSituacao } from '@/lib/services/empresas';
 import { criarUsuario, definirAtivo, redefinirSenha, vincular } from '@/lib/services/usuarios';
 
@@ -12,7 +13,10 @@ const dadosEmpresa = (fd: FormData) => ({
 
 export async function acaoCriarEmpresa(fd: FormData) {
   const a = await exigirUsuario('admin');
-  await executar('/admin/empresas', 'Empresa cadastrada.', () => criarEmpresa(a, dadosEmpresa(fd)));
+  let destino: string;
+  try { await criarEmpresa(a, dadosEmpresa(fd)); destino = `/admin/empresas?ok=${encodeURIComponent('Empresa cadastrada.')}`; }
+  catch (e) { destino = `/admin/empresas/nova?erro=${encodeURIComponent(mensagemDeErro(e))}`; } // erro: volta ao formulário
+  redirect(destino);
 }
 export async function acaoEditarEmpresa(fd: FormData) {
   const a = await exigirUsuario('admin'); const id = s(fd, 'id');

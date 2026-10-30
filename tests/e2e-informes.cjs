@@ -7,7 +7,7 @@ fs.writeFileSync('/tmp/e2e/inf1.pdf', '%PDF-1.4 informe do socio um'); fs.writeF
 (async () => {
   const br = await chromium.launch(); const ctx = async () => (await br.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
   const adm = await ctx(); await login(adm, 'admin@teste.local', 'SenhaDeTeste#2026'); await trocar(adm, 'SenhaDeTeste#2026', 'Troca#Segura2026x');
-  await adm.goto(B + '/admin/empresas'); await adm.fill('input[name=razaoSocial]', 'Empresa Alfa Ltda'); await adm.fill('input[name=cnpj]', '11.222.333/0001-81'); await adm.click('button:has-text("Cadastrar")'); await adm.waitForURL(/ok=/);
+  await adm.goto(B + '/admin/empresas/nova'); await adm.fill('input[name=razaoSocial]', 'Empresa Alfa Ltda'); await adm.fill('input[name=cnpj]', '11.222.333/0001-81'); await adm.click('button:has-text("Cadastrar")'); await adm.waitForURL(/ok=/);
   await adm.click('a:has-text("Abrir")'); await adm.waitForURL(/empresas\/[0-9a-f-]{36}$/); const E = adm.url().split('/').pop(); const pagina = `${B}/admin/empresas/${E}/informes`;
   for (const [n, em] of [['Socio Um', 'u1@alfa.com'], ['Socio Dois', 'u2@alfa.com']]) {
     await adm.goto(`${B}/admin/empresas/${E}`); await adm.fill('input[name=nome]', n); await adm.fill('input[name=email]', em); await adm.fill('input[name=senha]', 'Provisoria#Sol2026'); await adm.click('button:has-text("Criar usuário")'); await adm.waitForSelector('.msg-ok');

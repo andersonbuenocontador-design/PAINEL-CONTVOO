@@ -11,7 +11,7 @@ export default async function Entregas({ searchParams }: { searchParams: Promise
   const concluidas = v.filter((e) => e.concluida).length, semConfig = v.filter((e) => e.exigidos === 0).length;
   return (<><Topo u={u} /><main>
     <p><Link href="/admin">← Início</Link></p>
-    <div className="saudacao"><h1>Entregas do mês</h1><div className="row"><Link className="btn" href="/admin/empresas#nova">+ Cadastrar nova empresa</Link><Link className="btn sec" href="/admin/empresas">Todas as empresas</Link></div></div>
+    <div className="saudacao"><h1>Entregas do mês</h1><div className="row"><Link className="btn" href="/admin/empresas/nova">+ Cadastrar nova empresa</Link><Link className="btn sec" href="/admin/empresas">Todas as empresas</Link></div></div>
     <CompetenciaSeletor atual={comp} />
     <div className="grid">
       <div className="card"><h2>Concluídas</h2><strong style={{ fontSize: '2rem' }}>{concluidas}</strong><p className="soon">de {v.length} empresas ativas</p></div>

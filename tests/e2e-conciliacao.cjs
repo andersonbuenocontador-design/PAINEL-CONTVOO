@@ -13,7 +13,7 @@ fs.writeFileSync('/tmp/e2e/out.csv', 'Data;Histórico;Valor\n02/10/2026;TARIFA M
   const br = await chromium.launch();
   const adm = await (await br.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
   await login(adm, 'admin@teste.local', 'SenhaDeTeste#2026'); await trocar(adm, 'SenhaDeTeste#2026', 'Troca#Segura2026x'); await adm.waitForURL('**/admin');
-  await adm.goto(B + '/admin/empresas'); await adm.fill('input[name=razaoSocial]', 'Empresa Alfa Ltda'); await adm.fill('input[name=cnpj]', '11.222.333/0001-81'); await adm.click('button:has-text("Cadastrar")'); await adm.waitForURL(/ok=/);
+  await adm.goto(B + '/admin/empresas/nova'); await adm.fill('input[name=razaoSocial]', 'Empresa Alfa Ltda'); await adm.fill('input[name=cnpj]', '11.222.333/0001-81'); await adm.click('button:has-text("Cadastrar")'); await adm.waitForURL(/ok=/);
   await adm.click('a:has-text("Abrir")'); await adm.waitForURL(/empresas\/[0-9a-f-]{36}$/); const idAlfa = adm.url().split('/').pop();
   await adm.fill('input[name=nome]', 'Cliente Alfa'); await adm.fill('input[name=email]', 'alfa@cliente.com'); await adm.fill('input[name=senha]', 'Provisoria#Sol2026'); await adm.click('button:has-text("Criar usuário")'); await adm.waitForURL(/ok=/);
   execSync('npx tsx scripts/e2e-beta.ts', { stdio: 'inherit' });

@@ -10,7 +10,7 @@ const ok = (c, m) => { console.log((c ? 'OK   ' : 'FALHA'), m); if (!c) process.
   await adm.fill('#atual', 'SenhaDeTeste#2026'); await adm.fill('#nova', 'Troca#Segura2026x'); await adm.fill('#confirma', 'Troca#Segura2026x'); await adm.click('button');
   await adm.waitForURL('**/admin'); ok(true, 'troca de senha concluída');
   await adm.goto(B + '/admin/empresas');
-  const emp = async (rz, cnpj) => { await adm.goto(B + '/admin/empresas'); await adm.fill('input[name=razaoSocial]', rz); await adm.fill('input[name=cnpj]', cnpj); await adm.click('text=Cadastrar'); await adm.waitForURL(/[?&](erro|ok)=/); };
+  const emp = async (rz, cnpj) => { await adm.goto(B + '/admin/empresas/nova'); await adm.fill('input[name=razaoSocial]', rz); await adm.fill('input[name=cnpj]', cnpj); await adm.click('text=Cadastrar'); await adm.waitForURL(/[?&](erro|ok)=/); };
   await emp('Empresa Alfa Ltda', '11.222.333/0001-81');
   ok(await adm.locator('text=Empresa cadastrada.').count() > 0, 'empresa Alfa cadastrada');
   await emp('Empresa Beta Ltda', '11.222.333/0001-82');
@@ -19,7 +19,7 @@ const ok = (c, m) => { console.log((c ? 'OK   ' : 'FALHA'), m); if (!c) process.
   await emp('Empresa Alfa Dup', '11222333000181');
   ok(await adm.locator('text=Já existe uma empresa').count() > 0, 'CNPJ duplicado rejeitado');
   // cria usuário cliente da Alfa
-  await adm.click('a:has-text("Abrir") >> nth=0'); await adm.waitForLoadState('networkidle');
+  await adm.goto(B + '/admin/empresas'); await adm.click('a:has-text("Abrir") >> nth=0'); await adm.waitForLoadState('networkidle');
   const urlAlfa = adm.url();
   await adm.fill('input[name=nome]', 'Cliente Alfa'); await adm.fill('input[name=email]', 'alfa@cliente.com'); await adm.fill('input[name=senha]', 'Provisoria#Sol2026'); await adm.click('button:has-text("Criar usuário")'); await adm.waitForURL(/[?&](erro|ok)=/);
   ok(await adm.locator('text=Usuário criado').count() > 0, 'usuário cliente criado e vinculado à Alfa');
