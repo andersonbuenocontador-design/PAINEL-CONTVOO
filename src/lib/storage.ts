@@ -17,9 +17,18 @@ export function cabecalhosSupabase(extra: Record<string, string> = {}) {
   const k = process.env.SUPABASE_SECRET_KEY!;
   return { apikey: k, ...(k.startsWith('eyJ') ? { Authorization: `Bearer ${k}` } : {}), ...extra };
 }
+/** Qual chave foi colada em SUPABASE_SECRET_KEY (sem mostrar o valor): só a secreta/service_role grava arquivos. */
+export function tipoChaveSupabase(k = process.env.SUPABASE_SECRET_KEY ?? ''): 'secreta' | 'publica' | 'desconhecida' {
+  if (k.startsWith('sb_secret_')) return 'secreta';
+  if (k.startsWith('sb_publishable_')) return 'publica';
+  if (k.startsWith('eyJ')) { try { const role = JSON.parse(Buffer.from(k.split('.')[1], 'base64url').toString()).role; return role === 'service_role' ? 'secreta' : role === 'anon' ? 'publica' : 'desconhecida'; } catch { return 'desconhecida'; } }
+  return 'desconhecida';
+}
+export const MSG_CHAVE_PUBLICA = 'a SUPABASE_SECRET_KEY cadastrada no Render é a chave PÚBLICA (publishable/anon), que não grava arquivos. No Supabase: Project Settings → API Keys → copie a chave SECRETA (sb_secret_..., ou service_role na aba Legacy) e cole no Render.';
 const urlObjeto = (chave: string) => `${process.env.SUPABASE_URL!.replace(/\/$/, '')}/storage/v1/object/${bucket()}/${validar(chave).split('/').map(encodeURIComponent).join('/')}`;
 async function falha(r: Response, acao: string): Promise<never> {
   const corpo = (await r.text().catch(() => '')).slice(0, 200);
+  if (/row-level security|Unauthorized/i.test(corpo) && tipoChaveSupabase() !== 'secreta') throw new Error(`armazenamento (${acao}): ${MSG_CHAVE_PUBLICA}`);
   throw new Error(`armazenamento (${acao}): HTTP ${r.status} ${corpo}`);
 }
 

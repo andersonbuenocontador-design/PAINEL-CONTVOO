@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { apagar, armazenamentoOk, gravar, ler, prepararArmazenamento } from '../src/lib/storage';
+import { apagar, armazenamentoOk, gravar, ler, prepararArmazenamento, tipoChaveSupabase } from '../src/lib/storage';
 import { configPg } from '../src/lib/db';
 import { provedorPadrao, remetente } from '../src/lib/notificacoes';
 
@@ -107,5 +107,20 @@ describe('saudação pelo horário de Brasília', () => {
     expect([em(5), em(8), em(11)]).toEqual(['Bom dia', 'Bom dia', 'Bom dia']);
     expect([em(12), em(15), em(17)]).toEqual(['Boa tarde', 'Boa tarde', 'Boa tarde']);
     expect([em(18), em(20), em(-1), em(1), em(4)]).toEqual(['Boa noite', 'Boa noite', 'Boa noite', 'Boa noite', 'Boa noite']);
+  });
+});
+
+describe('chave do Supabase colada errada', () => {
+  afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+  const jwt = (role: string) => `eyJhbGciOiJIUzI1NiJ9.${Buffer.from(JSON.stringify({ role })).toString('base64url')}.assinatura`;
+  it('reconhece secreta e pública sem mostrar o valor', () => {
+    expect(tipoChaveSupabase('sb_secret_abc')).toBe('secreta'); expect(tipoChaveSupabase('sb_publishable_abc')).toBe('publica');
+    expect(tipoChaveSupabase(jwt('service_role'))).toBe('secreta'); expect(tipoChaveSupabase(jwt('anon'))).toBe('publica'); expect(tipoChaveSupabase('xyz')).toBe('desconhecida');
+  });
+  it('recusa por permissão com chave pública vira instrução clara', async () => {
+    vi.stubEnv('SUPABASE_URL', 'https://abc.supabase.co'); vi.stubEnv('SUPABASE_SECRET_KEY', 'sb_publishable_xyz');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{"statusCode":"403","error":"Unauthorized","message":"new row violates row-level security policy"}', { status: 400 })));
+    await expect(gravar('a/b', Buffer.from('x'))).rejects.toThrow(/chave PÚBLICA/);
+    await expect(gravar('a/b', Buffer.from('x'))).rejects.not.toThrow(/sb_publishable_xyz/);
   });
 });

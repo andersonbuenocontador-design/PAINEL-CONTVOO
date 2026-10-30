@@ -165,6 +165,11 @@ export function assinaturaOk(ext: string, b: Buffer) {
   if (ext === 'jpg') return b[0] === 0xff && b[1] === 0xd8;
   return !b.includes(0); // ofx, csv, xml: texto
 }
+/** Grava no armazenamento; se ele falhar, quem envia vê uma mensagem clara (o detalhe técnico vai para o log do servidor). */
+export async function gravarOuAvisar(chave: string, dados: Buffer) {
+  try { await gravar(chave, dados); }
+  catch (e) { console.error(e); throw new AppError('Não foi possível guardar o arquivo agora. Tente de novo em alguns minutos; se continuar, avise o escritório.'); }
+}
 export const nomeSeguro = (n: string) => n.replace(/[\\/\u0000-\u001f"]/g, '_').slice(-180) || 'arquivo';
 
 export async function enviarArquivo(actor: Actor, p: { empresaId: string; exigenciaId: string; competencia: string; nome: string; dados: Buffer }) {
@@ -179,7 +184,7 @@ export async function enviarArquivo(actor: Actor, p: { empresaId: string; exigen
   if (!assinaturaOk(ext, p.dados)) throw new AppError('O conteúdo do arquivo não corresponde ao formato informado.');
   const chave = `${emp.id}/${randomUUID()}`;
   const sha = createHash('sha256').update(p.dados).digest('hex');
-  await gravar(chave, p.dados);
+  await gravarOuAvisar(chave, p.dados);
   return tx(async (c) => {
     // trava a exigência+competência para evitar duas versões concorrentes
     await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${ex.id}:${p.competencia}`]);
@@ -246,7 +251,7 @@ export async function enviarAvulsos(actor: Actor, p: { empresaId: string; compet
   const ids: string[] = [];
   for (const a of arqs) {
     const chave = `${emp.id}/avulsos/${randomUUID()}`;
-    await gravar(chave, a.dados);
+    await gravarOuAvisar(chave, a.dados);
     ids.push(await tx(async (c) => {
       const r = await c.query(
         `INSERT INTO documentos_avulsos(empresa_id,competencia,descricao,nome_original,chave_storage,tamanho,sha256,enviado_por) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,

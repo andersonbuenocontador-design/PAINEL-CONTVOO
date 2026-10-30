@@ -1,5 +1,5 @@
 import { query } from '@/lib/db';
-import { armazenamentoOk } from '@/lib/storage';
+import { armazenamentoOk, MSG_CHAVE_PUBLICA, tipoChaveSupabase } from '@/lib/storage';
 import { conferirVariaveis, diagnosticar, problemaNoInicio } from '@/lib/diagnostico';
 
 /** Para monitoramento. Não exige login e não expõe dados: só ok/falha do banco e do armazenamento e, se houver,
@@ -13,6 +13,7 @@ export async function GET() {
   const discoTemporario = !!process.env.RENDER && !(process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY);
   r.armazenamento = !discoTemporario && await armazenamentoOk();
   const inicio = problemaNoInicio();
+  if (process.env.SUPABASE_SECRET_KEY && tipoChaveSupabase() === 'publica') { r.armazenamento = false; problemas.push(`armazenamento: ${MSG_CHAVE_PUBLICA}`); }
   if (!r.armazenamento && !inicio?.includes('armazenamento:')) problemas.push(process.env.SUPABASE_URL ? 'armazenamento: o Supabase Storage não respondeu (confira SUPABASE_URL e SUPABASE_SECRET_KEY no Render).' : `armazenamento: ${conferirVariaveis([{ nome: 'SUPABASE_URL' }, { nome: 'SUPABASE_SECRET_KEY' }]).join('; ')}.`);
   if (inicio && (!r.banco || !r.armazenamento || /admin:/.test(inicio))) problemas.unshift(inicio);
   r.ok = r.banco && r.armazenamento;

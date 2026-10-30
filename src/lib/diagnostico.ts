@@ -19,6 +19,8 @@ export function diagnosticar(e: unknown, onde: 'banco' | 'armazenamento' | 'admi
   if (code === 'ECONNREFUSED' || code === 'ETIMEDOUT' || /timeout/i.test(msg)) return `${onde}: sem resposta do servidor. Confira o endereço/porta (Session pooler usa a porta 5432) e se o projeto do Supabase não está pausado.`;
   if (/HTTP (401|403)/.test(msg) || /Invalid (API )?key|signature/i.test(msg)) return 'armazenamento: SUPABASE_SECRET_KEY recusada. Copie a chave secreta (sb_secret_...) em Project Settings → API Keys.';
   if (/PÚBLICO/.test(msg)) return 'armazenamento: ' + msg;
+  if (/chave PÚBLICA/.test(msg)) return msg.replace(/^armazenamento \([^)]*\): /, 'armazenamento: ');
+  if (/row-level security/i.test(msg)) return 'armazenamento: o Supabase recusou a gravação (permissão). Confira se a SUPABASE_SECRET_KEY no Render é a chave SECRETA (sb_secret_... ou service_role), não a pública.';
   if (/SEED_ADMIN/.test(msg)) return 'admin: ' + msg;
   return `${onde}: ${mascarar(msg).slice(0, 200)}`;
 }
