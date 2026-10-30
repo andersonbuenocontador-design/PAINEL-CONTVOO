@@ -198,9 +198,15 @@ export function resumoImportacao(r: Awaited<ReturnType<typeof importarDireto>>, 
   return partes.join('; ') + '.';
 }
 
-/** O arquivo é extrato de um banco reconhecido? (layout de banco conhecido e com lançamentos). Evita tratar nota fiscal, recibo etc. como extrato. */
+/** O arquivo é extrato bancário? OFX; PDF de banco com leitor próprio; ou PDF de outro banco cujo saldo fecha. Evita tratar nota fiscal, recibo etc. como extrato. */
 export async function pareceExtratoBancario(nome: string, dados: Buffer) {
-  try { const ex = await lerExtrato(nome, dados); return !!ex.conta?.banco && ex.conta.banco !== 'BANCO' && ex.movimentos.length > 0; } catch { return false; }
+  try {
+    const ex = await lerExtrato(nome, dados);
+    if (!ex.movimentos.length) return false;
+    if (ex.formato === 'ofx') return true; // OFX é sempre extrato bancário (padrão de todos os bancos)
+    // banco com leitor próprio, ou banco desconhecido lido pelo leitor genérico com o saldo do extrato fechando (prova de que é extrato e foi bem lido)
+    return (!!ex.conta?.banco && ex.conta.banco !== 'BANCO') || ex.conferenciaSaldo?.confere === true;
+  } catch { return false; }
 }
 /** Se o arquivo for extrato bancário, leva os lançamentos direto para a conciliação; senão devolve null sem efeito nenhum. */
 export async function tentarImportarExtrato(actor: Actor, p: { empresaId: string; competencia: string; nome: string; dados: Buffer }) {

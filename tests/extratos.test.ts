@@ -324,3 +324,11 @@ describe('extrato reconhecido em qualquer envio', () => {
     expect(X.urlConciliacao('/cliente/x/extratos', r!, { ok: 'ok' })).toBe(`/cliente/x/extratos?competencia=${r!.competencia}&conta=${r!.contaId}&ok=ok#lancamentos`);
   });
 });
+
+describe('extrato de banco sem leitor próprio', () => {
+  it('PDF lido pelo leitor genérico com saldo fechando é tratado como extrato; PDF sem texto não', async () => {
+    const pdf = (n: string) => readFileSync('tests/fixtures/extratos-pdf/' + n);
+    expect(await X.pareceExtratoBancario('tabela_generica_ficticia.pdf', pdf('tabela_generica_ficticia.pdf'))).toBe(true);
+    expect(await X.pareceExtratoBancario('sem_texto.pdf', pdf('sem_texto.pdf'))).toBe(false);
+  });
+});
