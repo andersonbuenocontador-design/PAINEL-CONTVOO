@@ -23,7 +23,15 @@ if (bancoOk && (email || senha)) {
     try {
       const r = await c.query(`INSERT INTO usuarios(nome,email,senha_hash,papel,deve_trocar_senha) VALUES ('Administrador',$1,$2,'admin',true) ON CONFLICT DO NOTHING RETURNING id`,
         [email.toLowerCase(), await bcrypt.hash(senha, 12)]);
-      console.log(r.rowCount ? 'admin: criado (troca de senha no 1º acesso)' : 'admin: já existe');
+      if (r.rowCount) console.log('admin: criado (troca de senha no 1º acesso)');
+      else if (process.env.REDEFINIR_SENHA_ADMIN === '1') {
+        // Recuperação sem acesso ao servidor: grava SEED_ADMIN_PASSWORD como nova senha provisória (troca obrigatória) e encerra as sessões.
+        const u = await c.query(`UPDATE usuarios SET senha_hash=$2, deve_trocar_senha=true, token_version=token_version+1, falhas_login=0, bloqueado_ate=NULL
+          WHERE lower(email)=$1 AND papel='admin' RETURNING id`, [email.toLowerCase(), await bcrypt.hash(senha, 12)]);
+        if (!u.rowCount) throw new Error(`SEED_ADMIN_EMAIL ${email} não é um administrador cadastrado.`);
+        await c.query(`INSERT INTO auditoria(usuario_id,acao,entidade,entidade_id,detalhes) VALUES (NULL,'senha_admin_redefinida_no_inicio','usuario',$1,'{}')`, [u.rows[0].id]).catch(() => {});
+        console.log('admin: senha redefinida (troca no próximo acesso). Apague REDEFINIR_SENHA_ADMIN e SEED_ADMIN_PASSWORD no Render.');
+      } else console.log('admin: já existe');
     } finally { await c.end(); }
   } catch (e) { problemas.push(diagnosticar(e, 'admin')); }
 }

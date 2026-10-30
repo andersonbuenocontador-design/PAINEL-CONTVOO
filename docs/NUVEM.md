@@ -90,6 +90,9 @@ Quando o site na nuvem estiver funcionando:
 
 ---
 
+## Esqueci a senha do administrador
+Render → *Environment*: confira `SEED_ADMIN_EMAIL` (seu e-mail), coloque em `SEED_ADMIN_PASSWORD` uma senha provisória nova (10+ caracteres) e crie `REDEFINIR_SENHA_ADMIN` = `1` → *Save*. Em ~3 minutos entre com a senha provisória (o painel pede uma nova). Depois **apague** `REDEFINIR_SENHA_ADMIN` e `SEED_ADMIN_PASSWORD`. Se houver outro administrador, ele também pode redefinir em *Usuários*.
+
 ## Segurança adicional (recomendado, 2 minutos)
 Supabase → **Project Settings → Database → SSL Configuration → Download certificate**. Abra o arquivo `.crt` no Bloco de Notas, copie tudo e cole em Render → *Environment* → nova variável `DATABASE_CA_CERT`. Assim o site confere que está falando com o banco verdadeiro (sem isso a conexão já é cifrada, mas não verificada).
 
