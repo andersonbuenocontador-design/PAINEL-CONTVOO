@@ -99,3 +99,13 @@ describe('conferência das variáveis (sem mostrar valores)', () => {
     expect(r.join(' ')).not.toContain('segredo');
   });
 });
+
+describe('saudação pelo horário de Brasília', () => {
+  it('bom dia (5h–11h59), boa tarde (12h–17h59), boa noite (18h–4h59)', async () => {
+    const { saudacaoDoHorario } = await import('../src/lib/format');
+    const em = (horaBrasilia: number) => saudacaoDoHorario(new Date(Date.UTC(2026, 9, 30, horaBrasilia + 3, 0)));
+    expect([em(5), em(8), em(11)]).toEqual(['Bom dia', 'Bom dia', 'Bom dia']);
+    expect([em(12), em(15), em(17)]).toEqual(['Boa tarde', 'Boa tarde', 'Boa tarde']);
+    expect([em(18), em(20), em(-1), em(1), em(4)]).toEqual(['Boa noite', 'Boa noite', 'Boa noite', 'Boa noite', 'Boa noite']);
+  });
+});

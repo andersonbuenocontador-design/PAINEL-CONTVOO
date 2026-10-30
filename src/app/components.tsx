@@ -63,3 +63,5 @@ export function competenciaDe(c?: string) {
   if (c && /^\d{4}-(0[1-9]|1[0-2])$/.test(c)) return c;
   const a = new Date(); return `${a.getFullYear()}-${String(a.getMonth() + 1).padStart(2, '0')}`;
 }
+
+export { saudacaoDoHorario } from '@/lib/format';
