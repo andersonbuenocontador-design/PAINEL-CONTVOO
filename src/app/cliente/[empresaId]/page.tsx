@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { exigirUsuario } from '@/lib/session';
 import { listarEmpresas } from '@/lib/services/empresas';
-import { resumoCliente } from '@/lib/services/hub';
+import { resumoCliente, resumoFinanceiro } from '@/lib/services/hub';
 import { AppError } from '@/lib/errors';
 import { Atalho, Avisos, CompetenciaSeletor, ConviteAvaliacao, Topo, competenciaDe, saudacaoDoHorario } from '../../components';
 
@@ -12,7 +12,7 @@ const CONC = { revisao: 'Em preenchimento', enviada: 'Enviada ao escritório', d
 export default async function ClienteHub({ params, searchParams }: { params: Promise<{ empresaId: string }>; searchParams: Promise<{ competencia?: string; erro?: string; ok?: string }> }) {
   const u = await exigirUsuario('cliente');
   const { empresaId } = await params; const sp = await searchParams; const comp = competenciaDe(sp.competencia); const c = `?competencia=${comp}`;
-  let r; try { r = await resumoCliente(u, empresaId, comp); } catch (x) { if (x instanceof AppError) notFound(); throw x; }
+  let r, f; try { [r, f] = await Promise.all([resumoCliente(u, empresaId, comp), resumoFinanceiro(u, empresaId, comp)]); } catch (x) { if (x instanceof AppError) notFound(); throw x; }
   const varias = (await listarEmpresas(u)).length > 1; const [ano, mes] = comp.split('-'); const d = r.docs; const p = r.pendencias;
   const docsInfo = !d.exigidos ? (r.pdfs ? `${r.pdfs} PDF(s) enviado(s)` : 'Nenhum documento pedido neste mês')
     : d.concluida ? 'Tudo entregue e aprovado ✓' : d.rejeitados ? `${d.rejeitados} recusado(s): envie de novo` : d.pendentes ? `Faltam ${d.pendentes} de ${d.exigidos}` : `Enviados; aguardando o escritório`;
@@ -31,6 +31,33 @@ export default async function ClienteHub({ params, searchParams }: { params: Pro
       <Atalho href={`/cliente/${empresaId}/pendencias`} icone="conversa" titulo="Pendências" desc="Solicitações do escritório"
         info={p.aguardando ? `${p.aguardando} aguardando você` : p.abertas ? `${p.abertas} em andamento` : 'Nenhuma pendência'} alerta={p.aguardando > 0} ok={!p.abertas} />
     </div>
+    {f.movimentacoes > 0 && <ResumoMes f={f} mes={mes} ano={ano} href={`/cliente/${empresaId}/extratos${c}`} />}
     <ConviteAvaliacao />
   </main></>);
+}
+
+const reais = (c: number) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+/** Variação em relação ao mês anterior (some quando não há base para comparar). */
+function Variacao({ atual, antes, bomSubir }: { atual: number; antes?: number; bomSubir: boolean }) {
+  if (!antes) return null;
+  const pct = Math.round(((atual - antes) / antes) * 100); if (!pct) return <span className="var neutra">igual ao mês anterior</span>;
+  return <span className={`var ${(pct > 0) === bomSubir ? 'boa' : 'ruim'}`}>{pct > 0 ? '+' : ''}{pct}% vs. mês anterior</span>;
+}
+/** Resumo do mês para o cliente: entradas, saídas, resultado e os maiores gastos (a partir dos extratos anexados). */
+function ResumoMes({ f, mes, ano, href }: { f: Awaited<ReturnType<typeof resumoFinanceiro>>; mes: string; ano: string; href: string }) {
+  const maior = Math.max(...f.maioresGastos.map((g) => g.valor), 1);
+  return (<section className="card resumo-mes" aria-labelledby="resumo-mes-t">
+    <div className="resumo-cab"><h2 id="resumo-mes-t">Resumo de {MESES[Number(mes) - 1]} de {ano}</h2><Link href={href}>Ver movimentações</Link></div>
+    <div className="resumo-kpis">
+      <div className="kpi"><span>Entrou</span><strong className="pos">{reais(f.entradas)}</strong><Variacao atual={f.entradas} antes={f.anterior?.entradas} bomSubir /></div>
+      <div className="kpi"><span>Saiu</span><strong className="neg">{reais(f.saidas)}</strong><Variacao atual={f.saidas} antes={f.anterior?.saidas} bomSubir={false} /></div>
+      <div className="kpi"><span>Resultado do mês</span><strong className={f.resultado >= 0 ? 'pos' : 'neg'}>{reais(f.resultado)}</strong><span className="var neutra">{f.resultado >= 0 ? 'entrou mais do que saiu' : 'saiu mais do que entrou'}</span></div>
+    </div>
+    {f.maioresGastos.length > 0 && <><h3>Maiores gastos</h3><ol className="gastos">{f.maioresGastos.map((g) => (
+      <li key={g.categoria}><div className="gasto-lin"><span>{g.categoria}</span><strong>{reais(g.valor)}</strong></div>
+        <div className="barra" aria-hidden="true"><div style={{ width: `${Math.max(3, (g.valor / maior) * 100)}%` }} /></div></li>))}</ol></>}
+    {f.semCategoria > 0 && <p className="sem-cat">{reais(f.semCategoria)} em saídas ainda sem categoria. <Link href={href}>Organizar com o Contvoo AI</Link> para ver o resumo completo.</p>}
+    <p className="soon">Com base nos extratos anexados. Transferências entre contas da própria empresa não entram na conta.</p>
+  </section>);
 }

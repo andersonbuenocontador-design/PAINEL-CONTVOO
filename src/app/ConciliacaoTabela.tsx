@@ -1,9 +1,10 @@
 'use client';
+import { Comprovantes } from './Comprovantes';
 import { Fragment, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { acaoClassificarLote, acaoConfirmarLinhas, acaoEditarLinha, acaoLimparCorrecao, acaoPedirCorrecao, acaoSemNota } from './conciliacao-actions';
 
-export type Linha = { id: number; data: string; descricao_original: string; valor: number; documento: string | null; banco: string; conta_bancaria_id: string; conta_codigo: number | null; conta_nome: string | null; classificacao: string | null; complemento: string | null; confianca: 'A' | 'M' | 'B'; motivo: string | null; observacao: string | null; origem: string; revisado: boolean; revisado_por: string | null; correcao_pedida: boolean; correcao_motivo: string | null; conta_grupo: string | null; nota_fiscal: string | null; sem_nota: boolean; chave?: string | null };
+export type Linha = { id: number; data: string; descricao_original: string; valor: number; documento: string | null; banco: string; conta_bancaria_id: string; conta_codigo: number | null; conta_nome: string | null; classificacao: string | null; complemento: string | null; confianca: 'A' | 'M' | 'B'; motivo: string | null; observacao: string | null; origem: string; revisado: boolean; revisado_por: string | null; correcao_pedida: boolean; correcao_motivo: string | null; conta_grupo: string | null; nota_fiscal: string | null; sem_nota: boolean; chave?: string | null; comprovantes?: { id: string; nome: string }[] };
 export type ContaPlano = { codigo: number; classificacao: string; nome: string; grupo?: string | null; descricao?: string | null; tipo?: 'C' | 'D' | 'T' | 'CD' | null };
 /** Categorias agrupadas (sem código nem classificação); com o sentido do lançamento, mostra só as que servem para entrada ou saída. */
 function OpcoesCategorias({ plano, sentido }: { plano: ContaPlano[]; sentido?: 'C' | 'D' }) {
@@ -70,7 +71,7 @@ export function ConciliacaoTabela({ linhas, plano, bancos, admin, somenteLeitura
           <td className="conta">{l.conta_codigo != null ? <>{l.conta_grupo && <span className="cod">{l.conta_grupo} › </span>}{l.conta_nome}</> : <><span className="prefixo">REVISAR</span>{ent ? 'Entrada' : 'Saída'} sem categoria</>}</td>
           <td className="comp">{(l.complemento || l.descricao_original).toUpperCase().slice(0, 140)}</td>
           <td className="r num">{ent ? num(l.valor) : ''}</td><td className="r num">{!ent ? num(l.valor) : ''}</td>
-          <td className="nota">{notaTxt(l) ?? <span className="falta-nota" title="Informe o número da nota ou marque Sem nota">Falta</span>}</td>
+          <td className="nota">{notaTxt(l) ?? <span className="falta-nota" title="Informe o número da nota ou marque Sem nota">Falta</span>}{(l.comprovantes?.length ?? 0) > 0 && <div className="comp-qtd" onClick={(e) => e.stopPropagation()}>{l.comprovantes!.map((c, i) => <a key={c.id} href={`/api/conciliacao/comprovante/${c.id}`} title={`Baixar ${c.nome}`}>{l.comprovantes!.length > 1 ? `Comprovante ${i + 1}` : 'Comprovante'}</a>)}</div>}</td>
           <td><span className={`chip ${CONF[l.confianca] === 'Alta' ? 'alta' : CONF[l.confianca] === 'Média' ? 'media' : 'baixa'}`}>{CONF[l.confianca]}</span></td>
           <td className="mot">{l.correcao_pedida && <strong style={{ color: 'var(--erro)' }}>Correção pedida: {l.correcao_motivo} </strong>}{[l.motivo, l.observacao].filter(Boolean).join(' ')}</td>
           <td onClick={(e) => e.stopPropagation()}>{!pode ? (l.revisado ? <span className="rev">✓</span> : null) : l.revisado ? <span className="rev" title={`Revisado${l.revisado_por ? ' por ' + l.revisado_por : ''}`}>✓</span> : <button className="btn peq" title="Confirmar esta classificação" disabled={pend || l.conta_codigo == null} onClick={() => roda(() => acaoConfirmarLinhas([l.id]))}>OK</button>}</td></tr>
@@ -93,6 +94,7 @@ function Editor({ l, plano, pend, onSalvar }: { l: Linha; plano: ContaPlano[]; p
         <span className="dica"><label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontWeight: 400 }}><input type="checkbox" style={{ width: 'auto' }} checked={semNota} onChange={(e) => { setSemNota(e.target.checked); if (e.target.checked) setNota(''); }} /> Sem nota</label></span></label>
       <label className="campo">Complemento<input type="text" value={comp} maxLength={300} onChange={(e) => setComp(e.target.value)} /></label>
       <label className="campo">Observação<input type="text" value={obs} maxLength={1000} onChange={(e) => setObs(e.target.value)} /></label></div>
+    <div className="campo">Comprovante<Comprovantes movimentacaoId={l.id} inicial={l.comprovantes ?? []} editavel /></div>
     <div className="linha-flex"><button className="btn pri" disabled={pend} onClick={() => onSalvar({ contaCodigo: conta ? Number(conta) : null, complemento: comp, observacao: obs, notaFiscal: nota.trim(), semNota })}>Salvar</button>
       <span className="muted" style={{ fontSize: 13 }}>Informe o número da nota fiscal ou marque "Sem nota" — é obrigatório para enviar ao escritório.</span></div></td></tr>);
 }

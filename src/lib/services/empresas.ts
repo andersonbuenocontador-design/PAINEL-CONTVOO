@@ -12,6 +12,8 @@ const empresaSchema = z.object({
   cnpj: z.string().refine(cnpjValido, 'CNPJ inválido.').transform(soDigitos),
   emailContato: z.string().optional().transform(vazioParaNull).refine((v) => !v || z.string().email().safeParse(v).success, 'E-mail de contato inválido.'),
   responsavelId: z.string().uuid().nullish().transform((v) => v ?? null),
+  whatsapp: z.string().optional().transform((v) => { const d = soDigitos(v ?? ''); return !d ? null : d.length <= 11 ? `55${d}` : d; })
+    .refine((v) => !v || /^55\d{10,11}$/.test(v), 'WhatsApp inválido. Use DDD + número, ex.: (51) 99999-1234.'),
   inicioUso: z.string().optional().transform(vazioParaNull).refine((v) => !v || /^\d{4}-\d{2}-\d{2}$/.test(v), 'Data inválida.'),
 });
 export type EmpresaInput = z.input<typeof empresaSchema>;
@@ -22,8 +24,8 @@ export async function criarEmpresa(actor: Actor, input: EmpresaInput) {
   return tx(async (c) => {
     try {
       const r = await c.query(
-        `INSERT INTO empresas(razao_social,nome_fantasia,cnpj,email_contato,responsavel_id,inicio_uso) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
-        [d.razaoSocial, d.nomeFantasia, d.cnpj, d.emailContato, d.responsavelId, d.inicioUso]);
+        `INSERT INTO empresas(razao_social,nome_fantasia,cnpj,email_contato,responsavel_id,inicio_uso,whatsapp) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+        [d.razaoSocial, d.nomeFantasia, d.cnpj, d.emailContato, d.responsavelId, d.inicioUso, d.whatsapp]);
       const id = r.rows[0].id as string;
       await registrar(c, { usuarioId: actor.id, empresaId: id, acao: 'empresa.criar', entidade: 'empresa', entidadeId: id, detalhes: { cnpj: d.cnpj } });
       await (await import('./conciliacao')).garantirPlanoGenerico(c, id); // toda empresa nova já nasce com o plano genérico de categorias
@@ -42,8 +44,8 @@ export async function editarEmpresa(actor: Actor, id: string, input: EmpresaInpu
   await tx(async (c) => {
     try {
       const r = await c.query(
-        `UPDATE empresas SET razao_social=$2,nome_fantasia=$3,cnpj=$4,email_contato=$5,responsavel_id=$6,inicio_uso=$7,atualizado_em=now() WHERE id=$1 RETURNING id`,
-        [id, d.razaoSocial, d.nomeFantasia, d.cnpj, d.emailContato, d.responsavelId, d.inicioUso]);
+        `UPDATE empresas SET razao_social=$2,nome_fantasia=$3,cnpj=$4,email_contato=$5,responsavel_id=$6,inicio_uso=$7,whatsapp=$8,atualizado_em=now() WHERE id=$1 RETURNING id`,
+        [id, d.razaoSocial, d.nomeFantasia, d.cnpj, d.emailContato, d.responsavelId, d.inicioUso, d.whatsapp]);
       if (!r.rowCount) throw new AppError('Empresa não encontrada.', 'nao_encontrado');
       await registrar(c, { usuarioId: actor.id, empresaId: id, acao: 'empresa.editar', entidade: 'empresa', entidadeId: id });
     } catch (e: any) {
@@ -63,7 +65,7 @@ export async function definirSituacao(actor: Actor, id: string, situacao: 'ativa
   });
 }
 
-const COLS = `e.id,e.razao_social,e.nome_fantasia,e.cnpj,e.email_contato,e.responsavel_id,e.situacao,e.inicio_uso,e.criado_em`;
+const COLS = `e.id,e.razao_social,e.nome_fantasia,e.cnpj,e.email_contato,e.responsavel_id,e.situacao,e.inicio_uso,e.criado_em,e.whatsapp`;
 
 /** Admin vê todas; cliente só as empresas explicitamente vinculadas a ele (e ativas). */
 export async function listarEmpresas(actor: Actor, busca?: string) {

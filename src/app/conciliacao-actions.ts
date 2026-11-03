@@ -2,7 +2,7 @@
 import { redirect } from 'next/navigation';
 import { exigirUsuario } from '@/lib/session';
 import { executar, mensagemDeErro } from '@/lib/actions-util';
-import { classificarEmLote, concluirConciliacao, confirmarLinhas, definirContaPlanoAtiva, devolverParaCorrecao, editarLinha, enviarParaConferencia, importarPlano, limparCorrecao, pedirCorrecao, reabrirConciliacao, reclassificarNaoRevisadas, salvarContaPlano, marcarSemNota } from '@/lib/services/conciliacao';
+import { classificarEmLote, concluirConciliacao, confirmarLinhas, definirContaPlanoAtiva, devolverParaCorrecao, editarLinha, enviarParaConferencia, importarPlano, limparCorrecao, pedirCorrecao, reabrirConciliacao, reclassificarNaoRevisadas, salvarContaPlano, marcarSemNota, anexarComprovante, removerComprovante } from '@/lib/services/conciliacao';
 
 type R = { ok: true } | { ok: false; erro: string };
 const rodar = async (fn: () => Promise<unknown>): Promise<R> => { try { await fn(); return { ok: true }; } catch (e) { return { ok: false, erro: mensagemDeErro(e) }; } };
@@ -12,6 +12,15 @@ export async function acaoClassificarLote(ids: number[], contaCodigo: number): P
 export async function acaoConfirmarLinhas(ids: number[]): Promise<R> { const u = await exigirUsuario(); return rodar(() => confirmarLinhas(u, ids)); }
 export async function acaoEditarLinha(id: number, d: { contaCodigo?: number | null; complemento?: string; observacao?: string; notaFiscal?: string; semNota?: boolean }): Promise<R> { const u = await exigirUsuario(); return rodar(() => editarLinha(u, id, d)); }
 export async function acaoSemNota(ids: number[]): Promise<R> { const u = await exigirUsuario(); return rodar(() => marcarSemNota(u, ids)); }
+
+/** Comprovante por lançamento (PDF ou foto). Devolve o comprovante criado para a tela mostrar sem recarregar. */
+export async function acaoAnexarComprovante(fd: FormData): Promise<{ ok: true; id: string; nome: string } | { ok: false; erro: string }> {
+  const u = await exigirUsuario(); const f = fd.get('arquivo');
+  if (!(f instanceof File)) return { ok: false, erro: 'Selecione o arquivo do comprovante.' };
+  try { return { ok: true, ...(await anexarComprovante(u, Number(fd.get('movimentacaoId')), { nome: f.name, dados: Buffer.from(await f.arrayBuffer()) })) }; }
+  catch (e) { return { ok: false, erro: mensagemDeErro(e) }; }
+}
+export async function acaoRemoverComprovante(id: string): Promise<R> { const u = await exigirUsuario(); return rodar(() => removerComprovante(u, id)); }
 
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? '');
 const baseDe = (papel: string, e: string) => (papel === 'admin' ? `/admin/empresas/${e}/extratos` : `/cliente/${e}/extratos`);

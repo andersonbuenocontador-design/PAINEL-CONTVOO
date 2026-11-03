@@ -38,11 +38,11 @@ export async function cobrarDocumentos(actor: Actor, empresaId: string, competen
       await c.query(`UPDATE pendencias SET situacao='aberta', atualizado_em=now() WHERE id=$1`, [aberta.id]);
       await registrar(c, { usuarioId: actor.id, empresaId, acao: 'pendencia.lembrete_cobranca', entidade: 'pendencia', entidadeId: aberta.id, detalhes: { competencia, faltam: faltam.length } });
     });
-    return { id: aberta.id as string, lembrete: true };
+    return { id: aberta.id as string, lembrete: true, texto: textoCobranca(competencia, faltam, true) };
   }
   const id = await criarPendencia(actor, empresaId, { categoria: 'documento', competencia, descricao: textoCobranca(competencia, faltam) });
   await query(`UPDATE pendencias SET origem='cobranca_documentos' WHERE id=$1`, [id]);
-  return { id, lembrete: false };
+  return { id, lembrete: false, texto: textoCobranca(competencia, faltam) };
 }
 
 /** Chamado quando o cliente envia um documento: se nada mais falta no mês, a cobrança se resolve sozinha. */
@@ -60,4 +60,10 @@ export async function resolverCobrancaSeCompleto(c: Runner, actor: Actor, empres
     await c.query('INSERT INTO pendencia_mensagens(pendencia_id,usuario_id,texto) VALUES ($1,$2,$3)', [p.id, actor.id, 'Documentos enviados. Cobrança encerrada automaticamente.']);
     await registrar(c, { usuarioId: actor.id, empresaId, acao: 'pendencia.resolver_cobranca_automatica', entidade: 'pendencia', entidadeId: p.id });
   }
+}
+
+/** Mensagem pronta para o WhatsApp (link wa.me: abre o WhatsApp do escritório com o texto; sem custo e sem API). */
+export function linkWhatsApp(numero: string, texto: string, appUrl = process.env.APP_URL) {
+  const msg = `Olá! Aqui é a Contvoo Contabilidade.\n\n${texto}${appUrl ? `\n\nAcesse o painel: ${appUrl.replace(/\/$/, '')}` : ''}`;
+  return `https://wa.me/${numero}?text=${encodeURIComponent(msg)}`;
 }

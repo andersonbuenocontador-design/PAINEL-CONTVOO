@@ -162,3 +162,15 @@
 .conc .btn.link{background:none;border:0;color:var(--accent,#0f766e);padding:4px 6px;box-shadow:none}.conc .btn.link:disabled{color:#98a2b3}
 .conc .cartao-guiado.pausa,.conc .cartao-guiado.fim{text-align:center;justify-items:center}
 @media (max-width:640px){.conc .cartao-guiado{padding:16px}.conc .guiada-frase{font-size:1.15rem}.conc kbd{display:none}}
+/* comprovante por lançamento */
+.conc .comprovantes{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px;font-size:13px;font-weight:400}
+.conc .comprovante{display:inline-flex;gap:6px;align-items:center;background:#f2f4f7;border:1px solid var(--line);border-radius:8px;padding:3px 8px;max-width:280px}
+.conc .comprovante a{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.conc .btn.anexar{cursor:pointer;font-size:13px;padding:5px 12px}
+.conc .comp-qtd{display:grid;gap:2px;font-size:12px;margin-top:2px}
+/* cabeçalho com o mês ao lado do nome; conferência em cartões */
+.conc .titulo-mes{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}.conc .mes-topo{display:flex;align-items:flex-end;gap:8px;margin:0}.conc .mes-topo .campo{margin:0}.conc .mes-topo select{padding:6px 10px}
+.conc .kpis-conf{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:8px 0 14px}
+.conc .kpi-c{border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:4px;background:var(--surface,#fff)}
+.conc .kpi-c>span{font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;color:var(--ink-2,#667085)}.conc .kpi-c strong{font-size:1.35rem;font-variant-numeric:tabular-nums}
+.conc .kpi-c.ok strong{color:#0f766e}.conc .kpi-c.alerta{border-color:#f5c2bd;background:#fef6f5}.conc .kpi-c.alerta strong{color:#b42318}.conc .kpi-c .pos{color:#0f766e}.conc .kpi-c .neg{color:#b42318}

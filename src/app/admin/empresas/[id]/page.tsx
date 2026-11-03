@@ -25,6 +25,7 @@ export default async function EmpresaDetalhe({ params, searchParams }: { params:
         <div><label>Nome fantasia</label><input name="nomeFantasia" defaultValue={e.nome_fantasia ?? ''} /></div>
         <div><label>CNPJ *</label><input name="cnpj" defaultValue={e.cnpj} required /></div>
         <div><label>E-mail de contato</label><input name="emailContato" type="email" defaultValue={e.email_contato ?? ''} /></div>
+        <div><label>WhatsApp do cliente</label><input name="whatsapp" type="tel" inputMode="tel" placeholder="(51) 99999-1234" defaultValue={e.whatsapp ? e.whatsapp.replace(/^55(\d{2})(\d+)(\d{4})$/, '($1) $2-$3') : ''} /></div>
         <div><label>Responsável</label><select name="responsavelId" defaultValue={e.responsavel_id ?? ''}><option value="">—</option>{admins.rows.map((a) => <option key={a.id} value={a.id}>{a.nome}</option>)}</select></div>
         <div><label>Início de uso</label><input name="inicioUso" type="date" defaultValue={e.inicio_uso ? new Date(e.inicio_uso).toISOString().slice(0, 10) : ''} /></div>
       </div><p><button>Salvar</button></p></form>

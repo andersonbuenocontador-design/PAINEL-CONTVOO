@@ -4,7 +4,9 @@ import { query, tx } from '../db';
 import { chaveNormalizada } from '../chave';
 import { Actor, AppError, exigirAdmin } from '../errors';
 import { Core, Local } from '../pdf/core';
-import { competenciaSchema } from './documentos';
+import { createHash, randomUUID } from 'node:crypto';
+import { assinaturaOk, competenciaSchema, gravarOuAvisar, nomeSeguro } from './documentos';
+import { apagar, ler } from '../storage';
 import { obterEmpresa } from './empresas';
 import { registrar } from './auditoria';
 import { servePara, sugerirGenerico } from '../regras-generico';
@@ -122,12 +124,14 @@ export type LinhaConciliacao = {
   conta_codigo: number | null; conta_nome: string | null; classificacao: string | null; complemento: string | null;
   confianca: 'A' | 'M' | 'B'; motivo: string | null; observacao: string | null; origem: string; revisado: boolean; revisado_por: string | null;
   correcao_pedida: boolean; correcao_motivo: string | null; conta_grupo: string | null; nota_fiscal: string | null; sem_nota: boolean; chave: string | null;
+  comprovantes: { id: string; nome: string }[];
 };
 export async function listarConciliacao(actor: Actor, empresaId: string, competencia: string): Promise<LinhaConciliacao[]> {
   const e = await obterEmpresa(actor, empresaId); competenciaSchema.parse(competencia);
   return (await query(
     `SELECT m.id,m.data::text data,m.descricao_original,m.valor_centavos::text valor,m.documento,cb.banco,cb.id conta_bancaria_id,m.conta_codigo,p.nome conta_nome,p.classificacao,
-            m.complemento,m.confianca,m.motivo,m.observacao,m.origem,m.revisado,u.nome revisado_por,m.correcao_pedida,m.correcao_motivo,p.grupo conta_grupo,m.nota_fiscal,m.sem_nota,m.chave_normalizada chave
+            m.complemento,m.confianca,m.motivo,m.observacao,m.origem,m.revisado,u.nome revisado_por,m.correcao_pedida,m.correcao_motivo,p.grupo conta_grupo,m.nota_fiscal,m.sem_nota,m.chave_normalizada chave,
+            COALESCE((SELECT json_agg(json_build_object('id',k.id,'nome',k.nome_original) ORDER BY k.enviado_em) FROM movimentacao_comprovantes k WHERE k.movimentacao_id=m.id AND k.removido_em IS NULL),'[]') comprovantes
        FROM movimentacoes m JOIN contas_bancarias cb ON cb.id=m.conta_id
        LEFT JOIN plano_contas p ON p.empresa_id=m.empresa_id AND p.codigo=m.conta_codigo LEFT JOIN usuarios u ON u.id=m.revisado_por
       WHERE m.empresa_id=$1 AND m.competencia=$2 ORDER BY m.data, m.id`, [e.id, competencia])).rows.map((r) => ({ ...r, id: Number(r.id), valor: Number(r.valor) }));
@@ -324,6 +328,53 @@ export async function editarLinha(actor: Actor, id: number, input: { contaCodigo
     await registrar(c, { usuarioId: actor.id, empresaId: l.empresaId, acao: 'conciliacao.editar', entidade: 'movimentacao', entidadeId: String(id) });
   });
   if (d.contaCodigo && d.contaCodigo !== l.conta) await classificarEmLote(actor, [id], d.contaCodigo);
+}
+
+/* ================= Comprovante por lançamento (nota, boleto ou recibo) ================= */
+export const COMPROVANTE_MAX = 10 * 1024 * 1024; export const COMPROVANTES_POR_LINHA = 5;
+const EXT_COMPROVANTE: Record<string, string> = { pdf: 'pdf', jpg: 'jpg', jpeg: 'jpg', png: 'png' };
+/** Anexa um PDF ou foto à movimentação (quem pode editar a linha pode anexar). */
+export async function anexarComprovante(actor: Actor, movimentacaoId: number, arq: { nome: string; dados: Buffer }) {
+  const [l] = await linhasAcessiveis(actor, [movimentacaoId], { paraEditar: true });
+  if (!arq.dados.length) throw new AppError('Selecione o arquivo do comprovante.');
+  if (arq.dados.length > COMPROVANTE_MAX) throw new AppError('O comprovante passa de 10 MB. Envie um arquivo menor (ou uma foto com menos resolução).');
+  const ext = EXT_COMPROVANTE[(arq.nome.split('.').pop() ?? '').toLowerCase()];
+  if (!ext) throw new AppError('Envie o comprovante em PDF, JPG ou PNG.');
+  if (!assinaturaOk(ext, arq.dados)) throw new AppError(`"${nomeSeguro(arq.nome)}" não é um ${ext.toUpperCase()} válido.`);
+  const n = (await query('SELECT count(*)::int n FROM movimentacao_comprovantes WHERE movimentacao_id=$1 AND removido_em IS NULL', [l.id])).rows[0].n as number;
+  if (n >= COMPROVANTES_POR_LINHA) throw new AppError(`Cada lançamento aceita até ${COMPROVANTES_POR_LINHA} comprovantes.`);
+  const chave = `${l.empresaId}/comprovantes/${randomUUID()}`;
+  await gravarOuAvisar(chave, arq.dados);
+  return tx(async (c) => {
+    const r = await c.query(
+      `INSERT INTO movimentacao_comprovantes(movimentacao_id,empresa_id,nome_original,chave_storage,tamanho,sha256,enviado_por) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+      [l.id, l.empresaId, nomeSeguro(arq.nome), chave, arq.dados.length, createHash('sha256').update(arq.dados).digest('hex'), actor.id]);
+    await registrar(c, { usuarioId: actor.id, empresaId: l.empresaId, acao: 'conciliacao.comprovante_anexar', entidade: 'movimentacao', entidadeId: String(l.id) });
+    return { id: r.rows[0].id as string, nome: nomeSeguro(arq.nome) };
+  });
+}
+async function obterComprovante(actor: Actor, id: string) {
+  if (!z.string().uuid().safeParse(id).success) throw new AppError('Comprovante não encontrado.', 'nao_encontrado');
+  const k = (await query('SELECT * FROM movimentacao_comprovantes WHERE id=$1 AND removido_em IS NULL', [id])).rows[0];
+  if (!k) throw new AppError('Comprovante não encontrado.', 'nao_encontrado');
+  await obterEmpresa(actor, k.empresa_id); // mesma regra de acesso da empresa; mesma resposta se não for sua
+  return k;
+}
+export async function baixarComprovante(actor: Actor, id: string) {
+  const k = await obterComprovante(actor, id);
+  const dados = await ler(k.chave_storage);
+  await tx((c) => registrar(c, { usuarioId: actor.id, empresaId: k.empresa_id, acao: 'conciliacao.comprovante_baixar', entidade: 'movimentacao', entidadeId: String(k.movimentacao_id) }));
+  return { dados, nome: k.nome_original as string };
+}
+/** Retirar um comprovante errado (enquanto a competência estiver aberta para quem remove). */
+export async function removerComprovante(actor: Actor, id: string) {
+  const k = await obterComprovante(actor, id);
+  await linhasAcessiveis(actor, [Number(k.movimentacao_id)], { paraEditar: true });
+  await tx(async (c) => {
+    await c.query('UPDATE movimentacao_comprovantes SET removido_em=now() WHERE id=$1', [id]);
+    await registrar(c, { usuarioId: actor.id, empresaId: k.empresa_id, acao: 'conciliacao.comprovante_remover', entidade: 'movimentacao', entidadeId: String(k.movimentacao_id), detalhes: { nome: k.nome_original } });
+  });
+  await apagar(k.chave_storage);
 }
 
 /* ================= Plano genérico de categorias (todas as empresas) ================= */

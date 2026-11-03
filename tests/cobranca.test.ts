@@ -32,7 +32,7 @@ describe('cobrar envio de documentos (Entregas do mês)', () => {
     expect((await cobrancasAbertas(admin, C)).has(empA)).toBe(true);
     // cobrar de novo: lembrete na MESMA solicitação, com a lista atualizada
     const r2 = await cobrarDocumentos(admin, empA, C);
-    expect(r2).toEqual({ id, lembrete: true });
+    expect(r2).toMatchObject({ id, lembrete: true }); expect(r2.texto).toMatch(/^Lembrete: ainda faltam/);
     expect((await listarPendencias(admin, empA)).filter((x) => x.situacao === 'aberta')).toHaveLength(1);
     const msgs = (await query('SELECT texto FROM pendencia_mensagens WHERE pendencia_id=$1 ORDER BY id', [id])).rows.map((m) => m.texto);
     expect(msgs).toHaveLength(2); expect(msgs[1]).toMatch(/^Lembrete: ainda faltam documentos de 10\/2026:\n• Folha de pagamento/);
@@ -54,5 +54,15 @@ describe('cobrar envio de documentos (Entregas do mês)', () => {
     expect((await cobrancasAbertas(admin, C)).has(empA)).toBe(false);
     expect((await resumoPendencias(ua, empA)).aguardando).toBe(0);
     await expect(cobrarDocumentos(admin, empA, C)).rejects.toThrow(/já enviou todos/);
+  });
+});
+
+describe('cobrança pelo WhatsApp', () => {
+  it('monta o link wa.me com a mensagem e o endereço do painel', async () => {
+    const { linkWhatsApp } = await import('../src/lib/services/cobranca');
+    const url = linkWhatsApp('5551999991234', 'Faltam documentos de 10/2026:\n• Extrato', 'https://painel.exemplo.com/');
+    expect(url.startsWith('https://wa.me/5551999991234?text=')).toBe(true);
+    const msg = decodeURIComponent(url.split('text=')[1]);
+    expect(msg).toBe('Olá! Aqui é a Contvoo Contabilidade.\n\nFaltam documentos de 10/2026:\n• Extrato\n\nAcesse o painel: https://painel.exemplo.com');
   });
 });

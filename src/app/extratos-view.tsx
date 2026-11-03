@@ -52,7 +52,7 @@ export async function ExtratosPagina({ u, empresaId, comp, sp, base, voltar }: {
     <Topo u={u} /><main style={{ maxWidth: 1320 }}><div className="conc" style={{ display: 'grid', gap: 20 }}>
       <div className="cab">
         <div><a className="btn peq" href={voltar} style={{ marginBottom: 8 }}>← Voltar</a>
-          <div className="eyebrow">{mes}/{ano}</div><h1>{e.razao_social}</h1>
+          <div className="eyebrow">{mes}/{ano}</div><div className="titulo-mes"><h1>{e.razao_social}</h1><form method="get" className="mes-topo"><label className="campo" style={{ width: 'auto' }}>Mês<select name="competencia" defaultValue={comp} style={{ width: 'auto' }}>{Array.from({ length: 12 }, (_, i) => { const d = new Date(new Date().getFullYear(), new Date().getMonth() - i, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }).map((m) => <option key={m} value={m}>{m.split('-')[1]}/{m.split('-')[0]}</option>)}</select></label><button className="btn">Ver</button></form></div>
           <div className="linha-flex" style={{ marginTop: 6 }}><span className={`chip ${status === 'concluida' ? 'status-concluida' : status === 'devolvida' ? 'baixa' : 'status-revisao'}`}>{ROT[status]}</span><span className="muted" style={{ fontSize: 13 }}>{rs.linhas} lançamento(s) · {rs.naoRev} para revisar</span></div></div>
         <div className="acoes">
           <a className="btn pri" href={`/api/conciliacao/exportar?empresaId=${empresaId}&competencia=${comp}`}>Baixar Excel</a>
@@ -75,16 +75,18 @@ export async function ExtratosPagina({ u, empresaId, comp, sp, base, voltar }: {
       {!admin && <ConciliacaoCliente key={sp.conta ?? 'todas'} linhas={linhas} plano={planoTela} bancos={bancosTela} somenteLeitura={somenteLeitura} bancoInicial={sp.conta && porConta.has(sp.conta) ? sp.conta : undefined} mes={comp}
             podeEnviar={status === 'revisao' || status === 'devolvida'} enviar={<form action={acaoEnviarConferencia}><input type="hidden" name="empresaId" value={empresaId} /><input type="hidden" name="competencia" value={comp} /><button className="btn pri">Concluir e enviar ao escritório</button></form>} />}
       <div className="painel"><h2>Conferência da competência</h2>
-        <div className="grid2"><div><div className="eyebrow">Movimentações</div><strong>{linhas.length}</strong></div><div><div className="eyebrow">Classificadas (com conta)</div><strong>{linhas.length - semConta}</strong></div>
-          <div><div className="eyebrow">Sem conta</div><strong>{semConta}</strong></div><div><div className="eyebrow">Revisadas (OK)</div><strong>{linhas.filter((l) => l.revisado).length}</strong></div>
-          <div><div className="eyebrow">Com correção pedida</div><strong>{nCorrecoes}</strong></div>
-          <div><div className="eyebrow">Total de entradas</div><strong className="num">{brl2(linhas.filter((l) => l.valor > 0).reduce((a, l) => a + l.valor, 0))}</strong></div>
-          <div><div className="eyebrow">Total de saídas</div><strong className="num">{brl2(Math.abs(linhas.filter((l) => l.valor < 0).reduce((a, l) => a + l.valor, 0)))}</strong></div></div>
+        <div className="kpis-conf">
+          <div className="kpi-c"><span>Movimentações</span><strong>{linhas.length}</strong></div>
+          <div className="kpi-c ok"><span>Com categoria</span><strong>{linhas.length - semConta}</strong></div>
+          <div className={`kpi-c ${semConta ? 'alerta' : ''}`}><span>Sem categoria</span><strong>{semConta}</strong></div>
+          <div className="kpi-c"><span>Revisadas</span><strong>{linhas.filter((l) => l.revisado).length}</strong></div>
+          <div className={`kpi-c ${nCorrecoes ? 'alerta' : ''}`}><span>Correção pedida</span><strong>{nCorrecoes}</strong></div>
+          <div className="kpi-c"><span>Total de entradas</span><strong className="num pos">{brl2(linhas.filter((l) => l.valor > 0).reduce((a, l) => a + l.valor, 0))}</strong></div>
+          <div className="kpi-c"><span>Total de saídas</span><strong className="num neg">{brl2(Math.abs(linhas.filter((l) => l.valor < 0).reduce((a, l) => a + l.valor, 0)))}</strong></div></div>
         {saldos.length > 0 && <div className="rolagem"><table><thead><tr>{['Conta', 'Saldo inicial', 'Entradas', 'Saídas', 'Saldo final calculado', 'Saldo final do extrato', 'Situação'].map((h, i) => <th key={h} className={i > 0 && i < 6 ? 'r' : ''}>{h}</th>)}</tr></thead><tbody>
           {saldos.map((s) => (<tr key={s.contaId}><td>{s.banco}{s.conta ? ` · ${s.conta}` : ''}</td><td className="r num">{brl2(s.saldoInicial)}</td><td className="r num">{brl2(s.entradas)}</td><td className="r num">{brl2(Math.abs(s.saidas))}</td><td className="r num">{brl2(s.saldoCalculado)}</td><td className="r num">{brl2(s.saldoFinalExtrato)}</td>
             <td>{s.confere === true ? <span className="conf-ok">✓ Confere</span> : s.confere === false ? <span className="conf-erro">Diverge em {brl2(Math.abs(s.diferenca ?? 0))}. Confira se falta importar algum lançamento.</span> : <span className="muted">Sem dados para conferir (o arquivo não traz saldo inicial e final).</span>}</td></tr>))}</tbody></table></div>}
         {saldos.some((s) => s.confere === false) && <div className="aviso erro">Há conta com saldo que não fecha. O sistema só considera a conta conciliada quando o saldo calculado é igual ao do extrato.</div>}</div>
-      <form method="get" className="painel"><div className="linha-flex"><label className="campo" style={{ width: 'auto' }}>Competência<select name="competencia" defaultValue={comp} style={{ width: 'auto' }}>{Array.from({ length: 12 }, (_, i) => { const d = new Date(new Date().getFullYear(), new Date().getMonth() - i, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }).map((m) => <option key={m} value={m}>{m.split('-')[1]}/{m.split('-')[0]}</option>)}</select></label><button className="btn">Ver</button></div></form>
       {porConta.size > 0 && <div className="bancos">{[...porConta.entries()].map(([cid, g]) => { const nl = linhas.filter((l) => l.conta_bancaria_id === cid); return (
         <div className="banco" key={cid}><div><h3>{g.nome}{g.conta ? ` · cc ${g.conta}` : ''}</h3></div>
           <div className="rolagem"><table><thead><tr>{['Período', 'Saldo anterior', 'Entradas', 'Saídas', 'Saldo final', ''].map((t, i) => <th key={i} className={i && i < 5 ? 'r' : ''}>{t}</th>)}</tr></thead><tbody>

@@ -53,3 +53,15 @@ body::before,body::after{content:"";position:fixed;z-index:-1;width:min(1000px,1
 body::before{right:-14%;bottom:-8%;opacity:.12}
 body::after{left:-16%;top:70px;transform:rotate(180deg);opacity:.07}
 @media print{body::before,body::after{display:none}}
+/* cobrança pelo WhatsApp (Entregas do mês) */
+button.whats{background:#128c4a}button.whats:hover{background:#0e7a40}.sem-whats{font-size:.85rem;color:var(--tx-2,#667085)}.msg-err-inline{font-size:.85rem;color:var(--err)}
+/* resumo do mês (tela inicial do cliente) */
+.resumo-mes{display:grid;gap:14px;margin-top:20px}.resumo-cab{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}.resumo-cab h2{margin:0}
+.resumo-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.kpi{border:1px solid var(--bd);border-radius:12px;padding:14px 16px;display:grid;gap:4px;background:#fff}.kpi>span:first-child{font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--tx-2,#667085);font-weight:600}
+.kpi strong{font-size:1.45rem;font-variant-numeric:tabular-nums}.kpi .pos{color:#0f766e}.kpi .neg{color:#b42318}
+.var{font-size:.8rem}.var.boa{color:#0f766e}.var.ruim{color:#b42318}.var.neutra{color:var(--tx-2,#667085)}
+.resumo-mes h3{margin:4px 0 0;font-size:1rem}.gastos{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.gasto-lin{display:flex;justify-content:space-between;gap:10px;font-size:.92rem}.gasto-lin strong{font-variant-numeric:tabular-nums}
+.barra{height:8px;background:#eef1f5;border-radius:99px;overflow:hidden;margin-top:4px}.barra>div{height:100%;background:#1f6feb;border-radius:99px}
+.sem-cat{margin:0;font-size:.9rem;background:#fff8eb;border:1px solid #f5d77a;border-radius:10px;padding:8px 12px}

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { acaoClassificarLote, acaoConfirmarLinhas, acaoEditarLinha, acaoSemNota } from './conciliacao-actions';
 import type { ContaPlano, Linha } from './ConciliacaoTabela';
+import { Comprovantes } from './Comprovantes';
 
 const brl = (c: number) => (Math.abs(c) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 // categorias mais comuns, para os botões de escolha rápida (completam o que o cliente já usou no mês)
@@ -156,7 +157,8 @@ export function ConciliacaoGuiada({ linhas: inicial, plano, mes, onVerTabela, on
         <div className="linha-flex"><input type="text" className="nota-input" value={nota} maxLength={60} placeholder="Número da nota (ex.: 1234)" onChange={(e) => setNota(e.target.value)} autoFocus style={{ maxWidth: 260 }} />
           <button className="btn pri" disabled={salvando} onClick={() => void salvarNota(false)}>Salvar número <kbd>Enter</kbd></button>
           <button className="btn" disabled={salvando} onClick={() => void salvarNota(true)}>Sem nota <kbd>S</kbd></button>
-          <button className="btn link" onClick={pular}>Responder depois <kbd>→</kbd></button></div></div>)}
+          <button className="btn link" onClick={pular}>Responder depois <kbd>→</kbd></button></div>
+        <Comprovantes key={atual.id} movimentacaoId={atual.id} inicial={atual.comprovantes ?? []} editavel /></div>)}
 
       <div className="guiada-rodape"><button className="btn link" onClick={voltar} disabled={pos === 0}>← Anterior <kbd>Ctrl+Z</kbd></button><span className="muted">Salvo automaticamente a cada resposta</span><button className="btn link" onClick={pular}>Pular <kbd>→</kbd></button></div>
     </div>)}

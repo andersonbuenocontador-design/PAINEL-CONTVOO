@@ -343,3 +343,39 @@ describe('extrato de banco sem leitor próprio', () => {
     expect(await X.pareceExtratoBancario('sem_texto.pdf', pdf('sem_texto.pdf'))).toBe(false);
   });
 });
+
+describe('comprovante por lançamento', () => {
+  const PDF = Buffer.from('%PDF-1.4\n% comprovante ficticio\n');
+  it('cliente anexa PDF/foto, lista na conciliação, baixa e retira; formatos e acesso são conferidos', async () => {
+    await X.importarDireto(ua, { empresaId: empA, contaId: contaA, competencia: C, nome: 'c.csv', dados: csv(['05/10/2026;BOLETO FORNECEDOR;-300,00']) });
+    const [l] = await K.listarConciliacao(ua, empA, C); expect(l.comprovantes).toEqual([]);
+    const k = await K.anexarComprovante(ua, l.id, { nome: 'boleto.pdf', dados: PDF });
+    expect((await K.listarConciliacao(ua, empA, C))[0].comprovantes).toEqual([{ id: k.id, nome: 'boleto.pdf' }]);
+    expect((await K.baixarComprovante(admin, k.id)).dados.equals(PDF)).toBe(true);
+    await expect(K.anexarComprovante(ua, l.id, { nome: 'falso.pdf', dados: Buffer.from('nao e pdf') })).rejects.toThrow(/não é um PDF válido/);
+    await expect(K.anexarComprovante(ua, l.id, { nome: 'planilha.xlsx', dados: Buffer.from('PK..') })).rejects.toThrow(/PDF, JPG ou PNG/);
+    await expect(K.anexarComprovante(ub, l.id, { nome: 'x.pdf', dados: PDF })).rejects.toThrow(/não encontrad/);
+    await expect(K.baixarComprovante(ub, k.id)).rejects.toThrow(/não encontrad/);
+    await K.removerComprovante(ua, k.id);
+    expect((await K.listarConciliacao(ua, empA, C))[0].comprovantes).toEqual([]);
+    await expect(K.baixarComprovante(admin, k.id)).rejects.toThrow(/não encontrado/);
+  });
+  it('depois de enviado ao escritório o cliente não anexa mais', async () => {
+    await X.importarDireto(ua, { empresaId: empA, contaId: contaA, competencia: C, nome: 'c.csv', dados: csv(['05/10/2026;TARIFA;-10,00']) });
+    const [l] = await K.listarConciliacao(ua, empA, C); await K.classificarEmLote(ua, [l.id], 21); await K.marcarSemNota(ua, [l.id]); await K.enviarParaConferencia(ua, empA, C);
+    await expect(K.anexarComprovante(ua, l.id, { nome: 'a.pdf', dados: PDF })).rejects.toThrow();
+  });
+});
+
+describe('resumo do mês do cliente', () => {
+  it('soma entradas e saídas sem as transferências entre contas próprias e lista os maiores gastos', async () => {
+    const { resumoFinanceiro } = await import('../src/lib/services/hub');
+    await X.importarDireto(ua, { empresaId: empA, contaId: contaA, competencia: C, nome: 'r.csv', dados: csv(['02/10/2026;PIX RECEBIDO CLIENTE;1.000,00', '03/10/2026;ENERGIA CEEE;-200,00', '04/10/2026;TARIFA PACOTE;-50,00', '05/10/2026;TRANSF CONTA PROPRIA;-400,00']) });
+    const ls = await K.listarConciliacao(ua, empA, C);
+    await K.classificarEmLote(ua, [ls.find((l) => /TRANSF/.test(l.descricao_original))!.id], cod('SOC006'));
+    const f = await resumoFinanceiro(ua, empA, C);
+    expect(f).toMatchObject({ entradas: 100000, saidas: 25000, resultado: 75000, anterior: null });
+    expect(f.maioresGastos.every((g) => g.categoria && g.categoria !== 'Não sei identificar')).toBe(true); expect(f.maioresGastos.reduce((t, g) => t + g.valor, 0) + f.semCategoria).toBe(25000);
+    await expect(resumoFinanceiro(ub, empA, C)).rejects.toThrow(/não encontrada/);
+  });
+});
