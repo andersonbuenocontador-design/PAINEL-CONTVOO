@@ -1,5 +1,5 @@
 'use client';
-// Para o cliente, a conciliação abre no modo guiado (um lançamento por vez); "Ver em tabela" mostra a tabela completa.
+// Para o cliente, a conciliação abre com o Contvoo AI (um lançamento por vez); "Ver em tabela" mostra a tabela completa.
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ConciliacaoGuiada } from './ConciliacaoGuiada';
@@ -15,7 +15,7 @@ export function ConciliacaoCliente(p: { linhas: Linha[]; plano: ContaPlano[]; ba
   if (guiadaPossivel && modo === 'guiada')
     return <ConciliacaoGuiada linhas={p.linhas} plano={p.plano} mes={p.mes} onVerTabela={() => troca('tabela')} onEnviar={p.enviar} podeEnviar={p.podeEnviar} primeiroBanco={p.bancoInicial} />;
   return (<>
-    {guiadaPossivel && <div className="linha-flex" style={{ justifyContent: 'flex-end' }}><button className="btn pri" onClick={() => troca('guiada')}>✨ Classificar um por vez (modo guiado)</button></div>}
+    {guiadaPossivel && <div className="linha-flex" style={{ justifyContent: 'flex-end' }}><button className="btn pri" onClick={() => troca('guiada')}>Pedir ajuda ao Contvoo AI</button></div>}
     <ConciliacaoTabela linhas={p.linhas} plano={p.plano} bancos={p.bancos} admin={false} somenteLeitura={p.somenteLeitura} bancoInicial={p.bancoInicial} />
   </>);
 }

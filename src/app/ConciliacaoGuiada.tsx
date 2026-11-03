@@ -1,5 +1,5 @@
 'use client';
-// Conciliação guiada: um lançamento por vez, sugestão em destaque, confirmação em um clique ou tecla, pergunta da nota logo em
+// Contvoo AI (assistente de classificação): um lançamento por vez, sugestão em destaque, confirmação em um clique ou tecla, pergunta da nota logo em
 // seguida, progresso visível, metas pequenas e pausa sugerida. Cada resposta é salva na hora (o cliente pode parar quando quiser).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -7,7 +7,6 @@ import { acaoClassificarLote, acaoConfirmarLinhas, acaoEditarLinha, acaoSemNota 
 import type { ContaPlano, Linha } from './ConciliacaoTabela';
 
 const brl = (c: number) => (Math.abs(c) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const ICONE: Record<string, string> = { 'Receitas': '💰', 'Compras e mercadorias': '🛒', 'Despesas da empresa': '🏢', 'Funcionários e folha': '👥', 'Impostos e taxas': '🧾', 'Transporte e viagens': '🚗', 'Despesas financeiras': '🏦', 'Bens e investimentos': '💻', 'Sócios e transferências': '🤝', 'Outras movimentações': '📌' };
 // categorias mais comuns, para os botões de escolha rápida (completam o que o cliente já usou no mês)
 const COMUNS = { C: ['Recebimento de clientes', 'Venda de produtos', 'Prestação de serviços', 'Transferência recebida de conta própria', 'Dinheiro colocado pelo sócio', 'Outras entradas'], D: ['Compra de mercadorias para revenda', 'Materiais de uso e consumo', 'Combustível', 'Retirada de dinheiro pelo sócio', 'Dinheiro enviado para outra conta da empresa', 'Outras despesas da empresa'] };
 const CONQUISTAS = [{ n: 5, t: 'Primeiros passos' }, { n: 20, t: 'Ritmo de organização' }];
@@ -46,7 +45,7 @@ export function ConciliacaoGuiada({ linhas: inicial, plano, mes, onVerTabela, on
     const n = feitosSessao + 1; setFeitosSessao(n);
     const faltam = linhas.filter((l) => precisaCategoria(l) || precisaNota(l)).length - 1;
     if (n % 20 === 0 && faltam > 0) setPausa(true);
-    else if (n % 5 === 0 && faltam > 0) setAviso(`Muito bem! Você concluiu mais 5 movimentações. ${faltam > 0 ? `Faltam ${faltam}.` : ''}`);
+    else if (n % 5 === 0 && faltam > 0) setAviso(`Mais 5 movimentações concluídas. ${faltam > 0 ? `Faltam ${faltam}.` : ''}`);
     setPos((p) => p + 1);
   }, [feitosSessao, linhas]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!aviso) return; const t = setTimeout(() => setAviso(null), 3500); return () => clearTimeout(t); }, [aviso]);
@@ -114,21 +113,21 @@ export function ConciliacaoGuiada({ linhas: inicial, plano, mes, onVerTabela, on
 
   return (<div className="guiada">
     <div className="guiada-topo">
-      <div><h2>Vamos organizar as movimentações de {nomeMes}</h2>
+      <div><span className="ai-marca"><span className="ai-logo" aria-hidden="true">AI</span>Contvoo AI</span><h2>Vamos organizar as movimentações de {nomeMes}</h2>
         <p className="muted">{total} movimentações · {classificadas} com categoria · {prontas} prontas (categoria e nota) · faltam {total - prontas}</p></div>
       <button className="btn" onClick={onVerTabela}>Ver em tabela</button>
     </div>
     <div className="progresso" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Progresso da conciliação"><div style={{ width: `${pct}%` }} /></div>
-    <div className="guiada-meta"><strong>{pct.toLocaleString('pt-BR')}% concluído</strong>{atual && <span>🎯 Próxima meta: mais {5 - (feitosSessao % 5)} movimentação(ões)</span>}
-      {conquistas.map((c) => <span key={c} className="conquista">🏆 {c}</span>)}</div>
+    <div className="guiada-meta"><strong>{pct.toLocaleString('pt-BR')}% concluído</strong>{atual && <span className="muted">Próxima meta: mais {5 - (feitosSessao % 5)} movimentação(ões)</span>}
+      {conquistas.map((c) => <span key={c} className="conquista">{c}</span>)}</div>
     {aviso && <div className="aviso info guiada-aviso" role="status">{aviso}</div>}
     {erro && <div className="aviso erro" role="alert">{erro}</div>}
 
     {pausa ? (<div className="cartao-guiado pausa">
-      <h3>🎉 Você já organizou {feitosSessao} movimentações!</h3><p>Quer continuar agora ou fazer uma pausa? <strong>Seu progresso está salvo.</strong></p>
+      <h3>Você já organizou {feitosSessao} movimentações!</h3><p>Quer continuar agora ou fazer uma pausa? <strong>Seu progresso está salvo.</strong></p>
       <div className="linha-flex"><button className="btn pri" onClick={() => setPausa(false)} autoFocus>Continuar</button><button className="btn" onClick={terminar}>Pausar e voltar depois</button></div></div>)
     : !atual ? (<div className="cartao-guiado fim">
-      <h3>{linhas.some((l) => precisaCategoria(l) || precisaNota(l)) ? 'Você passou por todos os lançamentos desta rodada.' : '✅ Tudo pronto! Todas as movimentações têm categoria e nota.'}</h3>
+      <h3>{linhas.some((l) => precisaCategoria(l) || precisaNota(l)) ? 'Você passou por todos os lançamentos desta rodada.' : 'Tudo pronto. Todas as movimentações têm categoria e nota.'}</h3>
       {linhas.some((l) => precisaCategoria(l) || precisaNota(l)) ? <p>Alguns ficaram para depois. <button className="btn" onClick={() => { setPos(0); router.refresh(); }}>Recomeçar pelos que faltam</button></p>
         : podeEnviar ? <><p>Agora é só enviar ao escritório para a conferência.</p>{onEnviar}</> : null}</div>)
     : (<div className="cartao-guiado" key={atual.id}>
@@ -139,21 +138,21 @@ export function ConciliacaoGuiada({ linhas: inicial, plano, mes, onVerTabela, on
 
       {etapa === 'categoria' ? (<>
         {atual.conta_codigo != null && !escolhendo && (<div className="sugestao">
-          <div><span className="muted">{atual.revisado ? 'Categoria escolhida' : 'Sugestão'}</span><strong>{ICONE[atual.conta_grupo ?? ''] ?? '📌'} {atual.conta_nome}</strong>{atual.conta_grupo && <span className="muted">{atual.conta_grupo}</span>}
+          <div><span className="muted">{atual.revisado ? 'Categoria escolhida' : 'Sugestão do Contvoo AI'}</span><strong>{atual.conta_nome}</strong>{atual.conta_grupo && <span className="muted">{atual.conta_grupo}</span>}
             {!atual.revisado && atual.motivo && <span className="muted motivo">{atual.motivo}</span>}</div>
-          <div className="linha-flex"><button className="btn pri grande" disabled={salvando} onClick={() => void confirmar()} autoFocus>✓ Confirmar <kbd>Enter</kbd></button>
+          <div className="linha-flex"><button className="btn pri grande" disabled={salvando} onClick={() => void confirmar()} autoFocus>Confirmar <kbd>Enter</kbd></button>
             <button className="btn" onClick={() => setEscolhendo(true)}>Alterar <kbd>A</kbd></button></div></div>)}
         {(atual.conta_codigo == null || escolhendo) && <p className="guiada-pergunta">{atual.valor > 0 ? 'De onde veio esse dinheiro?' : 'O que foi esse pagamento?'}</p>}
-        <div className="rapidas">{rapidas.map((c, i) => <button key={c.codigo} className="btn rapida" disabled={salvando} onClick={() => void escolher(c)} title={c.descricao ?? undefined}><kbd>{i + 1}</kbd> {ICONE[c.grupo ?? ''] ?? '📌'} {c.nome}</button>)}
-          {naoSei && <button className="btn rapida nao-sei" disabled={salvando} onClick={() => void escolher(naoSei)} title="O escritório vai revisar este lançamento"><kbd>N</kbd> ❓ Não sei identificar</button>}</div>
+        <div className="rapidas">{rapidas.map((c, i) => <button key={c.codigo} className="btn rapida" disabled={salvando} onClick={() => void escolher(c)} title={c.descricao ?? undefined}><kbd>{i + 1}</kbd> {c.nome}</button>)}
+          {naoSei && <button className="btn rapida nao-sei" disabled={salvando} onClick={() => void escolher(naoSei)} title="O escritório vai revisar este lançamento"><kbd>N</kbd> Não sei identificar</button>}</div>
         <label className="campo outra">Outra categoria
           <select value="" onChange={(e) => { const c = servem.find((p) => String(p.codigo) === e.target.value); if (c) void escolher(c); }}>
             <option value="">Procurar na lista completa…</option>
-            {[...new Map(servem.map((c) => [c.grupo ?? 'Plano do escritório', 1])).keys()].map((g) => <optgroup key={g} label={`${ICONE[g] ?? ''} ${g}`}>{servem.filter((c) => (c.grupo ?? 'Plano do escritório') === g).map((c) => <option key={c.codigo} value={c.codigo}>{c.nome}</option>)}</optgroup>)}
+            {[...new Map(servem.map((c) => [c.grupo ?? 'Plano do escritório', 1])).keys()].map((g) => <optgroup key={g} label={g}>{servem.filter((c) => (c.grupo ?? 'Plano do escritório') === g).map((c) => <option key={c.codigo} value={c.codigo}>{c.nome}</option>)}</optgroup>)}
           </select></label>
         {iguais.length > 0 && atual.conta_codigo != null && <p><button className="btn" disabled={salvando} onClick={() => void escolher(servem.find((c) => c.codigo === atual.conta_codigo) ?? { codigo: atual.conta_codigo!, nome: atual.conta_nome ?? '', classificacao: '' }, iguais)}>Confirmar este e mais {iguais.length} lançamento(s) iguais</button></p>}
       </>) : (<div className="nota-passo">
-        <p className="guiada-pergunta">✓ {atual.conta_nome}. <span>Esse lançamento tem nota fiscal?</span></p>
+        <p className="guiada-pergunta">{atual.conta_nome}. <span>Esse lançamento tem nota fiscal?</span></p>
         <div className="linha-flex"><input type="text" className="nota-input" value={nota} maxLength={60} placeholder="Número da nota (ex.: 1234)" onChange={(e) => setNota(e.target.value)} autoFocus style={{ maxWidth: 260 }} />
           <button className="btn pri" disabled={salvando} onClick={() => void salvarNota(false)}>Salvar número <kbd>Enter</kbd></button>
           <button className="btn" disabled={salvando} onClick={() => void salvarNota(true)}>Sem nota <kbd>S</kbd></button>
