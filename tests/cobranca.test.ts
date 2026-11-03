@@ -57,12 +57,3 @@ describe('cobrar envio de documentos (Entregas do mês)', () => {
   });
 });
 
-describe('cobrança pelo WhatsApp', () => {
-  it('monta o link wa.me com a mensagem e o endereço do painel', async () => {
-    const { linkWhatsApp } = await import('../src/lib/services/cobranca');
-    const url = linkWhatsApp('5551999991234', 'Faltam documentos de 10/2026:\n• Extrato', 'https://painel.exemplo.com/');
-    expect(url.startsWith('https://wa.me/5551999991234?text=')).toBe(true);
-    const msg = decodeURIComponent(url.split('text=')[1]);
-    expect(msg).toBe('Olá! Aqui é a Contvoo Contabilidade.\n\nFaltam documentos de 10/2026:\n• Extrato\n\nAcesse o painel: https://painel.exemplo.com');
-  });
-});

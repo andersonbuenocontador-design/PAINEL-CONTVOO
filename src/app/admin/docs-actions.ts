@@ -1,8 +1,7 @@
 'use server';
 import { redirect } from 'next/navigation';
 import { exigirUsuario } from '@/lib/session';
-import { cobrarDocumentos, linkWhatsApp } from '@/lib/services/cobranca';
-import { obterEmpresa } from '@/lib/services/empresas';
+import { cobrarDocumentos } from '@/lib/services/cobranca';
 import { executar, mensagemDeErro } from '@/lib/actions-util';
 import { aplicarModelo, conferirArquivo, criarExigencia, criarModeloDeEmpresa, definirExigenciaAtiva, editarExigencia, enviarArquivo, removerAvulso } from '@/lib/services/documentos';
 import { AppError } from '@/lib/errors';
@@ -47,16 +46,6 @@ export async function acaoEnviarPeloEscritorio(fd: FormData) {
 export async function acaoRemoverAvulsoAdmin(fd: FormData) {
   const a = await exigirUsuario('admin'); const e = s(fd, 'empresaId'); const c = s(fd, 'competencia');
   await executar(`/admin/empresas/${e}/documentos?competencia=${c}#outros`, 'Arquivo retirado.', () => removerAvulso(a, s(fd, 'id')));
-}
-/** "Cobrar pelo WhatsApp": registra a cobrança no painel (conta no "Cobrado Nx") e devolve o link do WhatsApp com a mensagem. */
-export async function acaoCobrarWhatsApp(empresaId: string, competencia: string): Promise<{ ok: true; url: string } | { ok: false; erro: string }> {
-  const a = await exigirUsuario('admin');
-  try {
-    const e = await obterEmpresa(a, empresaId);
-    if (!e.whatsapp) return { ok: false, erro: 'Cadastre o WhatsApp do cliente na ficha da empresa.' };
-    const r = await cobrarDocumentos(a, empresaId, competencia);
-    return { ok: true, url: linkWhatsApp(e.whatsapp, r.texto) };
-  } catch (x) { return { ok: false, erro: mensagemDeErro(x) }; }
 }
 export async function acaoCobrarDocumentos(fd: FormData) {
   const a = await exigirUsuario('admin'); const e = s(fd, 'empresaId'); const c = s(fd, 'competencia'); const volta = `/admin/entregas?competencia=${c}`;

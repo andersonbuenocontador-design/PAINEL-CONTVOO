@@ -62,8 +62,3 @@ export async function resolverCobrancaSeCompleto(c: Runner, actor: Actor, empres
   }
 }
 
-/** Mensagem pronta para o WhatsApp (link wa.me: abre o WhatsApp do escritório com o texto; sem custo e sem API). */
-export function linkWhatsApp(numero: string, texto: string, appUrl = process.env.APP_URL) {
-  const msg = `Olá! Aqui é a Contvoo Contabilidade.\n\n${texto}${appUrl ? `\n\nAcesse o painel: ${appUrl.replace(/\/$/, '')}` : ''}`;
-  return `https://wa.me/${numero}?text=${encodeURIComponent(msg)}`;
-}

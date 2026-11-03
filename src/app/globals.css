@@ -53,8 +53,6 @@ body::before,body::after{content:"";position:fixed;z-index:-1;width:min(1000px,1
 body::before{right:-14%;bottom:-8%;opacity:.12}
 body::after{left:-16%;top:70px;transform:rotate(180deg);opacity:.07}
 @media print{body::before,body::after{display:none}}
-/* cobrança pelo WhatsApp (Entregas do mês) */
-button.whats{background:#128c4a}button.whats:hover{background:#0e7a40}.sem-whats{font-size:.85rem;color:var(--tx-2,#667085)}.msg-err-inline{font-size:.85rem;color:var(--err)}
 /* resumo do mês (tela inicial do cliente) */
 .resumo-mes{display:grid;gap:14px;margin-top:20px}.resumo-cab{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}.resumo-cab h2{margin:0}
 .resumo-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}

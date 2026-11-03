@@ -4,13 +4,11 @@ import { visaoGeral } from '@/lib/services/documentos';
 import { query } from '@/lib/db';
 import { cobrancasAbertas } from '@/lib/services/cobranca';
 import { acaoCobrarDocumentos } from '../docs-actions';
-import { CobrarWhatsApp } from './CobrarWhatsApp';
 import { Avisos, Topo, CompetenciaSeletor, competenciaDe } from '../../components';
 
 export default async function Entregas({ searchParams }: { searchParams: Promise<{ competencia?: string; erro?: string; ok?: string }> }) {
   const u = await exigirUsuario('admin'); const sp = await searchParams; const comp = competenciaDe(sp.competencia);
   const [v, cobradas] = await Promise.all([visaoGeral(u, comp), cobrancasAbertas(u, comp)]);
-  const whats = new Map((await query(`SELECT id, whatsapp FROM empresas WHERE whatsapp IS NOT NULL`)).rows.map((r) => [r.id as string, r.whatsapp as string]));
   const novos = new Map((await query(`SELECT empresa_id, count(*)::int n FROM documentos_avulsos WHERE visto_em IS NULL AND removido_em IS NULL AND descartado_em IS NULL GROUP BY empresa_id`)).rows.map((r) => [r.empresa_id as string, r.n as number]));
   const concluidas = v.filter((e) => e.concluida).length, semConfig = v.filter((e) => e.exigidos === 0).length;
   return (<><Topo u={u} /><main>
@@ -28,10 +26,7 @@ export default async function Entregas({ searchParams }: { searchParams: Promise
       {v.map((e) => { const estado = !e.exigidos ? 'cinza' : e.pendentes || e.rejeitados ? 'vermelho' : 'verde'; return (<tr key={e.id} className={`entrega-${estado}`}><td><Link href={`/admin/empresas/${e.id}`} title="Usuários, documentos, sócios e retiradas da empresa">{e.razao_social}</Link>{novos.get(e.id) ? <> <Link href={`/admin/empresas/${e.id}/documentos#outros`} className="tag" title="PDFs enviados pelo cliente que ainda não foram abertos">{novos.get(e.id)} PDF novo{novos.get(e.id)! > 1 ? 's' : ''}</Link></> : null}</td><td>{e.exigidos}</td><td>{e.enviados}</td><td>{e.aprovados}</td><td>{e.rejeitados}</td><td>{e.pendentes}</td><td>{e.percentual}%</td><td><div className="acoes-entrega"><Link href={`/admin/empresas/${e.id}/documentos?competencia=${comp}`}>Conferir</Link>
           {estado === 'vermelho' && (() => { const cb = cobradas.get(e.id); const dt = (d: Date) => new Date(d).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }); return (<>
             {cb && <span className="cobrado" title={`1ª cobrança em ${dt(cb.criado_em)}. A solicitação está no painel do cliente e se encerra sozinha quando ele enviar tudo.`}><strong>Cobrado {cb.lembretes + 1}x</strong> · último em {dt(cb.ultimo)}</span>}
-            {/* com WhatsApp cadastrado, o botão de cobrar já abre o WhatsApp com a mensagem (e registra a cobrança no painel) */}
-            {whats.has(e.id) ? <CobrarWhatsApp empresaId={e.id} competencia={comp} rotulo={cb ? 'Cobrar de novo' : 'Cobrar envio'} />
-              : <><form action={acaoCobrarDocumentos}><input type="hidden" name="empresaId" value={e.id} /><input type="hidden" name="competencia" value={comp} /><button className="danger">{cb ? 'Cobrar de novo' : 'Cobrar envio'}</button></form>
-                <Link className="sem-whats" href={`/admin/empresas/${e.id}`} title="Cadastre o WhatsApp na ficha da empresa: o botão de cobrar passa a abrir o WhatsApp">+ WhatsApp</Link></>}</>); })()}</div></td></tr>); })}
+            <form action={acaoCobrarDocumentos}><input type="hidden" name="empresaId" value={e.id} /><input type="hidden" name="competencia" value={comp} /><button className="danger">{cb ? 'Cobrar de novo' : 'Cobrar envio'}</button></form></>); })()}</div></td></tr>); })}
       {!v.length && <tr><td colSpan={8} className="soon">Nenhuma empresa ativa.</td></tr>}</tbody></table></div>
   </main></>);
 }

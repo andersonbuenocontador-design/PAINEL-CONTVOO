@@ -16,7 +16,6 @@ export default async function NovaEmpresa({ searchParams }: { searchParams: Prom
         <div><label>Nome fantasia</label><input name="nomeFantasia" /></div>
         <div><label>CNPJ *</label><input name="cnpj" required inputMode="numeric" /></div>
         <div><label>E-mail de contato</label><input name="emailContato" type="email" /></div>
-        <div><label>WhatsApp do cliente</label><input name="whatsapp" type="tel" inputMode="tel" placeholder="(51) 99999-1234" /></div>
         <div><label>Responsável no escritório</label><select name="responsavelId"><option value="">—</option>{admins.rows.map((a) => <option key={a.id} value={a.id}>{a.nome}</option>)}</select></div>
         <div><label>Início de uso do painel</label><input name="inicioUso" type="date" /></div>
       </div><p><button>Cadastrar</button></p></form></div>
