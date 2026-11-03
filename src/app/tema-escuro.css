@@ -1,0 +1,48 @@
+/* Modo noite: ligado pelo botão sol/lua do topo (html[data-theme="dark"]; a escolha fica guardada no navegador).
+   Só troca cores: variáveis do painel (globals.css) e da conciliação (.conc), mais as cores fixas que não usam variável. */
+:root[data-theme="dark"]{color-scheme:dark;--bg:#0d1724;--card:#142233;--tx:#e6edf5;--mut:#9aa8b8;--pri:#5b8cff;--bd:#253549;--ok:#3ccf91;--err:#f97066}
+:root[data-theme="dark"] .conc{
+  --bg:#0d1724;--surface:#142233;--sunken:#0f1c2b;--ink:#e6edf5;--muted:#9aa8b8;--faint:#7b8a9b;
+  --line:#253549;--line-strong:#34475e;
+  --accent:#2bb3a3;--accent-weak:#123a37;--on-accent:#06201d;
+  --media:#2a2814;--media-edge:#6f6326;--baixa:#2b2210;--baixa-edge:#7d6224;
+  --ok:#3ccf91;--ok-weak:#103323;--erro:#f97066;--erro-weak:#3b1715;--focus:#6aa8ff;
+  --sh:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25);--sh2:0 8px 30px rgba(0,0,0,.45);
+}
+:root[data-theme="dark"] header.top{background:#081320;border-bottom:1px solid #1c2b3d}
+:root[data-theme="dark"] input,:root[data-theme="dark"] select,:root[data-theme="dark"] textarea{background:#0f1c2b;color:var(--tx);border-color:var(--bd)}
+:root[data-theme="dark"] a:not([class]){color:#8fb4ff}:root[data-theme="dark"] header.top a{color:#fff}
+:root[data-theme="dark"] button.danger{background:#c4321f}
+:root[data-theme="dark"] .avaliacao .btn{background:#fff;color:#0b2a4a}
+:root[data-theme="dark"] button.sec,:root[data-theme="dark"] .btn.sec{background:#1a2a3e;color:var(--tx)}
+:root[data-theme="dark"] .msg-err,:root[data-theme="dark"] tr.entrega-vermelho td,:root[data-theme="dark"] tr.linha-vencida td,:root[data-theme="dark"] .tag.vencida{background:#3b1715}
+:root[data-theme="dark"] .msg-ok,:root[data-theme="dark"] tr.entrega-verde td{background:#103323}
+:root[data-theme="dark"] .tag,:root[data-theme="dark"] .atalho .icone,:root[data-theme="dark"] .msg-pend.esc{background:#1b2c4a}
+:root[data-theme="dark"] .tag.off,:root[data-theme="dark"] .msg-pend.cli,:root[data-theme="dark"] pre.codigos{background:#1a2a3e}
+:root[data-theme="dark"] .atalho.alerta .icone{background:#3d2a10;color:#f7b267}
+:root[data-theme="dark"] .atalho .info.alerta{color:#f7b267}
+:root[data-theme="dark"] .atalho:hover{box-shadow:0 6px 18px rgba(0,0,0,.4)}
+:root[data-theme="dark"] .kpi{background:var(--card)}
+:root[data-theme="dark"] .kpi .pos,:root[data-theme="dark"] .var.boa{color:#3ccf91}
+:root[data-theme="dark"] .kpi .neg,:root[data-theme="dark"] .var.ruim{color:#f97066}
+:root[data-theme="dark"] .barra{background:#1f3044}
+:root[data-theme="dark"] .sem-cat{background:#33290f;border-color:#7a6326}
+:root[data-theme="dark"] .login-fundo{background:linear-gradient(160deg,#0b1522 0%,#0e1b2b 55%,#10233a 100%)}
+:root[data-theme="dark"] .login-fundo .login{box-shadow:0 18px 50px rgba(0,0,0,.5)}
+:root[data-theme="dark"] .login .marca{background:#081320}
+:root[data-theme="dark"] body::before,:root[data-theme="dark"] body::after{filter:brightness(1.6)}
+/* conciliação: cores fixas */
+:root[data-theme="dark"] .conc .progresso{background:#1f3044}
+:root[data-theme="dark"] .conc .conquista,:root[data-theme="dark"] .conc .comprovante{background:#1a2a3e;border-color:#34475e;color:var(--ink)}
+:root[data-theme="dark"] .conc .tag-correcao{background:#3b1715;color:#f97066}
+:root[data-theme="dark"] .conc .guiada-desc{background:#0f1c2b;color:#c9d4e0}
+:root[data-theme="dark"] .conc .sugestao{background:#0f2a28;border-color:#1f6b62}
+:root[data-theme="dark"] .conc kbd{background:#1a2a3e;border-color:#34475e;color:var(--ink)}
+:root[data-theme="dark"] .conc .nota-passo{background:#0f1c2b}
+:root[data-theme="dark"] .conc .kpi-c.alerta{background:#3b1715;border-color:#6b2a24}
+:root[data-theme="dark"] .conc .kpi-c.alerta strong,:root[data-theme="dark"] .conc .kpi-c .neg,:root[data-theme="dark"] .conc .val-sai,:root[data-theme="dark"] .conc .falta-nota{color:#f97066}
+:root[data-theme="dark"] .conc .kpi-c.ok strong,:root[data-theme="dark"] .conc .kpi-c .pos,:root[data-theme="dark"] .conc .val-ent{color:#3ccf91}
+:root[data-theme="dark"] .conc .ai-marca{color:var(--muted)}
+/* botão sol/lua */
+.tema-botao{background:transparent!important;border:1px solid #ffffff55!important;color:#fff;width:36px;height:36px;padding:0!important;display:inline-grid!important;place-items:center;border-radius:8px}
+.tema-botao:hover{background:#ffffff1a!important}.tema-botao svg{width:18px;height:18px}

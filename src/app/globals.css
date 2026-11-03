@@ -63,3 +63,5 @@ body::after{left:-16%;top:70px;transform:rotate(180deg);opacity:.07}
 .gasto-lin{display:flex;justify-content:space-between;gap:10px;font-size:.92rem}.gasto-lin strong{font-variant-numeric:tabular-nums}
 .barra{height:8px;background:#eef1f5;border-radius:99px;overflow:hidden;margin-top:4px}.barra>div{height:100%;background:#1f6feb;border-radius:99px}
 .sem-cat{margin:0;font-size:.9rem;background:#fff8eb;border:1px solid #f5d77a;border-radius:10px;padding:8px 12px}
+.msg-pend{padding:6px 10px;margin:6px 0;border-radius:8px}.msg-pend.esc{background:#eef2ff}.msg-pend.cli{background:#f2f4f7}
+tr.linha-vencida td{background:#fef3f2}.tag.vencida{background:#fef3f2;color:var(--err)}pre.codigos{background:#fff}

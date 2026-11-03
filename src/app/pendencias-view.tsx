@@ -21,8 +21,8 @@ export async function PendenciasPagina({ u, empresaId, sp, voltar }: { u: Usuari
     <details key={p.id} open={p.situacao === 'aberta' && !admin ? true : undefined} style={{ borderBottom: '1px solid var(--bd)', padding: '10px 0' }}>
       <summary><strong>{CATEGORIAS[p.categoria]}</strong>{p.competencia && ` · ${p.competencia.slice(5)}/${p.competencia.slice(0, 4)}`} — {p.descricao.slice(0, 90)}{p.descricao.length > 90 ? '…' : ''}
         {' '}<span className={`tag ${p.situacao === 'aberta' || p.situacao === 'respondida' ? '' : 'off'}`}>{SIT[p.situacao]}</span>
-        {p.prazo && <span className={`tag ${p.vencida ? '' : 'off'}`} style={p.vencida ? { background: '#fef3f2', color: 'var(--err)' } : undefined}> prazo {dm(p.prazo)}{p.vencida ? ' (vencido)' : ''}</span>}</summary>
-      <div style={{ margin: '10px 0' }}>{msgs.get(p.id)!.map((m) => (<div key={m.id} style={{ padding: '6px 10px', margin: '6px 0', borderRadius: 8, background: m.papel === 'admin' ? '#eef2ff' : '#f2f4f7' }}>
+        {p.prazo && <span className={`tag ${p.vencida ? 'vencida' : 'off'}`}> prazo {dm(p.prazo)}{p.vencida ? ' (vencido)' : ''}</span>}</summary>
+      <div style={{ margin: '10px 0' }}>{msgs.get(p.id)!.map((m) => (<div key={m.id} className={m.papel === 'admin' ? 'msg-pend esc' : 'msg-pend cli'}>
         <div className="soon">{m.papel === 'admin' ? `Escritório · ${m.nome}` : `Cliente · ${m.nome}`} · {dt(m.criado_em)}</div><div style={{ whiteSpace: 'pre-wrap' }}>{m.texto}</div></div>))}</div>
       {admin && p.responsavel && <p className="soon">Responsável no escritório: {p.responsavel}</p>}
       {(p.situacao === 'aberta' || p.situacao === 'respondida') && (<form action={acaoResponderPendencia}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="empresaId" value={empresaId} />

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { TemaBotao } from './TemaBotao';
 import { sair } from './actions';
 import type { UsuarioSessao } from '@/lib/services/usuarios';
 import { mfaDisponivel } from '@/lib/session';
@@ -16,6 +17,7 @@ export function Topo({ u }: { u: UsuarioSessao }) {
       <span className="espaco" />
       <Link href={inicio} className="inicio-topo">Início</Link>
       {mfaDisponivel(u) ? <a href="/conta/seguranca" title="Segurança da conta" className="nome-topo">{nome}</a> : <span className="nome-topo">{nome}</span>}
+      <TemaBotao />
       <form action={sair}><button className="sec">Sair</button></form>
     </header>
   );
