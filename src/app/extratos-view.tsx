@@ -11,7 +11,7 @@ import { obterEmpresa } from '@/lib/services/empresas';
 import { listarContas, listarImportacoes, obterPrevia } from '@/lib/services/extratos';
 import { puxarExtratosDosDocumentos } from '@/lib/services/extratos';
 import { query } from '@/lib/db';
-import { bancosConciliacao, conferenciaSaldos, listarConciliacao, listarPlano, obterConciliacao, resumoLinhas } from '@/lib/services/conciliacao';
+import { bancosConciliacao, conferenciaSaldos, listarConciliacao, listarParticipantes, listarPlano, obterConciliacao, participanteExigido, resumoLinhas } from '@/lib/services/conciliacao';
 import { ConciliacaoTabela } from './ConciliacaoTabela';
 import { ConciliacaoCliente } from './ConciliacaoCliente';
 import './conciliacao.css';
@@ -31,8 +31,8 @@ export async function ExtratosPagina({ u, empresaId, comp, sp, base, voltar }: {
   const outrosMeses = [...new Set(puxados.filter((r) => r.competencia !== comp && r.gravadas > 0).map((r) => r.competencia))];
   // mês sem lançamentos: mostra em quais meses estão os extratos desta empresa (ex.: extrato de julho anexado com outubro aberto)
   const mesesComExtrato = (await query(`SELECT competencia, count(*)::int n FROM movimentacoes WHERE empresa_id=$1 GROUP BY 1 ORDER BY 1 DESC LIMIT 6`, [empresaId])).rows as { competencia: string; n: number }[];
-  const [contasTodas, linhas, plano, bancosImp, imps, conc, saldos] = await Promise.all([
-    listarContas(u, empresaId), listarConciliacao(u, empresaId, comp), listarPlano(u, empresaId), bancosConciliacao(u, empresaId, comp), listarImportacoes(u, empresaId, comp), obterConciliacao(u, empresaId, comp), conferenciaSaldos(u, empresaId, comp),
+  const [contasTodas, linhas, plano, bancosImp, imps, conc, saldos, participantes] = await Promise.all([
+    listarContas(u, empresaId), listarConciliacao(u, empresaId, comp), listarPlano(u, empresaId), bancosConciliacao(u, empresaId, comp), listarImportacoes(u, empresaId, comp), obterConciliacao(u, empresaId, comp), conferenciaSaldos(u, empresaId, comp), listarParticipantes(u, empresaId),
   ]);
   const status = conc.status; const admin = u.papel === 'admin'; const somenteLeitura = !admin && (status === 'enviada' || status === 'concluida');
   const ROT = { revisao: 'Em revisão', enviada: 'Enviada ao escritório', devolvida: 'Devolvida para correção', concluida: 'Concluída' } as const;
@@ -40,7 +40,7 @@ export async function ExtratosPagina({ u, empresaId, comp, sp, base, voltar }: {
   const brl2 = (c: number | null) => (c == null ? '—' : (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
   const contas = contasTodas.filter((c) => c.ativo);
   const rs = resumoLinhas(linhas);
-  const planoTela = (admin || !plano.some((c) => c.generico) ? plano : plano.filter((c) => c.generico)).map((c) => ({ codigo: c.codigo, classificacao: c.classificacao, nome: c.nome, grupo: c.grupo, descricao: c.descricao, tipo: c.tipo }));
+  const planoTela = (admin || !plano.some((c) => c.generico) ? plano : plano.filter((c) => c.generico)).map((c) => ({ codigo: c.codigo, classificacao: c.classificacao, nome: c.nome, grupo: c.grupo, descricao: c.descricao, tipo: c.tipo, participante: participanteExigido(c.codigo) }));
   const [ano, mes] = comp.split('-');
   type Res = { periodo: string[] | null; entradas: number; saidas: number; saldoFinalInformado: number | null; conferenciaSaldo?: { saldoAnterior: number | null; saldoFinalInformado: number | null; confere: boolean | null; diferenca: number | null } | null };
   const porConta = new Map<string, { nome: string; conta: string | null; itens: typeof bancosImp }>();
@@ -72,7 +72,7 @@ export async function ExtratosPagina({ u, empresaId, comp, sp, base, voltar }: {
       {status === 'devolvida' && <div className="aviso erro" role="alert"><strong>O escritório devolveu esta competência para correção.</strong>{conc.mensagem && <> Mensagem: {conc.mensagem}</>} {nCorrecoes > 0 ? `${nCorrecoes} movimentação(ões) estão marcadas com o que precisa ser ajustado (filtro "Correção pedida").` : ''} Depois de ajustar, envie de novo ao escritório.</div>}
       {status === 'enviada' && <div className="aviso info">{admin ? 'O cliente enviou esta competência para conferência. Marque as linhas que precisam de ajuste e devolva, ou aprove.' : 'Competência enviada ao escritório. Aguardando conferência; a edição fica bloqueada até a devolução ou conclusão.'}</div>}
       {status === 'concluida' && <div className="aviso info">Competência concluída pelo escritório.</div>}
-      {!admin && <ConciliacaoCliente key={sp.conta ?? 'todas'} linhas={linhas} plano={planoTela} bancos={bancosTela} somenteLeitura={somenteLeitura} bancoInicial={sp.conta && porConta.has(sp.conta) ? sp.conta : undefined} mes={comp}
+      {!admin && <ConciliacaoCliente key={sp.conta ?? 'todas'} empresaId={empresaId} participantes={participantes} linhas={linhas} plano={planoTela} bancos={bancosTela} somenteLeitura={somenteLeitura} bancoInicial={sp.conta && porConta.has(sp.conta) ? sp.conta : undefined} mes={comp}
             podeEnviar={status === 'revisao' || status === 'devolvida'} enviar={<form action={acaoEnviarConferencia}><input type="hidden" name="empresaId" value={empresaId} /><input type="hidden" name="competencia" value={comp} /><button className="btn pri">Concluir e enviar ao escritório</button></form>} />}
       <div className="painel"><h2>Conferência da competência</h2>
         <div className="kpis-conf">
@@ -112,7 +112,7 @@ export async function ExtratosPagina({ u, empresaId, comp, sp, base, voltar }: {
           <td>{i.status === 'previa' && <a href={`${base}/importacao/${i.id}`}>Abrir prévia</a>}</td></tr>))}</tbody></table></>}</details>}
 
       <div id="lancamentos" />
-      {admin && <ConciliacaoTabela key={sp.conta ?? 'todas'} linhas={linhas} plano={planoTela} bancos={bancosTela} admin={admin} somenteLeitura={somenteLeitura} bancoInicial={sp.conta && porConta.has(sp.conta) ? sp.conta : undefined} />}
+      {admin && <ConciliacaoTabela key={sp.conta ?? 'todas'} empresaId={empresaId} participantes={participantes} linhas={linhas} plano={planoTela} bancos={bancosTela} admin={admin} somenteLeitura={somenteLeitura} bancoInicial={sp.conta && porConta.has(sp.conta) ? sp.conta : undefined} />}
     </div></main></>);
 }
 

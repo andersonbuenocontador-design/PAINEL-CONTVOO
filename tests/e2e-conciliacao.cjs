@@ -37,8 +37,13 @@ fs.writeFileSync('/tmp/e2e/out.csv', 'Data;Histórico;Valor\n02/10/2026;TARIFA M
   ok(await cli.locator('tr:has-text("ENERGIA") td.conta:has-text("Energia elétrica")').count() > 0 && await cli.locator('tr:has-text("ENERGIA") td.conta:has-text("(23)")').count() === 0 && await cli.locator('tr:has-text("ENERGIA") .chip:has-text("Média")').count() > 0, 'energia sugerida em Média com a categoria genérica, sem código');
   ok(await cli.locator('tr:has-text("PIX") .prefixo:has-text("REVISAR")').count() > 0, 'sem natureza: REVISAR / Baixa');
   await cli.screenshot({ path: '/tmp/e2e/conc1.png', fullPage: true });
-  await cli.click('tr:has-text("PIX CLIENTE")'); await cli.locator('tr.editor select').selectOption({ label: 'Recebimento de clientes' }); await cli.locator('tr.editor button:has-text("Salvar")').click();
+  await cli.click('tr:has-text("PIX CLIENTE")'); await cli.locator('tr.editor select').first().selectOption({ label: 'Recebimento de clientes' }); await cli.locator('tr.editor button:has-text("Salvar")').click();
   await cli.waitForSelector('button:has-text("Para revisar (1)")'); ok(true, 'editar a linha: conta escolhida confirma e sai de "Para revisar"');
+  await cli.click('button:has-text("Todas (3)")'); await cli.waitForSelector('td.conta .falta-nota:has-text("Falta cliente")'); ok(await cli.locator('button:has-text("Falta cliente/fornecedor (1)")').count() === 1, 'recebimento de cliente pede o cliente: "Falta cliente" e filtro');
+  await cli.click('tr:has-text("PIX CLIENTE")'); await cli.click('tr.editor button[aria-label="Cadastrar novo cliente"]'); await cli.locator('tr.editor .participante-novo input').first().fill('Cliente Teste Ltda');
+  await cli.click('tr.editor button:has-text("Cadastrar cliente")'); await cli.waitForSelector('td.conta .part-nome:has-text("Cliente: Cliente Teste Ltda")');
+  ok(await cli.locator('button:has-text("Falta cliente/fornecedor")').count() === 0, 'botão "+" cadastra o cliente e já liga ao lançamento');
+  await cli.click('tr:has-text("PIX CLIENTE")');
   await cli.locator('tr:has-text("ENERGIA") button:has-text("OK")').click(); await cli.waitForSelector('button:has-text("Para revisar (0)")'); ok(true, 'OK confirma a classificação');
   await cli.click('button:has-text("Todas (3)")'); ok(await cli.locator('tbody tr.clicavel').count() === 3 && await cli.locator('.rev').count() === 2, 'todas as linhas; 2 revisadas (✓)');
   await cli.locator('thead input[type=checkbox]').check(); ok(await cli.locator('text=3 selecionado(s)').count() > 0, 'seleção em lote');
@@ -68,7 +73,7 @@ fs.writeFileSync('/tmp/e2e/out.csv', 'Data;Histórico;Valor\n02/10/2026;TARIFA M
   ok(true, 'escritório pediu correção na linha e devolveu a competência');
   await cli.goto(URLP); ok(await cli.locator('text=O escritório devolveu esta competência').count() > 0 && await cli.locator('text=Ajuste a linha marcada.').count() > 0 && await cli.locator('text=Correção pedida: Esta tarifa é outra despesa').count() > 0, 'cliente vê a mensagem e o motivo exato na linha');
   await cli.click('button:has-text("Concluir e enviar ao escritório")'); await cli.waitForSelector('.msg-err, .aviso.erro:has-text("correção pedida")'); ok(true, 'não deixa reenviar com correção pendente');
-  await cli.click('tbody tr.clicavel >> nth=0'); await cli.locator('tr.editor select').selectOption({ label: 'Tarifas bancárias' }); await cli.locator('tr.editor button:has-text("Salvar")').click();
+  await cli.click('tbody tr.clicavel >> nth=0'); await cli.locator('tr.editor select').first().selectOption({ label: 'Tarifas bancárias' }); await cli.locator('tr.editor button:has-text("Salvar")').click();
   await cli.waitForSelector('button:has-text("Correção pedida")', { state: 'detached' }); ok(true, 'corrigir a linha limpa o pedido de correção');
   await cli.click('button:has-text("Concluir e enviar ao escritório")'); await cli.waitForSelector('.chip:has-text("Enviada ao escritório")'); ok(true, 'cliente reenvia ao escritório');
   await adm.goto(URLA); await adm.click('button:has-text("Aprovar e concluir")'); await adm.waitForSelector('.chip.status-concluida'); ok(true, 'escritório aprova e conclui');

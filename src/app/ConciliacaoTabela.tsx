@@ -1,11 +1,12 @@
 'use client';
 import { Comprovantes } from './Comprovantes';
-import { Fragment, useMemo, useState, useTransition } from 'react';
+import { CampoParticipante, type Participante } from './Participante';
+import { Fragment, useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { acaoClassificarLote, acaoConfirmarLinhas, acaoEditarLinha, acaoLimparCorrecao, acaoPedirCorrecao, acaoSemNota } from './conciliacao-actions';
+import { acaoClassificarLote, acaoConfirmarLinhas, acaoEditarLinha, acaoLimparCorrecao, acaoPedirCorrecao, acaoSemNota, acaoDefinirParticipante } from './conciliacao-actions';
 
-export type Linha = { id: number; data: string; descricao_original: string; valor: number; documento: string | null; banco: string; conta_bancaria_id: string; conta_codigo: number | null; conta_nome: string | null; classificacao: string | null; complemento: string | null; confianca: 'A' | 'M' | 'B'; motivo: string | null; observacao: string | null; origem: string; revisado: boolean; revisado_por: string | null; correcao_pedida: boolean; correcao_motivo: string | null; conta_grupo: string | null; nota_fiscal: string | null; sem_nota: boolean; chave?: string | null; comprovantes?: { id: string; nome: string }[] };
-export type ContaPlano = { codigo: number; classificacao: string; nome: string; grupo?: string | null; descricao?: string | null; tipo?: 'C' | 'D' | 'T' | 'CD' | null };
+export type Linha = { id: number; data: string; descricao_original: string; valor: number; documento: string | null; banco: string; conta_bancaria_id: string; conta_codigo: number | null; conta_nome: string | null; classificacao: string | null; complemento: string | null; confianca: 'A' | 'M' | 'B'; motivo: string | null; observacao: string | null; origem: string; revisado: boolean; revisado_por: string | null; correcao_pedida: boolean; correcao_motivo: string | null; conta_grupo: string | null; nota_fiscal: string | null; sem_nota: boolean; chave?: string | null; comprovantes?: { id: string; nome: string }[]; participante_id?: string | null; participante_nome?: string | null };
+export type ContaPlano = { codigo: number; classificacao: string; nome: string; grupo?: string | null; descricao?: string | null; tipo?: 'C' | 'D' | 'T' | 'CD' | null; participante?: 'cliente' | 'fornecedor' | null };
 /** Categorias agrupadas (sem código nem classificação); com o sentido do lançamento, mostra só as que servem para entrada ou saída. */
 function OpcoesCategorias({ plano, sentido }: { plano: ContaPlano[]; sentido?: 'C' | 'D' }) {
   const serve = (c: ContaPlano) => !sentido || !c.tipo || c.tipo === 'CD' || c.tipo === 'T' || c.tipo === sentido;
@@ -17,9 +18,14 @@ const notaTxt = (l: { nota_fiscal: string | null; sem_nota: boolean }) => (l.not
 const CONF = { A: 'Alta', M: 'Média', B: 'Baixa' } as const;
 const num = (c: number) => (Math.abs(c) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
-type Filtro = { conf: 'revisar' | 'B' | 'M' | 'A' | 'todas' | 'correcao' | 'nota'; tipo: 'todos' | 'C' | 'D'; banco: string; q: string };
+type Filtro = { conf: 'revisar' | 'B' | 'M' | 'A' | 'todas' | 'correcao' | 'nota' | 'participante'; tipo: 'todos' | 'C' | 'D'; banco: string; q: string };
 
-export function ConciliacaoTabela({ linhas, plano, bancos, admin, somenteLeitura, bancoInicial }: { linhas: Linha[]; plano: ContaPlano[]; bancos: { id: string; nome: string }[]; admin: boolean; somenteLeitura: boolean; bancoInicial?: string }) {
+export function ConciliacaoTabela({ linhas, plano, bancos, admin, somenteLeitura, bancoInicial, empresaId, participantes = [] }: { linhas: Linha[]; plano: ContaPlano[]; bancos: { id: string; nome: string }[]; admin: boolean; somenteLeitura: boolean; bancoInicial?: string; empresaId: string; participantes?: Participante[] }) {
+  const [lista, setLista] = useState(participantes);
+  // novos cadastrados em outra tela (ex.: no Contvoo AI) chegam pelo servidor: junta com os desta tela
+  useEffect(() => setLista((x) => [...participantes, ...x.filter((p) => !participantes.some((q) => q.id === p.id))]), [participantes]);
+  const exige = (l: Linha) => plano.find((c) => c.codigo === l.conta_codigo)?.participante ?? null;
+  const faltaPart = (l: Linha) => !!exige(l) && !l.participante_id;
   const pode = !somenteLeitura; const [motivoCorrecao, setMotivoCorrecao] = useState('');
   const router = useRouter(); const [pend, start] = useTransition();
   // recém-enviado (bancoInicial): abre mostrando TODOS os lançamentos daquele extrato
@@ -29,20 +35,20 @@ export function ConciliacaoTabela({ linhas, plano, bancos, admin, somenteLeitura
   const rs = useMemo(() => ({ linhas: linhas.length, alta: linhas.filter((l) => l.confianca === 'A').length, media: linhas.filter((l) => l.confianca === 'M').length, baixa: linhas.filter((l) => l.confianca === 'B').length, naoRev: linhas.filter((l) => !l.revisado && l.confianca !== 'A').length, correcoes: linhas.filter((l) => l.correcao_pedida).length }), [linhas]);
   const vis = useMemo(() => {
     const q = norm(F.q);
-    return linhas.filter((l) => (F.conf === 'todas' || (F.conf === 'nota' ? !l.nota_fiscal && !l.sem_nota : F.conf === 'correcao' ? l.correcao_pedida : F.conf === 'revisar' ? !l.revisado && l.confianca !== 'A' : l.confianca === F.conf))
+    return linhas.filter((l) => (F.conf === 'todas' || (F.conf === 'nota' ? !l.nota_fiscal && !l.sem_nota : F.conf === 'participante' ? faltaPart(l) : F.conf === 'correcao' ? l.correcao_pedida : F.conf === 'revisar' ? !l.revisado && l.confianca !== 'A' : l.confianca === F.conf))
       && (F.tipo === 'todos' || (F.tipo === 'C') === l.valor > 0) && (F.banco === 'todos' || l.conta_bancaria_id === F.banco)
-      && (!q || norm(`${l.conta_nome ?? ''} ${l.conta_grupo ?? ''} ${l.nota_fiscal ?? ''} ${l.complemento ?? ''} ${l.motivo ?? ''} ${l.observacao ?? ''} ${l.descricao_original} ${num(l.valor)}`).includes(q))).slice(0, 1500);
-  }, [linhas, F]);
+      && (!q || norm(`${l.participante_nome ?? ''} ${l.conta_nome ?? ''} ${l.conta_grupo ?? ''} ${l.nota_fiscal ?? ''} ${l.complemento ?? ''} ${l.motivo ?? ''} ${l.observacao ?? ''} ${l.descricao_original} ${num(l.valor)}`).includes(q))).slice(0, 1500);
+  }, [linhas, F, plano]); // eslint-disable-line react-hooks/exhaustive-deps
   const todosMarcados = vis.length > 0 && vis.every((l) => sel.has(l.id));
   const roda = (fn: () => Promise<{ ok: boolean; erro?: string }>, depois?: () => void) => start(async () => { const r = await fn(); if (!r.ok) setErro(r.erro ?? 'Erro'); else { setErro(null); depois?.(); router.refresh(); } });
-  const opcoesConta = <OpcoesCategorias plano={plano} />; const faltaNota = linhas.filter((l) => !l.nota_fiscal && !l.sem_nota).length;
+  const opcoesConta = <OpcoesCategorias plano={plano} />; const faltaNota = linhas.filter((l) => !l.nota_fiscal && !l.sem_nota).length; const nFaltaPart = linhas.filter(faltaPart).length;
   const chip = (val: Filtro['conf'], txt: string, cls: string) => <button key={val} className={`chip ${cls}`} aria-pressed={F.conf === val} onClick={() => setF({ ...F, conf: val })}>{txt}</button>;
   const lote = [...sel];
   return (<>
     {erro && <div className="aviso erro" role="alert">{erro}</div>}
     <div className="painel" style={{ padding: 12 }}>
       <div className="linha-flex">
-        {rs.correcoes > 0 && chip('correcao', `Correção pedida (${rs.correcoes})`, 'baixa')}{chip('revisar', `Para revisar (${rs.naoRev})`, 'baixa')}{chip('B', `Baixa (${rs.baixa})`, 'baixa')}{chip('M', `Média (${rs.media})`, 'media')}{chip('A', `Alta (${rs.alta})`, 'alta')}{chip('todas', `Todas (${rs.linhas})`, 'neutro')}{faltaNota > 0 && chip('nota', `Falta nota (${faltaNota})`, 'baixa')}
+        {rs.correcoes > 0 && chip('correcao', `Correção pedida (${rs.correcoes})`, 'baixa')}{chip('revisar', `Para revisar (${rs.naoRev})`, 'baixa')}{chip('B', `Baixa (${rs.baixa})`, 'baixa')}{chip('M', `Média (${rs.media})`, 'media')}{chip('A', `Alta (${rs.alta})`, 'alta')}{chip('todas', `Todas (${rs.linhas})`, 'neutro')}{faltaNota > 0 && chip('nota', `Falta nota (${faltaNota})`, 'baixa')}{nFaltaPart > 0 && chip('participante', `Falta cliente/fornecedor (${nFaltaPart})`, 'baixa')}
         {(bancos.length > 1 || bancoInicial) && <select aria-label="Banco" value={F.banco} onChange={(e) => setF({ ...F, banco: e.target.value })} style={{ width: 'auto' }}><option value="todos">Todos os bancos</option>{bancos.map((b) => <option key={b.id} value={b.id}>{b.nome}</option>)}</select>}
         <select aria-label="Tipo" value={F.tipo} onChange={(e) => setF({ ...F, tipo: e.target.value as Filtro['tipo'] })} style={{ width: 'auto' }}><option value="todos">Recebimentos e pagamentos</option><option value="C">Só recebimentos (entradas)</option><option value="D">Só pagamentos (saídas)</option></select>
         <input type="search" placeholder="Buscar conta, complemento, valor…" aria-label="Buscar" value={F.q} onChange={(e) => setF({ ...F, q: e.target.value })} style={{ width: 'auto', minWidth: 220 }} />
@@ -68,28 +74,34 @@ export function ConciliacaoTabela({ linhas, plano, bancos, admin, somenteLeitura
         return (<Fragment key={l.id}><tr className={cls} tabIndex={0} onClick={alterna} onKeyDown={(e) => { if (e.key === 'Enter') alterna(); }}>
           {pode ? <td onClick={(e) => e.stopPropagation()}><input type="checkbox" style={{ width: 'auto' }} aria-label="Selecionar lançamento" checked={sel.has(l.id)} onChange={(e) => { const n = new Set(sel); e.target.checked ? n.add(l.id) : n.delete(l.id); setSel(n); }} /></td> : null}
           <td className="num">{l.data.slice(8, 10)}/{l.data.slice(5, 7)}</td>
-          <td className="conta">{l.conta_codigo != null ? <>{l.conta_grupo && <span className="cod">{l.conta_grupo} › </span>}{l.conta_nome}</> : <><span className="prefixo">REVISAR</span>{ent ? 'Entrada' : 'Saída'} sem categoria</>}</td>
+          <td className="conta">{l.conta_codigo != null ? <>{l.conta_grupo && <span className="cod">{l.conta_grupo} › </span>}{l.conta_nome}</> : <><span className="prefixo">REVISAR</span>{ent ? 'Entrada' : 'Saída'} sem categoria</>}
+            {l.participante_nome ? <div className="part-nome">{(exige(l) ?? (ent ? 'cliente' : 'fornecedor')) === 'cliente' ? 'Cliente' : 'Fornecedor'}: {l.participante_nome}</div>
+              : faltaPart(l) ? <div className="falta-nota">Falta {exige(l)}</div> : null}</td>
           <td className="comp">{(l.complemento || l.descricao_original).toUpperCase().slice(0, 140)}</td>
           <td className="r num">{ent ? num(l.valor) : ''}</td><td className="r num">{!ent ? num(l.valor) : ''}</td>
           <td className="nota">{notaTxt(l) ?? <span className="falta-nota" title="Informe o número da nota ou marque Sem nota">Falta</span>}{(l.comprovantes?.length ?? 0) > 0 && <div className="comp-qtd" onClick={(e) => e.stopPropagation()}>{l.comprovantes!.map((c, i) => <a key={c.id} href={`/api/conciliacao/comprovante/${c.id}`} title={`Baixar ${c.nome}`}>{l.comprovantes!.length > 1 ? `Comprovante ${i + 1}` : 'Comprovante'}</a>)}</div>}</td>
           <td><span className={`chip ${CONF[l.confianca] === 'Alta' ? 'alta' : CONF[l.confianca] === 'Média' ? 'media' : 'baixa'}`}>{CONF[l.confianca]}</span></td>
           <td className="mot">{l.correcao_pedida && <strong style={{ color: 'var(--erro)' }}>Correção pedida: {l.correcao_motivo} </strong>}{[l.motivo, l.observacao].filter(Boolean).join(' ')}</td>
           <td onClick={(e) => e.stopPropagation()}>{!pode ? (l.revisado ? <span className="rev">✓</span> : null) : l.revisado ? <span className="rev" title={`Revisado${l.revisado_por ? ' por ' + l.revisado_por : ''}`}>✓</span> : <button className="btn peq" title="Confirmar esta classificação" disabled={pend || l.conta_codigo == null} onClick={() => roda(() => acaoConfirmarLinhas([l.id]))}>OK</button>}</td></tr>
-          {pode && aberta === l.id && <Editor l={l} plano={plano} pend={pend} onSalvar={(d) => roda(() => acaoEditarLinha(l.id, d), () => setAberta(null))} />}</Fragment>);
+          {pode && aberta === l.id && <Editor l={l} plano={plano} pend={pend} empresaId={empresaId} lista={lista} onCriado={(p) => setLista((x) => [...x, p])} onParticipante={(id) => roda(() => acaoDefinirParticipante([l.id], id))} onSalvar={(d) => roda(() => acaoEditarLinha(l.id, d), () => setAberta(null))} />}</Fragment>);
       })}
       {!vis.length && <tr><td colSpan={pode ? 10 : 9}><div className="vazio">Nenhum lançamento neste filtro.</div></td></tr>}</tbody></table></div>
     <p className="muted" style={{ fontSize: 13, margin: 0 }}>Marque várias linhas (use a busca/filtros e a caixa do cabeçalho para marcar todas) e classifique de uma vez. Clique numa linha para trocar a categoria, o complemento ou informar a nota fiscal. "OK" confirma a classificação e ensina o sistema para os próximos meses deste cliente.</p>
   </>);
 }
 
-function Editor({ l, plano, pend, onSalvar }: { l: Linha; plano: ContaPlano[]; pend: boolean; onSalvar: (d: { contaCodigo?: number | null; complemento?: string; observacao?: string; notaFiscal?: string; semNota?: boolean }) => void }) {
+function Editor({ l, plano, pend, onSalvar, empresaId, lista, onCriado, onParticipante }: { l: Linha; plano: ContaPlano[]; pend: boolean; empresaId: string; lista: Participante[]; onCriado: (p: Participante) => void; onParticipante: (id: string | null) => void; onSalvar: (d: { contaCodigo?: number | null; complemento?: string; observacao?: string; notaFiscal?: string; semNota?: boolean }) => void }) {
   const [conta, setConta] = useState(l.conta_codigo != null ? String(l.conta_codigo) : ''); const [comp, setComp] = useState(l.complemento ?? ''); const [obs, setObs] = useState(l.observacao ?? '');
   const [nota, setNota] = useState(l.nota_fiscal ?? ''); const [semNota, setSemNota] = useState(l.sem_nota);
   const desc = plano.find((c) => String(c.codigo) === conta)?.descricao;
+  const exigido = plano.find((c) => String(c.codigo) === conta)?.participante ?? null; const tipoPart = exigido ?? (l.valor > 0 ? 'cliente' : 'fornecedor');
+  const [part, setPart] = useState(l.participante_id ?? null);
   return (<tr className="editor"><td colSpan={10}>
     <div className="muted" style={{ fontSize: 13 }}>Descrição do banco: <span className="num">{l.descricao_original}</span>{l.documento && <> · doc {l.documento}</>} · {l.banco}</div>
     <div className="ed">
       <label className="campo">Categoria<select value={conta} onChange={(e) => setConta(e.target.value)}><option value="">Sem categoria</option><OpcoesCategorias plano={plano} sentido={l.valor > 0 ? 'C' : 'D'} /></select>{desc && <span className="dica">{desc}</span>}</label>
+      <div className="campo">{tipoPart === 'cliente' ? 'Cliente' : 'Fornecedor'}{exigido ? ' *' : ' (opcional)'}
+        <CampoParticipante empresaId={empresaId} tipo={tipoPart} lista={lista} valor={part} descricao={l.descricao_original} onCriado={onCriado} onEscolher={(id) => { setPart(id); onParticipante(id); }} /></div>
       <label className="campo">Nº da nota fiscal *<input type="text" value={nota} maxLength={60} disabled={semNota} placeholder={semNota ? 'Sem nota' : 'Ex.: 1234'} onChange={(e) => setNota(e.target.value)} />
         <span className="dica"><label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontWeight: 400 }}><input type="checkbox" style={{ width: 'auto' }} checked={semNota} onChange={(e) => { setSemNota(e.target.checked); if (e.target.checked) setNota(''); }} /> Sem nota</label></span></label>
       <label className="campo">Complemento<input type="text" value={comp} maxLength={300} onChange={(e) => setComp(e.target.value)} /></label>

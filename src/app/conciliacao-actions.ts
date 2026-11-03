@@ -2,7 +2,7 @@
 import { redirect } from 'next/navigation';
 import { exigirUsuario } from '@/lib/session';
 import { executar, mensagemDeErro } from '@/lib/actions-util';
-import { classificarEmLote, concluirConciliacao, confirmarLinhas, definirContaPlanoAtiva, devolverParaCorrecao, editarLinha, enviarParaConferencia, importarPlano, limparCorrecao, pedirCorrecao, reabrirConciliacao, reclassificarNaoRevisadas, salvarContaPlano, marcarSemNota, anexarComprovante, removerComprovante } from '@/lib/services/conciliacao';
+import { classificarEmLote, concluirConciliacao, confirmarLinhas, definirContaPlanoAtiva, devolverParaCorrecao, editarLinha, enviarParaConferencia, importarPlano, limparCorrecao, pedirCorrecao, reabrirConciliacao, reclassificarNaoRevisadas, salvarContaPlano, marcarSemNota, anexarComprovante, removerComprovante, criarParticipante, definirParticipante, type Participante } from '@/lib/services/conciliacao';
 
 type R = { ok: true } | { ok: false; erro: string };
 const rodar = async (fn: () => Promise<unknown>): Promise<R> => { try { await fn(); return { ok: true }; } catch (e) { return { ok: false, erro: mensagemDeErro(e) }; } };
@@ -21,6 +21,13 @@ export async function acaoAnexarComprovante(fd: FormData): Promise<{ ok: true; i
   catch (e) { return { ok: false, erro: mensagemDeErro(e) }; }
 }
 export async function acaoRemoverComprovante(id: string): Promise<R> { const u = await exigirUsuario(); return rodar(() => removerComprovante(u, id)); }
+
+/** Botão "+" do cliente/fornecedor e escolha do cliente/fornecedor do lançamento. */
+export async function acaoCriarParticipante(empresaId: string, d: { tipo: 'cliente' | 'fornecedor'; nome: string; documento?: string }): Promise<{ ok: true; participante: Participante } | { ok: false; erro: string }> {
+  const u = await exigirUsuario();
+  try { return { ok: true, participante: await criarParticipante(u, empresaId, d) }; } catch (e) { return { ok: false, erro: mensagemDeErro(e) }; }
+}
+export async function acaoDefinirParticipante(ids: number[], participanteId: string | null): Promise<R> { const u = await exigirUsuario(); return rodar(() => definirParticipante(u, ids, participanteId)); }
 
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? '');
 const baseDe = (papel: string, e: string) => (papel === 'admin' ? `/admin/empresas/${e}/extratos` : `/cliente/${e}/extratos`);

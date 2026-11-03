@@ -379,3 +379,28 @@ describe('resumo do mês do cliente', () => {
     await expect(resumoFinanceiro(ub, empA, C)).rejects.toThrow(/não encontrada/);
   });
 });
+
+describe('cliente e fornecedor do lançamento', () => {
+  it('cadastra (sem duplicar), liga ao lançamento, exige antes de enviar e o mês seguinte já vem preenchido', async () => {
+    await X.importarDireto(ua, { empresaId: empA, contaId: contaA, competencia: C, nome: 'p.csv', dados: csv(['05/10/2026;PIX RECEBIDO JOAO DA SILVA;500,00']) });
+    const [l] = await K.listarConciliacao(ua, empA, C);
+    await K.classificarEmLote(ua, [l.id], cod('REC003')); await K.marcarSemNota(ua, [l.id]);
+    expect(K.participanteExigido(cod('REC003'))).toBe('cliente'); expect(K.participanteExigido(cod('CMP001'))).toBe('fornecedor'); expect(K.participanteExigido(cod('FIN001'))).toBeNull();
+    await expect(K.enviarParaConferencia(ua, empA, C)).rejects.toThrow(/Falta informar o cliente ou fornecedor em 1/);
+    await expect(K.criarParticipante(ua, empA, { tipo: 'cliente', nome: 'J', documento: '' })).rejects.toThrow(/Informe o nome/);
+    await expect(K.criarParticipante(ua, empA, { tipo: 'cliente', nome: 'João', documento: '123' })).rejects.toThrow(/CPF ou CNPJ inválido/);
+    const p = await K.criarParticipante(ua, empA, { tipo: 'cliente', nome: 'João da Silva', documento: '123.456.789-09' });
+    expect(p).toMatchObject({ tipo: 'cliente', nome: 'João da Silva', documento: '12345678909' });
+    expect((await K.criarParticipante(ua, empA, { tipo: 'cliente', nome: 'joão da silva' })).id).toBe(p.id);
+    await expect(K.criarParticipante(ub, empA, { tipo: 'cliente', nome: 'Intruso' })).rejects.toThrow(/não encontrada/);
+    const pb = await K.criarParticipante(ub, empB, { tipo: 'cliente', nome: 'Cliente de B' });
+    await expect(K.definirParticipante(ua, [l.id], pb.id)).rejects.toThrow(/não encontrado/);
+    await K.definirParticipante(ua, [l.id], p.id);
+    expect((await K.listarConciliacao(ua, empA, C))[0]).toMatchObject({ participante_id: p.id, participante_nome: 'João da Silva' });
+    expect((await K.listarParticipantes(ua, empA)).map((x) => x.nome)).toEqual(['João da Silva']);
+    await K.enviarParaConferencia(ua, empA, C);
+    // mês seguinte: mesmo lançamento já vem com a categoria e o cliente
+    await X.importarDireto(ua, { empresaId: empA, contaId: contaA, competencia: '2026-11', nome: 'p2.csv', dados: csv(['05/11/2026;PIX RECEBIDO JOAO DA SILVA;700,00']) });
+    expect((await K.listarConciliacao(ua, empA, '2026-11'))[0]).toMatchObject({ conta_codigo: cod('REC003'), participante_id: p.id });
+  });
+});

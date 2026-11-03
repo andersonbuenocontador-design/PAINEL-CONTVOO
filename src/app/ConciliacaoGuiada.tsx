@@ -3,29 +3,34 @@
 // seguida, progresso visível, metas pequenas e pausa sugerida. Cada resposta é salva na hora (o cliente pode parar quando quiser).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { acaoClassificarLote, acaoConfirmarLinhas, acaoEditarLinha, acaoSemNota } from './conciliacao-actions';
+import { acaoClassificarLote, acaoConfirmarLinhas, acaoDefinirParticipante, acaoEditarLinha, acaoSemNota } from './conciliacao-actions';
 import type { ContaPlano, Linha } from './ConciliacaoTabela';
 import { Comprovantes } from './Comprovantes';
+import { CampoParticipante, acharParticipante, type Participante } from './Participante';
 
 const brl = (c: number) => (Math.abs(c) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 // categorias mais comuns, para os botões de escolha rápida (completam o que o cliente já usou no mês)
 const COMUNS = { C: ['Recebimento de clientes', 'Venda de produtos', 'Prestação de serviços', 'Transferência recebida de conta própria', 'Dinheiro colocado pelo sócio', 'Outras entradas'], D: ['Compra de mercadorias para revenda', 'Materiais de uso e consumo', 'Combustível', 'Retirada de dinheiro pelo sócio', 'Dinheiro enviado para outra conta da empresa', 'Outras despesas da empresa'] };
 const CONQUISTAS = [{ n: 5, t: 'Primeiros passos' }, { n: 20, t: 'Ritmo de organização' }];
-type Etapa = 'categoria' | 'nota';
+type Etapa = 'categoria' | 'participante' | 'nota';
 type Feito = { id: number; antes: Pick<Linha, 'conta_codigo' | 'conta_nome' | 'conta_grupo' | 'revisado' | 'nota_fiscal' | 'sem_nota'> };
 
-export function ConciliacaoGuiada({ linhas: inicial, plano, mes, onVerTabela, onEnviar, podeEnviar, primeiroBanco }: { linhas: Linha[]; plano: ContaPlano[]; mes: string; onVerTabela: () => void; onEnviar?: React.ReactNode; podeEnviar: boolean; primeiroBanco?: string }) {
+export function ConciliacaoGuiada({ empresaId, participantes, linhas: inicial, plano, mes, onVerTabela, onEnviar, podeEnviar, primeiroBanco }: { empresaId: string; participantes: Participante[]; linhas: Linha[]; plano: ContaPlano[]; mes: string; onVerTabela: () => void; onEnviar?: React.ReactNode; podeEnviar: boolean; primeiroBanco?: string }) {
   const router = useRouter();
   const [linhas, setLinhas] = useState(inicial);
   useEffect(() => setLinhas(inicial), [inicial]);
   const naoSei = plano.find((c) => c.nome === 'Não sei identificar');
   const precisaCategoria = (l: Linha) => !l.revisado || l.correcao_pedida;
   const precisaNota = (l: Linha) => !l.nota_fiscal && !l.sem_nota;
+  // pagamento a fornecedor / recebimento de cliente: pergunta QUEM (cadastro com o botão "+")
+  const exige = (codigo: number | null | undefined) => plano.find((c) => c.codigo === codigo)?.participante ?? null;
+  const precisaPart = (l: Linha) => !!exige(l.conta_codigo) && !l.participante_id;
+  const [lista, setLista] = useState(participantes); const nomes = useRef(new Map(participantes.map((p) => [p.id, p.nome]))); const [iguaisPart, setIguaisPart] = useState<number[]>([]); const [escolhaPart, setEscolhaPart] = useState<string | null>(null);
   // fila inteligente (fixada ao abrir, para os cartões não pularem): correção pedida → sugestões fáceis → sem sugestão → só falta a nota
   const [fila] = useState(() => {
     // extrato recém-anexado (primeiroBanco) vem antes dos demais
     const peso = (l: Linha) => (l.correcao_pedida ? 0 : precisaCategoria(l) && l.conta_codigo != null ? 1 : precisaCategoria(l) ? 2 : 3) + (primeiroBanco && l.conta_bancaria_id !== primeiroBanco ? 10 : 0);
-    return inicial.filter((l) => precisaCategoria(l) || precisaNota(l)).sort((a, b) => peso(a) - peso(b) || a.data.localeCompare(b.data) || a.id - b.id).map((l) => l.id);
+    return inicial.filter((l) => precisaCategoria(l) || precisaPart(l) || precisaNota(l)).sort((a, b) => peso(a) - peso(b) || a.data.localeCompare(b.data) || a.id - b.id).map((l) => l.id);
   });
   const [pos, setPos] = useState(0); const [etapa, setEtapa] = useState<Etapa>('categoria');
   const [escolhendo, setEscolhendo] = useState(false); const [nota, setNota] = useState('');
@@ -34,17 +39,17 @@ export function ConciliacaoGuiada({ linhas: inicial, plano, mes, onVerTabela, on
   const historico = useRef<Feito[]>([]);
   const porId = useMemo(() => new Map(linhas.map((l) => [l.id, l])), [linhas]);
   const atual = fila[pos] != null ? porId.get(fila[pos]) : undefined;
-  const total = linhas.length; const prontas = linhas.filter((l) => !precisaCategoria(l) && !precisaNota(l)).length;
+  const total = linhas.length; const prontas = linhas.filter((l) => !precisaCategoria(l) && !precisaPart(l) && !precisaNota(l)).length;
   const classificadas = linhas.filter((l) => !precisaCategoria(l)).length;
   const pct = total ? Math.round((prontas / total) * 1000) / 10 : 100;
 
-  useEffect(() => { if (atual) { setEtapa(precisaCategoria(atual) ? 'categoria' : 'nota'); setNota(atual.nota_fiscal ?? ''); setEscolhendo(false); } }, [atual?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (atual) { setEtapa(precisaCategoria(atual) ? 'categoria' : precisaPart(atual) ? 'participante' : 'nota'); setIguaisPart([]); setNota(atual.nota_fiscal ?? ''); setEscolhendo(false); } }, [atual?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const atualiza = (id: number, d: Partial<Linha>) => setLinhas((ls) => ls.map((l) => (l.id === id ? { ...l, ...d } : l)));
   const salvar = async (fn: () => Promise<{ ok: boolean; erro?: string }>) => { setSalvando(true); const r = await fn(); setSalvando(false); if (!r.ok) { setErro(r.erro ?? 'Não foi possível salvar.'); return false; } setErro(null); return true; };
   const avancar = useCallback(() => {
     const n = feitosSessao + 1; setFeitosSessao(n);
-    const faltam = linhas.filter((l) => precisaCategoria(l) || precisaNota(l)).length - 1;
+    const faltam = linhas.filter((l) => precisaCategoria(l) || precisaPart(l) || precisaNota(l)).length - 1;
     if (n % 20 === 0 && faltam > 0) setPausa(true);
     else if (n % 5 === 0 && faltam > 0) setAviso(`Mais 5 movimentações concluídas. ${faltam > 0 ? `Faltam ${faltam}.` : ''}`);
     setPos((p) => p + 1);
@@ -52,11 +57,23 @@ export function ConciliacaoGuiada({ linhas: inicial, plano, mes, onVerTabela, on
   useEffect(() => { if (!aviso) return; const t = setTimeout(() => setAviso(null), 3500); return () => clearTimeout(t); }, [aviso]);
 
   const guardar = (l: Linha) => historico.current.push({ id: l.id, antes: { conta_codigo: l.conta_codigo, conta_nome: l.conta_nome, conta_grupo: l.conta_grupo, revisado: l.revisado, nota_fiscal: l.nota_fiscal, sem_nota: l.sem_nota } });
-  const depoisDaCategoria = (l: Linha) => { if (precisaNota(l)) setEtapa('nota'); else avancar(); };
+  const depoisDaCategoria = (l: Linha, codigo: number | null, iguais: number[] = []) => {
+    if (exige(codigo) && !l.participante_id) { setIguaisPart(iguais); setEtapa('participante'); }
+    else if (precisaNota(l)) setEtapa('nota'); else avancar();
+  };
+  const salvarParticipante = async (id: string) => {
+    if (!atual) return; const ids = [atual.id, ...iguaisPart.filter((i) => !porId.get(i)?.participante_id)];
+    if (await salvar(() => acaoDefinirParticipante(ids, id))) {
+      const nome = nomes.current.get(id) ?? null;
+      for (const i of ids) atualiza(i, { participante_id: id, participante_nome: nome });
+      if (ids.length > 1) setAviso(`${exige(atual.conta_codigo) === 'cliente' ? 'Cliente' : 'Fornecedor'} aplicado também a ${ids.length - 1} lançamento(s) iguais.`);
+      if (precisaNota(atual)) setEtapa('nota'); else avancar();
+    }
+  };
   const confirmar = async () => {
     if (!atual || atual.conta_codigo == null) return;
     guardar(atual);
-    if (await salvar(() => acaoConfirmarLinhas([atual.id]))) { atualiza(atual.id, { revisado: true, correcao_pedida: false, confianca: 'A' }); depoisDaCategoria(atual); }
+    if (await salvar(() => acaoConfirmarLinhas([atual.id]))) { atualiza(atual.id, { revisado: true, correcao_pedida: false, confianca: 'A' }); depoisDaCategoria(atual, atual.conta_codigo); }
   };
   const escolher = async (c: ContaPlano, iguais: number[] = []) => {
     if (!atual) return; guardar(atual);
@@ -64,7 +81,7 @@ export function ConciliacaoGuiada({ linhas: inicial, plano, mes, onVerTabela, on
     if (await salvar(() => acaoClassificarLote(ids, c.codigo))) {
       for (const id of ids) atualiza(id, { conta_codigo: c.codigo, conta_nome: c.nome, conta_grupo: c.grupo ?? null, revisado: true, correcao_pedida: false, confianca: 'A' });
       if (iguais.length) setAviso(`Categoria aplicada também a ${iguais.length} lançamento(s) iguais.`);
-      setEscolhendo(false); depoisDaCategoria(atual);
+      setEscolhendo(false); depoisDaCategoria(atual, c.codigo, iguais);
     }
   };
   const salvarNota = async (semNota: boolean) => {
@@ -87,6 +104,9 @@ export function ConciliacaoGuiada({ linhas: inicial, plano, mes, onVerTabela, on
   const rapidas = [...new Set([...usadas.map((c) => servem.find((p) => p.codigo === c)).filter(Boolean) as ContaPlano[], ...COMUNS[sentido].map((n) => servem.find((p) => p.nome === n)).filter(Boolean) as ContaPlano[]])]
     .filter((c) => c.codigo !== atual?.conta_codigo && c.codigo !== naoSei?.codigo).slice(0, 6);
 
+  const tipoPart = atual ? exige(atual.conta_codigo) : null;
+  const sugPart = atual && tipoPart ? acharParticipante(atual.descricao_original, lista, tipoPart) : undefined;
+  useEffect(() => { setEscolhaPart(null); }, [atual?.id, etapa]);
   // atalhos de teclado
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -99,6 +119,7 @@ export function ConciliacaoGuiada({ linhas: inicial, plano, mes, onVerTabela, on
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); voltar(); return; }
       if (e.key === 'ArrowRight') { e.preventDefault(); pular(); return; }
       if (e.key === 'ArrowLeft') { e.preventDefault(); voltar(); return; }
+      if (etapa === 'participante') { if (e.key === 'Enter' && (escolhaPart ?? sugPart?.id)) { e.preventDefault(); void salvarParticipante((escolhaPart ?? sugPart!.id)); } return; }
       if (etapa === 'categoria') {
         if (e.key === 'Enter' && atual.conta_codigo != null) { e.preventDefault(); void confirmar(); }
         else if (/^[1-6]$/.test(e.key) && rapidas[Number(e.key) - 1]) { e.preventDefault(); void escolher(rapidas[Number(e.key) - 1]); }
@@ -152,7 +173,15 @@ export function ConciliacaoGuiada({ linhas: inicial, plano, mes, onVerTabela, on
             {[...new Map(servem.map((c) => [c.grupo ?? 'Plano do escritório', 1])).keys()].map((g) => <optgroup key={g} label={g}>{servem.filter((c) => (c.grupo ?? 'Plano do escritório') === g).map((c) => <option key={c.codigo} value={c.codigo}>{c.nome}</option>)}</optgroup>)}
           </select></label>
         {iguais.length > 0 && atual.conta_codigo != null && <p><button className="btn" disabled={salvando} onClick={() => void escolher(servem.find((c) => c.codigo === atual.conta_codigo) ?? { codigo: atual.conta_codigo!, nome: atual.conta_nome ?? '', classificacao: '' }, iguais)}>Confirmar este e mais {iguais.length} lançamento(s) iguais</button></p>}
-      </>) : (<div className="nota-passo">
+      </>) : etapa === 'participante' && tipoPart ? (<div className="nota-passo part-passo">
+        <p className="guiada-pergunta">{atual.conta_nome}. <span>{tipoPart === 'cliente' ? 'Quem é o cliente que pagou?' : 'Quem é o fornecedor que recebeu?'}</span></p>
+        {sugPart && !escolhaPart && <div className="linha-flex"><span>Parece ser <strong>{sugPart.nome}</strong>.</span>
+          <button className="btn pri" disabled={salvando} onClick={() => void salvarParticipante(sugPart.id)} autoFocus>Confirmar <kbd>Enter</kbd></button></div>}
+        <CampoParticipante key={atual.id} empresaId={empresaId} tipo={tipoPart} lista={lista} valor={escolhaPart} descricao={atual.descricao_original} abrirNovo={!sugPart}
+          onCriado={(p) => { nomes.current.set(p.id, p.nome); setLista((x) => [...x, p]); }} onEscolher={(id) => { setEscolhaPart(id); if (id) void salvarParticipante(id); }} />
+        {iguaisPart.length > 0 && <p className="muted" style={{ margin: 0, fontSize: 13 }}>Vale também para os {iguaisPart.length} lançamento(s) iguais que você acabou de classificar.</p>}
+        <div className="linha-flex"><button className="btn link" onClick={() => { if (precisaNota(atual)) setEtapa('nota'); else pular(); }}>Responder depois <kbd>→</kbd></button></div>
+      </div>) : (<div className="nota-passo">
         <p className="guiada-pergunta">{atual.conta_nome}. <span>Esse lançamento tem nota fiscal?</span></p>
         <div className="linha-flex"><input type="text" className="nota-input" value={nota} maxLength={60} placeholder="Número da nota (ex.: 1234)" onChange={(e) => setNota(e.target.value)} autoFocus style={{ maxWidth: 260 }} />
           <button className="btn pri" disabled={salvando} onClick={() => void salvarNota(false)}>Salvar número <kbd>Enter</kbd></button>
