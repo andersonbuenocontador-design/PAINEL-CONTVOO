@@ -58,3 +58,39 @@ export function CampoParticipante({ empresaId, tipo, lista, valor, descricao, on
     </div>)}
   </div>);
 }
+
+/** Versão compacta para ficar ao lado da categoria: só o botão "+"; ele abre a escolha/cadastro do cliente ou fornecedor. */
+export function MaisParticipante({ empresaId, tipo, lista, valor, descricao, onEscolher, onCriado }: {
+  empresaId: string; tipo: 'cliente' | 'fornecedor'; lista: Participante[]; valor: string | null; descricao: string;
+  onEscolher: (id: string | null) => void; onCriado: (p: Participante) => void;
+}) {
+  const [aberto, setAberto] = useState(false); const rotulo = tipo === 'cliente' ? 'cliente' : 'fornecedor';
+  const doTipo = lista.filter((p) => p.tipo === tipo); const sugerido = acharParticipante(descricao, lista, tipo);
+  return (<span className="mais-part">
+    <button type="button" className="btn mais" onClick={() => setAberto((v) => !v)} aria-expanded={aberto} title={`Cadastrar ou escolher o ${rotulo}`} aria-label={`Cadastrar ou escolher o ${rotulo}`}>+</button>
+    {aberto && (<div className="mais-pop" role="dialog" aria-label={`${rotulo} do lançamento`}>
+      <strong>{tipo === 'cliente' ? 'Cliente' : 'Fornecedor'} deste lançamento</strong>
+      {sugerido && sugerido.id !== valor && <button type="button" className="btn pri" onClick={() => { onEscolher(sugerido.id); setAberto(false); }}>Usar {sugerido.nome}</button>}
+      {doTipo.length > 0 && <select value={valor ?? ''} aria-label={`Escolher ${rotulo} já cadastrado`} onChange={(e) => { onEscolher(e.target.value || null); setAberto(false); }}>
+        <option value="">Escolher um já cadastrado…</option>{doTipo.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}</select>}
+      <NovoParticipante empresaId={empresaId} tipo={tipo} descricao={descricao} onCriado={(p) => { onCriado(p); onEscolher(p.id); setAberto(false); }} onCancelar={() => setAberto(false)} />
+    </div>)}
+  </span>);
+}
+function NovoParticipante({ empresaId, tipo, descricao, onCriado, onCancelar }: { empresaId: string; tipo: 'cliente' | 'fornecedor'; descricao: string; onCriado: (p: Participante) => void; onCancelar: () => void }) {
+  const sug = sugerirParticipante(descricao); const rotulo = tipo === 'cliente' ? 'cliente' : 'fornecedor';
+  const [nome, setNome] = useState(sug.nome); const [doc, setDoc] = useState(fmtDoc(sug.documento));
+  const [erro, setErro] = useState<string | null>(null); const [salvando, setSalvando] = useState(false);
+  const salvar = async () => {
+    setSalvando(true); setErro(null); const r = await acaoCriarParticipante(empresaId, { tipo, nome, documento: doc }); setSalvando(false);
+    if (r.ok) onCriado(r.participante); else setErro(r.erro);
+  };
+  const enter = (e: React.KeyboardEvent) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); void salvar(); } };
+  return (<div className="participante-novo">
+    <label className="campo">Novo {rotulo}: nome *<input type="text" value={nome} maxLength={120} autoFocus onChange={(e) => setNome(e.target.value)} onKeyDown={enter} /></label>
+    <label className="campo">CPF ou CNPJ (opcional)<input type="text" inputMode="numeric" value={doc} maxLength={18} onChange={(e) => setDoc(e.target.value)} onKeyDown={enter} /></label>
+    <div className="linha-flex"><button type="button" className="btn pri" disabled={salvando || nome.trim().length < 2} onClick={() => void salvar()}>{salvando ? 'Salvando…' : `Cadastrar ${rotulo}`}</button>
+      <button type="button" className="btn link" onClick={onCancelar}>Cancelar</button></div>
+    {erro && <span className="falta-nota" role="alert">{erro}</span>}
+  </div>);
+}

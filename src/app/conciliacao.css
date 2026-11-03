@@ -181,3 +181,9 @@
 .conc .participante-novo{display:grid;gap:8px;border:1px dashed var(--line-strong);border-radius:10px;padding:10px 12px;background:var(--surface)}
 .conc .part-nome{font-size:12px;color:var(--muted);margin-top:2px}
 .conc .part-passo .participante{max-width:520px}
+.conc .cat-linha{display:flex;gap:6px;align-items:center}.conc .cat-linha select{flex:1;min-width:0}
+.conc .mais-part{position:relative;flex:none}
+.conc .mais-pop{position:absolute;right:0;top:calc(100% + 6px);z-index:20;width:320px;display:grid;gap:8px;background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;padding:12px;box-shadow:var(--sh2);font-weight:400}
+.conc .mais-pop .participante-novo{border:0;padding:0}
+.conc .part-nome .btn.link{padding:0 0 0 6px;font-size:12px}
+.conc .ed .campo>.part-nome,.conc .ed .campo>.falta-nota,.conc .ed .campo>.dica{display:block;margin-top:4px}

@@ -1,6 +1,6 @@
 'use client';
 import { Comprovantes } from './Comprovantes';
-import { CampoParticipante, type Participante } from './Participante';
+import { MaisParticipante, type Participante } from './Participante';
 import { Fragment, useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { acaoClassificarLote, acaoConfirmarLinhas, acaoEditarLinha, acaoLimparCorrecao, acaoPedirCorrecao, acaoSemNota, acaoDefinirParticipante } from './conciliacao-actions';
@@ -99,9 +99,13 @@ function Editor({ l, plano, pend, onSalvar, empresaId, lista, onCriado, onPartic
   return (<tr className="editor"><td colSpan={10}>
     <div className="muted" style={{ fontSize: 13 }}>Descrição do banco: <span className="num">{l.descricao_original}</span>{l.documento && <> · doc {l.documento}</>} · {l.banco}</div>
     <div className="ed">
-      <label className="campo">Categoria<select value={conta} onChange={(e) => setConta(e.target.value)}><option value="">Sem categoria</option><OpcoesCategorias plano={plano} sentido={l.valor > 0 ? 'C' : 'D'} /></select>{desc && <span className="dica">{desc}</span>}</label>
-      <div className="campo">{tipoPart === 'cliente' ? 'Cliente' : 'Fornecedor'}{exigido ? ' *' : ' (opcional)'}
-        <CampoParticipante empresaId={empresaId} tipo={tipoPart} lista={lista} valor={part} descricao={l.descricao_original} onCriado={onCriado} onEscolher={(id) => { setPart(id); onParticipante(id); }} /></div>
+      <div className="campo">Categoria
+        <div className="cat-linha"><select aria-label="Categoria" value={conta} onChange={(e) => setConta(e.target.value)}><option value="">Sem categoria</option><OpcoesCategorias plano={plano} sentido={l.valor > 0 ? 'C' : 'D'} /></select>
+          <MaisParticipante empresaId={empresaId} tipo={tipoPart} lista={lista} valor={part} descricao={l.descricao_original} onCriado={onCriado} onEscolher={(id) => { setPart(id); onParticipante(id); }} /></div>
+        {part ? <span className="part-nome">{tipoPart === 'cliente' ? 'Cliente' : 'Fornecedor'}: {lista.find((p) => p.id === part)?.nome ?? l.participante_nome}
+          <button type="button" className="btn link" onClick={() => { setPart(null); onParticipante(null); }} aria-label="Tirar o cliente/fornecedor">tirar</button></span>
+          : exigido ? <span className="falta-nota">Informe o {exigido} no botão +</span> : null}
+        {desc && <span className="dica">{desc}</span>}</div>
       <label className="campo">Nº da nota fiscal *<input type="text" value={nota} maxLength={60} disabled={semNota} placeholder={semNota ? 'Sem nota' : 'Ex.: 1234'} onChange={(e) => setNota(e.target.value)} />
         <span className="dica"><label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontWeight: 400 }}><input type="checkbox" style={{ width: 'auto' }} checked={semNota} onChange={(e) => { setSemNota(e.target.checked); if (e.target.checked) setNota(''); }} /> Sem nota</label></span></label>
       <label className="campo">Complemento<input type="text" value={comp} maxLength={300} onChange={(e) => setComp(e.target.value)} /></label>

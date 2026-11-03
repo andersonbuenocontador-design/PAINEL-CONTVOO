@@ -40,7 +40,7 @@ fs.writeFileSync('/tmp/e2e/out.csv', 'Data;Histórico;Valor\n02/10/2026;TARIFA M
   await cli.click('tr:has-text("PIX CLIENTE")'); await cli.locator('tr.editor select').first().selectOption({ label: 'Recebimento de clientes' }); await cli.locator('tr.editor button:has-text("Salvar")').click();
   await cli.waitForSelector('button:has-text("Para revisar (1)")'); ok(true, 'editar a linha: conta escolhida confirma e sai de "Para revisar"');
   await cli.click('button:has-text("Todas (3)")'); await cli.waitForSelector('td.conta .falta-nota:has-text("Falta cliente")'); ok(await cli.locator('button:has-text("Falta cliente/fornecedor (1)")').count() === 1, 'recebimento de cliente pede o cliente: "Falta cliente" e filtro');
-  await cli.click('tr:has-text("PIX CLIENTE")'); await cli.click('tr.editor button[aria-label="Cadastrar novo cliente"]'); await cli.locator('tr.editor .participante-novo input').first().fill('Cliente Teste Ltda');
+  await cli.click('tr:has-text("PIX CLIENTE")'); await cli.click('tr.editor button[aria-label="Cadastrar ou escolher o cliente"]'); await cli.locator('tr.editor .participante-novo input').first().fill('Cliente Teste Ltda');
   await cli.click('tr.editor button:has-text("Cadastrar cliente")'); await cli.waitForSelector('td.conta .part-nome:has-text("Cliente: Cliente Teste Ltda")');
   ok(await cli.locator('button:has-text("Falta cliente/fornecedor")').count() === 0, 'botão "+" cadastra o cliente e já liga ao lançamento');
   await cli.click('tr:has-text("PIX CLIENTE")');
