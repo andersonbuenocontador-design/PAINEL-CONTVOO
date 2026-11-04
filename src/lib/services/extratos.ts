@@ -132,14 +132,15 @@ export async function cancelarImportacao(actor: Actor, id: string) {
     await registrar(c, { usuarioId: actor.id, empresaId: i.empresa_id, acao: 'importacao.cancelar', entidade: 'importacao', entidadeId: id });
   });
 }
-/** Escritório retira da conciliação um extrato já gravado (ex.: entrou por engano): apaga os lançamentos dele. Não vale em competência concluída. */
+/** Retira da conciliação um extrato já gravado (ex.: entrou por engano): apaga os lançamentos dele.
+ *  Escritório: enquanto a competência não estiver concluída. Cliente: só enquanto ela estiver com ele (em revisão ou devolvida). */
 export async function excluirImportacao(actor: Actor, id: string) {
-  exigirAdmin(actor);
   const i = await carregarImportacao(actor, id);
   if (i.status !== 'confirmada') throw new AppError('Este extrato não está na conciliação.');
   await tx(async (c) => {
     const st = (await c.query('SELECT status FROM conciliacoes WHERE empresa_id=$1 AND competencia=$2', [i.empresa_id, i.competencia])).rows[0]?.status;
-    if (st === 'concluida') throw new AppError('A competência já foi concluída. Reabra para o cliente antes de excluir o extrato.');
+    if (st === 'concluida') throw new AppError(actor.papel === 'admin' ? 'A competência já foi concluída. Reabra para o cliente antes de excluir o extrato.' : 'Esta competência já foi concluída pelo escritório.');
+    if (actor.papel !== 'admin' && st === 'enviada') throw new AppError('Esta competência já foi enviada ao escritório. Para excluir um extrato, fale com o escritório.');
     const r = await c.query('DELETE FROM movimentacoes WHERE importacao_id=$1', [id]);
     await c.query(`UPDATE importacoes SET status='cancelada' WHERE id=$1`, [id]);
     await registrar(c, { usuarioId: actor.id, empresaId: i.empresa_id, acao: 'importacao.excluir', entidade: 'importacao', entidadeId: id, detalhes: { lancamentos: r.rowCount, arquivo: i.nome_arquivo } });

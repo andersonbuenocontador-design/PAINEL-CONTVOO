@@ -14,11 +14,12 @@ import { query } from '@/lib/db';
 import { bancosConciliacao, conferenciaSaldos, listarConciliacao, listarParticipantes, listarPlano, obterConciliacao, participanteExigido, resumoLinhas } from '@/lib/services/conciliacao';
 import { ConciliacaoTabela } from './ConciliacaoTabela';
 import { ConciliacaoCliente } from './ConciliacaoCliente';
+import { ExcluirExtrato } from './ExcluirExtrato';
 import './conciliacao.css';
 import { AppError } from '@/lib/errors';
 import { brl, dataBr } from '@/lib/format';
 import { Avisos, Topo } from './components';
-import { acaoAtivarConta, acaoExcluirImportacao, acaoCancelarImportacao, acaoConfirmarImportacao, acaoCriarConta, acaoEnviarExtrato } from './extratos-actions';
+import { acaoAtivarConta, acaoCancelarImportacao, acaoConfirmarImportacao, acaoCriarConta, acaoEnviarExtrato } from './extratos-actions';
 import { acaoConcluirConciliacao, acaoDevolverConciliacao, acaoEnviarConferencia, acaoReabrirConciliacao } from './conciliacao-actions';
 
 type SP = { competencia?: string; erro?: string; ok?: string; pendentes?: string; conta?: string };
@@ -93,8 +94,7 @@ export async function ExtratosPagina({ u, empresaId, comp, sp, base, voltar }: {
             {g.itens.map((it) => { const r = it.resumo as Res; const cs = r.conferenciaSaldo; return (<tr key={it.id}><td className="num">{r.periodo ? `${dm(r.periodo[0])}–${dm(r.periodo[1])}/${r.periodo[1].slice(2, 4)}` : it.nome_arquivo}</td>
               <td className="r num">{n2(cs?.saldoAnterior)}</td><td className="r num">{n2(r.entradas)}</td><td className="r num">{n2(Math.abs(r.saidas))}</td><td className="r num">{n2(cs?.saldoFinalInformado ?? r.saldoFinalInformado)}</td>
               <td>{cs?.confere === true ? <span className="conf-ok">✓</span> : cs?.confere === false ? <span className="conf-erro" title="Diferença">dif. {n2(cs.diferenca)}</span> : <span className="muted" title="O arquivo não traz saldo inicial e final">sem saldo</span>}
-                {admin && status !== 'concluida' && <form action={acaoExcluirImportacao} className="excluir-extrato"><input type="hidden" name="id" value={it.id} /><input type="hidden" name="empresaId" value={empresaId} /><input type="hidden" name="competencia" value={comp} />
-                  <button className="btn link perigo-txt" title={`Retirar da conciliação os lançamentos de ${it.nome_arquivo}`} aria-label={`Excluir o extrato ${it.nome_arquivo} da conciliação`}>Excluir</button></form>}</td></tr>); })}</tbody></table></div>
+                {(admin ? status !== 'concluida' : !somenteLeitura) && <ExcluirExtrato id={it.id} empresaId={empresaId} competencia={comp} arquivo={it.nome_arquivo} />}</td></tr>); })}</tbody></table></div>
           <div className="muted" style={{ fontSize: 12 }}>{nl.length} lançamentos · {nl.filter((l) => l.confianca !== 'A').length} para revisar</div></div>); })}</div>}
 
       {admin && !somenteLeitura && <details className="painel" open={linhas.length === 0 || !!sp.erro}><summary><strong>Enviar extrato e contas bancárias</strong></summary>

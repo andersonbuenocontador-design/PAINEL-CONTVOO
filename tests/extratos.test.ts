@@ -419,9 +419,15 @@ describe('o que vai para a conciliação', () => {
     const r = await X.puxarExtratosDosDocumentos(ua, empA);
     expect(r.length).toBe(1); expect(r[0].gravadas).toBeGreaterThan(0);
     const imp = (await query(`SELECT id FROM importacoes WHERE empresa_id=$1 AND status='confirmada'`, [empA])).rows[0].id;
-    await expect(X.excluirImportacao(ua, imp)).rejects.toThrow();
-    await X.excluirImportacao(admin, imp);
+    await expect(X.excluirImportacao(ub, imp)).rejects.toThrow(/não encontrad/); // outra empresa
+    await X.excluirImportacao(ua, imp); // o próprio cliente exclui enquanto a competência está com ele
     expect((await query('SELECT count(*)::int n FROM movimentacoes WHERE empresa_id=$1', [empA])).rows[0].n).toBe(0);
     await expect(X.excluirImportacao(admin, imp)).rejects.toThrow(/não está na conciliação/);
+    // depois de enviada ao escritório, o cliente não exclui mais; o escritório sim
+    const r2 = await X.importarDireto(ua, { empresaId: empA, contaId: contaA, competencia: C, nome: 'e2.csv', dados: csv(['05/10/2026;TARIFA;-10,00']) });
+    const imp2 = (await query(`SELECT id FROM importacoes WHERE empresa_id=$1 AND status='confirmada'`, [empA])).rows[0].id; expect(r2.gravadas).toBe(1);
+    const [l] = await K.listarConciliacao(ua, empA, C); await K.classificarEmLote(ua, [l.id], 21); await K.marcarSemNota(ua, [l.id]); await K.enviarParaConferencia(ua, empA, C);
+    await expect(X.excluirImportacao(ua, imp2)).rejects.toThrow(/já foi enviada ao escritório/);
+    await X.excluirImportacao(admin, imp2);
   });
 });
