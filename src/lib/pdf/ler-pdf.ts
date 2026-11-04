@@ -2,6 +2,7 @@ import { Core, Local } from './core';
 import type { Extrato, Movimento } from '../extrato-parser';
 import { ExtratoIlegivel } from '../extrato-parser';
 import { ehPagSeguro, lerPagSeguro } from './pagseguro';
+import { ehStone, lerStone } from './stone';
 
 
 const cent = (v: number) => Math.round(v * 100);
@@ -42,6 +43,7 @@ export async function lerPdf(nome: string, buf: Buffer): Promise<Extrato> {
   // e fica com ele quando o saldo fecha e o do texto não fecha.
   let ext: (ExtLocal & { semMovimento?: boolean; banco?: string }) | null = null;
   if (ehPagSeguro(linhas)) ext = lerPagSeguro(linhas as string[] & { ys: number[] });
+  else if (ehStone(linhas)) ext = lerStone(pags as Parameters<typeof lerStone>[0]);
   else { try { ext = Local.lerExtrato({ linhas, nome }, Core); } catch { ext = null; } }
   if (ext?.semMovimento) throw new ExtratoIlegivel(`Extrato ${ext.banco ?? ''} sem nenhum movimento no período; não há o que importar.`.replace('  ', ' '));
   if (!ext?.lancamentos?.length || (ext as { generico?: boolean }).generico) {
