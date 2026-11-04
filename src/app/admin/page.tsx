@@ -12,8 +12,8 @@ export default async function AdminHub({ searchParams }: { searchParams: Promise
     <div className="saudacao"><div><h1>{saudacaoDoHorario()}, {u.nome === 'Administrador' || u.nome.startsWith('Contvoo') ? 'Contvoo Contabilidade' : u.nome.split(' ')[0]}!</h1><p className="soon" style={{ margin: '4px 0 0' }}>Competência {mes}/{ano}</p></div><CompetenciaSeletor atual={comp} mini /></div>
     <div className="hub">
       <Atalho href={`/admin/entregas${c}`} icone="entrega" titulo="Entregas do mês" desc="Empresas, documentos e cadastro de novas empresas"
-        info={[r.a_conferir ? `${plural(r.a_conferir, 'documento', 'documentos')} para conferir` : `${r.entregasConcluidas} de ${r.empresas} empresas concluídas`, r.pdfs_novos ? plural(r.pdfs_novos, 'PDF novo', 'PDFs novos') : ''].filter(Boolean).join(' · ')}
-        alerta={r.a_conferir > 0 || r.pdfs_novos > 0} ok={!r.a_conferir && !r.pdfs_novos && r.empresas > 0 && r.entregasConcluidas === r.empresas} />
+        info={[r.comDocs ? `${r.enviaramTudo} de ${r.comDocs} empresas enviaram tudo` : 'Nenhum documento pedido neste mês', r.a_conferir ? `${plural(r.a_conferir, 'documento', 'documentos')} para conferir` : '', r.pdfs_novos ? plural(r.pdfs_novos, 'PDF novo', 'PDFs novos') : ''].filter(Boolean).join(' · ')}
+        alerta={r.enviaramTudo < r.comDocs || r.a_conferir > 0 || r.pdfs_novos > 0} ok={r.comDocs > 0 && r.enviaramTudo === r.comDocs && !r.a_conferir && !r.pdfs_novos} />
       <Atalho href={`/admin/conciliacoes${c}`} icone="banco" titulo="Conciliações" desc="Extratos classificados pelos clientes"
         info={r.conciliacoes ? `${plural(r.conciliacoes, 'aguardando', 'aguardando')} sua conferência` : 'Nenhuma aguardando conferência'} alerta={r.conciliacoes > 0} />
       <Atalho href="/admin/pendencias" icone="conversa" titulo="Pendências" desc="Solicitações aos clientes e respostas"
