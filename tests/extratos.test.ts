@@ -462,3 +462,21 @@ describe('saldo anterior informado', () => {
     expect((await K.conferenciaSaldos(ua, empA, C))[0]).toMatchObject({ saldoInicial: null, saldoInicialInformado: false });
   });
 });
+
+describe('cliente exclui o documento que enviou', () => {
+  it('extrato enviado sai dos documentos e da conciliação; volta a ficar pendente; aprovado não sai', async () => {
+    const D = await import('../src/lib/services/documentos');
+    const ofx = fx('exemplo_ofx_nao_oficial.ofx');
+    const ex = await D.criarExigencia(admin, empA, { nome: 'Extrato conta corrente', formatos: ['ofx'] });
+    const arq = await D.enviarArquivo(ua, { empresaId: empA, exigenciaId: ex, competencia: C, nome: 'extrato.ofx', dados: ofx });
+    await X.puxarExtratosDosDocumentos(ua, empA);
+    expect((await K.listarConciliacao(ua, empA, C)).length).toBeGreaterThan(0);
+    await expect(X.excluirArquivoEnviado(ub, arq)).rejects.toThrow(/não encontrad/);
+    await X.excluirArquivoEnviado(ua, arq);
+    expect((await K.listarConciliacao(ua, empA, C)).length).toBe(0);
+    expect((await D.situacaoCompetencia(ua, empA, C)).itens.find((i) => i.exigencia_id === ex)!.situacao).toBe('pendente');
+    const arq2 = await D.enviarArquivo(ua, { empresaId: empA, exigenciaId: ex, competencia: C, nome: 'extrato.ofx', dados: ofx });
+    await D.conferirArquivo(admin, arq2, 'aprovado');
+    await expect(X.excluirArquivoEnviado(ua, arq2)).rejects.toThrow(/já foi aprovado/);
+  });
+});

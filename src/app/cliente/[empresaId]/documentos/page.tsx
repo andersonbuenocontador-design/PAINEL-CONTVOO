@@ -5,6 +5,7 @@ import { listarAvulsos, situacaoCompetencia } from '@/lib/services/documentos';
 import { AppError } from '@/lib/errors';
 import { Avisos, CompetenciaSeletor, ROTULO, Topo, competenciaDe } from '../../../components';
 import { acaoEnviarArquivo, acaoEnviarAvulsos, acaoRemoverAvulso } from '../../actions';
+import { ExcluirArquivo } from '../../ExcluirArquivo';
 
 
 export default async function DocumentosCliente({ params, searchParams }: { params: Promise<{ empresaId: string }>; searchParams: Promise<{ competencia?: string; erro?: string; ok?: string }> }) {
@@ -23,7 +24,8 @@ export default async function DocumentosCliente({ params, searchParams }: { para
         {s.itens.map((i) => (<tr key={i.exigencia_id}>
           <td><strong>{i.nome}</strong>{i.instituicao && ` — ${i.instituicao}`}{!i.obrigatorio && <span className="tag off"> opcional</span>}
             {i.instrucoes && <div className="soon">{i.instrucoes}</div>}<div className="soon">Formatos: {i.formatos.join(', ').toUpperCase()}</div></td>
-          <td><span className="tag">{ROTULO[i.situacao]}</span>{i.arquivo_id && <div className="soon">v{i.versao} · <a href={`/api/arquivos/${i.arquivo_id}`}>{i.nome_original}</a></div>}
+          <td><span className="tag">{ROTULO[i.situacao]}</span>{i.arquivo_id && <div className="soon">v{i.versao} · <a href={`/api/arquivos/${i.arquivo_id}`}>{i.nome_original}</a>
+            {i.situacao === 'enviado' && <ExcluirArquivo id={i.arquivo_id} empresaId={empresaId} competencia={comp} nome={i.nome_original} />}</div>}
             {i.situacao === 'rejeitado' && <div className="msg-err" style={{ marginTop: 6 }}>Motivo: {i.motivo_rejeicao}</div>}</td>
           <td>{i.situacao === 'aprovado' ? <span className="soon">Aprovado</span> : (
             <form action={acaoEnviarArquivo}><input type="hidden" name="empresaId" value={empresaId} /><input type="hidden" name="competencia" value={comp} /><input type="hidden" name="exigenciaId" value={i.exigencia_id} />

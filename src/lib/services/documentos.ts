@@ -121,7 +121,7 @@ export async function situacaoCompetencia(actor: Actor, empresaId: string, compe
     `SELECT x.id exigencia_id, x.nome, x.instituicao, x.categoria, x.formatos, x.obrigatorio, x.frequencia, x.instrucoes, x.dia_prazo,
             a.id arquivo_id, a.versao, a.nome_original, a.situacao, a.motivo_rejeicao, a.enviado_em
        FROM exigencias x
-       LEFT JOIN LATERAL (SELECT * FROM arquivos WHERE exigencia_id=x.id AND competencia=$2 ORDER BY versao DESC LIMIT 1) a ON true
+       LEFT JOIN LATERAL (SELECT * FROM arquivos WHERE exigencia_id=x.id AND competencia=$2 AND situacao<>'substituido' ORDER BY versao DESC LIMIT 1) a ON true
       WHERE x.empresa_id=$1 AND x.ativo ORDER BY x.nome`, [emp.id, competencia]);
   const itens = rows.filter((r) => aplicaNaCompetencia(r.frequencia, competencia) || r.arquivo_id)
     .map((r) => ({ ...r, situacao: (r.situacao ?? 'pendente') as (typeof SITUACOES)[number] }));
@@ -144,7 +144,7 @@ export async function visaoGeral(actor: Actor, competencia: string) {
   const { rows } = await query(
     `SELECT e.id,e.razao_social,x.obrigatorio,x.frequencia,COALESCE(a.situacao,'pendente') situacao
        FROM empresas e LEFT JOIN exigencias x ON x.empresa_id=e.id AND x.ativo
-       LEFT JOIN LATERAL (SELECT situacao FROM arquivos WHERE exigencia_id=x.id AND competencia=$1 ORDER BY versao DESC LIMIT 1) a ON true
+       LEFT JOIN LATERAL (SELECT situacao FROM arquivos WHERE exigencia_id=x.id AND competencia=$1 AND situacao<>'substituido' ORDER BY versao DESC LIMIT 1) a ON true
       WHERE e.situacao='ativa' ORDER BY e.razao_social`, [competencia]);
   type Item = { obrigatorio: boolean; situacao: string };
   const m = new Map<string, { id: string; razao_social: string; itens: Item[] }>();

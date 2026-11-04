@@ -4,7 +4,7 @@ import { query, tx } from '../db';
 import { Actor, AppError, exigirAdmin } from '../errors';
 import { ExtratoIlegivel, lerExtrato, type Movimento } from '../extrato-parser';
 import { competenciaSchema, TAMANHO_MAX } from './documentos';
-import { ler } from '../storage';
+import { apagar, ler } from '../storage';
 import { obterEmpresa } from './empresas';
 import { registrar } from './auditoria';
 
@@ -255,4 +255,28 @@ export async function puxarExtratosDosDocumentos(actor: Actor, empresaId: string
 }
 export async function marcarExtratoVerificado(tabela: 'arquivos' | 'documentos_avulsos', id: string) {
   await query(`UPDATE ${tabela === 'arquivos' ? 'arquivos' : 'documentos_avulsos'} SET extrato_verificado_em=now() WHERE id=$1`, [id]);
+}
+
+/** Cliente (ou escritório) exclui um documento pedido que enviou por engano, enquanto o escritório ainda não conferiu.
+ *  Se era extrato, os lançamentos dele saem da conciliação (enquanto a competência estiver com o cliente). */
+export async function excluirArquivoEnviado(actor: Actor, arquivoId: string) {
+  if (!z.string().uuid().safeParse(arquivoId).success) throw new AppError('Arquivo não encontrado.', 'nao_encontrado');
+  const a = (await query('SELECT * FROM arquivos WHERE id=$1', [arquivoId])).rows[0];
+  if (!a) throw new AppError('Arquivo não encontrado.', 'nao_encontrado');
+  await obterEmpresa(actor, a.empresa_id);
+  if (actor.papel === 'cliente' && a.situacao !== 'enviado') throw new AppError(a.situacao === 'aprovado' ? 'Este documento já foi aprovado pelo escritório.' : 'O escritório já está conferindo este documento. Para trocar, fale com o escritório.');
+  if (a.situacao === 'substituido') throw new AppError('Esta versão já foi substituída.');
+  const imps = (await query(`SELECT id, competencia FROM importacoes WHERE empresa_id=$1 AND sha256=$2 AND status='confirmada'`, [a.empresa_id, a.sha256])).rows;
+  for (const comp of new Set(imps.map((i) => i.competencia as string))) await exigirEditavel(actor, a.empresa_id, comp);
+  await tx(async (c) => {
+    let lancamentos = 0;
+    for (const i of imps) {
+      lancamentos += (await c.query('DELETE FROM movimentacoes WHERE importacao_id=$1', [i.id])).rowCount ?? 0;
+      await c.query(`UPDATE importacoes SET status='cancelada' WHERE id=$1`, [i.id]);
+    }
+    await c.query('DELETE FROM arquivos WHERE id=$1', [a.id]);
+    await registrar(c, { usuarioId: actor.id, empresaId: a.empresa_id, acao: 'arquivo.excluir', entidade: 'arquivo', entidadeId: a.id, detalhes: { nome: a.nome_original, competencia: a.competencia, versao: a.versao, lancamentos_retirados: lancamentos } });
+  });
+  await apagar(a.chave_storage).catch(() => {});
+  return { competencia: a.competencia as string };
 }

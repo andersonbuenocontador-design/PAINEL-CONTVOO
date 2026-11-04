@@ -51,7 +51,7 @@ export async function resolverCobrancaSeCompleto(c: Runner, actor: Actor, empres
   if (!abertas.length) return;
   const { rows } = await c.query(
     `SELECT x.frequencia, a.situacao FROM exigencias x
-       LEFT JOIN LATERAL (SELECT situacao FROM arquivos WHERE exigencia_id=x.id AND competencia=$2 ORDER BY versao DESC LIMIT 1) a ON true
+       LEFT JOIN LATERAL (SELECT situacao FROM arquivos WHERE exigencia_id=x.id AND competencia=$2 AND situacao<>'substituido' ORDER BY versao DESC LIMIT 1) a ON true
       WHERE x.empresa_id=$1 AND x.ativo AND x.obrigatorio`, [empresaId, competencia]);
   const falta = rows.some((r) => (aplicaNaCompetencia(r.frequencia, competencia) || r.situacao) && (!r.situacao || r.situacao === 'rejeitado'));
   if (falta) return;
