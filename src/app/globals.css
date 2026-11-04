@@ -66,3 +66,8 @@ body::after{left:-16%;top:70px;transform:rotate(180deg);opacity:.07}
 .msg-pend{padding:6px 10px;margin:6px 0;border-radius:8px}.msg-pend.esc{background:#eef2ff}.msg-pend.cli{background:#f2f4f7}
 tr.linha-vencida td{background:#fef3f2}.tag.vencida{background:#fef3f2;color:var(--err)}pre.codigos{background:#fff}
 .kpi .pos-t{color:#0f766e;font-weight:600}.kpi .neg-t{color:#b42318;font-weight:600}.kpi .neutro{color:var(--mut)}:root[data-theme="dark"] .kpi .pos-t{color:#3ccf91}:root[data-theme="dark"] .kpi .neg-t{color:#f97066}
+/* aviso da Lei 15.270/2025 na aba Retiradas dos sócios */
+.aviso-lucros{background:#fff8eb;border:1px solid #f5c26b;border-left:5px solid #d97706;border-radius:12px;padding:14px 18px;margin:0 0 16px;color:#3d2a06}
+.aviso-lucros h2{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:1.05rem;text-transform:uppercase;letter-spacing:.02em;color:#92400e}
+.aviso-lucros p{margin:6px 0;line-height:1.5}
+:root[data-theme="dark"] .aviso-lucros{background:#2e2410;border-color:#7a5a1e;border-left-color:#f59e0b;color:#f3e3c3}:root[data-theme="dark"] .aviso-lucros h2{color:#fbbf24}

@@ -21,6 +21,13 @@ export default async function Retiradas({ params, searchParams }: { params: Prom
   const ocultos = (<>{Object.entries(h).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}</>);
   return (<><Topo u={u} /><main><p><a href={`/cliente/${empresaId}?competencia=${comp}`}>← {e.razao_social}</a></p>
     <h1>Retiradas dos sócios</h1><Avisos erro={sp.erro} ok={sp.ok} />
+    <section className="aviso-lucros" role="note" aria-labelledby="aviso-lucros-t">
+      <h2 id="aviso-lucros-t"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v4M12 17h.01" /></svg>
+        Atenção – distribuição de lucros</h2>
+      <p>Conforme a <strong>Lei nº 15.270/2025</strong>, a partir de janeiro de 2026, a distribuição de lucros e dividendos <strong>superior a R$ 50.000,00 no mesmo mês</strong>, pela mesma empresa à mesma pessoa física, estará sujeita à <strong>retenção de 10% de Imposto de Renda (IRRF) sobre o valor total distribuído</strong>, e não apenas sobre o valor excedente.</p>
+      <p>Por isso, solicitamos que todas as retiradas sejam informadas corretamente nesta aba, para que possamos acompanhar os valores mensais e realizar os procedimentos fiscais necessários.</p>
+      <p>Em caso de dúvidas ou previsão de retiradas acima desse limite, <strong>entre em contato com nosso escritório antes de realizar a distribuição</strong>.</p>
+    </section>
     <p className="soon">Informe aqui tudo o que cada sócio retirou da empresa no mês: pró-labore, distribuição de lucros e outras retiradas. Depois clique em <strong>Enviar ao escritório</strong>.</p>
     <CompetenciaSeletor atual={comp} />
     {r.envio && <div className="msg-ok">{r.envio.sem_retiradas ? 'Você informou que não houve retiradas' : 'Retiradas enviadas ao escritório'} em {new Date(r.envio.enviado_em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}. Para corrigir, fale com o escritório.</div>}
