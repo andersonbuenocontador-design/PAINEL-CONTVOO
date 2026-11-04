@@ -80,7 +80,7 @@ export function ConciliacaoTabela({ linhas, plano, bancos, admin, somenteLeitura
           <td className="conta">{l.conta_codigo != null ? <>{l.conta_grupo && <span className="cod">{l.conta_grupo} › </span>}{l.conta_nome}</> : <><span className="prefixo">REVISAR</span>{ent ? 'Entrada' : 'Saída'} sem categoria</>}
             {l.participante_nome ? <div className="part-nome">{(exige(l) ?? (ent ? 'cliente' : 'fornecedor')) === 'cliente' ? 'Cliente' : 'Fornecedor'}: {l.participante_nome}</div>
               : faltaPart(l) ? <div className="falta-nota">Falta {exige(l)}</div> : null}</td>
-          <td className="comp">{(complementoDe(l) || l.descricao_original).toUpperCase().slice(0, 140)}</td>
+          <td className="comp">{(l.participante_nome || l.nota_fiscal ? complementoDe(l) : l.descricao_original).toUpperCase().slice(0, 140)}</td>
           <td className="r num">{ent ? num(l.valor) : ''}</td><td className="r num">{!ent ? num(l.valor) : ''}</td>
           <td className="nota">{notaTxt(l) ?? <span className="falta-nota" title="Informe o número da nota ou marque Sem nota">Falta</span>}{(l.comprovantes?.length ?? 0) > 0 && <div className="comp-qtd" onClick={(e) => e.stopPropagation()}>{l.comprovantes!.map((c, i) => <a key={c.id} href={`/api/conciliacao/comprovante/${c.id}`} title={`Baixar ${c.nome}`}>{l.comprovantes!.length > 1 ? `Comprovante ${i + 1}` : 'Comprovante'}</a>)}</div>}</td>
           <td><span className={`chip ${CONF[l.confianca] === 'Alta' ? 'alta' : CONF[l.confianca] === 'Média' ? 'media' : 'baixa'}`}>{CONF[l.confianca]}</span></td>

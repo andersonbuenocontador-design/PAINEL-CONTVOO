@@ -3,19 +3,11 @@
 // (o nome e o CPF/CNPJ vêm sugeridos a partir da descrição do banco).
 import { useState } from 'react';
 import { acaoCriarParticipante } from './conciliacao-actions';
+import { sugerirParticipante } from '@/lib/complemento';
+export { sugerirParticipante };
 
 export type Participante = { id: string; tipo: 'cliente' | 'fornecedor'; nome: string; documento: string | null };
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
-const PREFIXOS = /^(PAGAMENTO|PAGTO|PAG|PIX|TED|DOC|TRANSF\w*|TRANSFERENCIA|RECEBIMENTO|RECEBIDO|ENVIADO|ENVIADA|RECEBIDA|BOLETO|COMPRA|DEBITO|CREDITO|CARTAO|TARIFA|\s|-|\/)+/;
-
-/** Sugestão de nome e CPF/CNPJ a partir da descrição do banco (ex.: "PAGAMENTO PIX - BORRACHARIA TRES PO / 05.966.876/0001-00"). */
-export function sugerirParticipante(descricao: string) {
-  const doc = (descricao.match(/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}|\d{3}\.\d{3}\.\d{3}-\d{2}/)?.[0] ?? '').replace(/\D/g, '');
-  const partes = descricao.split(/\s+-\s+/);
-  let nome = (partes.length > 1 ? partes.slice(1).join(' - ') : descricao).split(/\s+\/\s+|\s+DOC\.?:/i)[0];
-  nome = nome.replace(PREFIXOS, '').replace(/\s+/g, ' ').trim();
-  return { nome: nome.length >= 2 ? nome.slice(0, 120) : '', documento: doc.length === 11 || doc.length === 14 ? doc : '' };
-}
 /** Já cadastrado? Procura pelo CPF/CNPJ da descrição ou pelo nome contido nela. */
 export function acharParticipante(descricao: string, lista: Participante[], tipo: 'cliente' | 'fornecedor') {
   const d = norm(descricao); const digitos = descricao.replace(/\D/g, '');

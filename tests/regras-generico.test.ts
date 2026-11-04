@@ -32,5 +32,11 @@ describe('complemento da planilha', () => {
     expect(complementoDe({ participante_nome: 'Mercado Pago', nota_fiscal: null })).toBe('Mercado Pago');
     expect(complementoDe({ participante_nome: null, nota_fiscal: '99' })).toBe('NF 99');
     expect(complementoDe({})).toBe('');
+    // sem cadastro: usa o nome que está na descrição do banco
+    expect(complementoDe({ descricao_original: 'PAGAMENTO PIX - 63 833 427 GIELIS V / 63.833.427/0001-90', nota_fiscal: '92755' })).toBe('63 833 427 GIELIS V NF 92755');
+    expect(complementoDe({ descricao_original: 'PAGAMENTO PIX - RODIMAR JOSE ZOLET / 761.661.719-00' })).toBe('RODIMAR JOSE ZOLET');
+    expect(complementoDe({ descricao_original: 'PAGAMENTO PIX - X / 1', participante_nome: 'Cadastrado Ltda', nota_fiscal: '1' })).toBe('Cadastrado Ltda NF 1');
+    expect(complementoDe({ descricao_original: 'TARIFA PACOTE SERVICOS' })).toBe('');
+    expect(complementoDe({ descricao_original: 'COMPRAS NACIONAIS AC PECAS CANOAS BR - DOC.: VE0266276' })).toBe('');
   });
 });
