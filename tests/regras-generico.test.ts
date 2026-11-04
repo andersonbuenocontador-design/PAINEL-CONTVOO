@@ -24,3 +24,13 @@ describe('sugestão de categoria (plano genérico)', () => {
     for (const d of ['TARIFA', 'POSTO', 'CEEE', 'UBER', 'SEGURO']) { const s = sugerirGenerico(d, 1000); if (s) expect(servePara(PLANO_GENERICO.find((c) => c.codigo === s.codigo)!.tipo, 'C')).toBe(true); }
   });
 });
+
+describe('complemento da planilha', () => {
+  it('nome do cliente/fornecedor + número da nota; sem nota, só o nome', async () => {
+    const { complementoDe } = await import('../src/lib/complemento');
+    expect(complementoDe({ participante_nome: 'Mercado Pago', nota_fiscal: '1234' })).toBe('Mercado Pago NF 1234');
+    expect(complementoDe({ participante_nome: 'Mercado Pago', nota_fiscal: null })).toBe('Mercado Pago');
+    expect(complementoDe({ participante_nome: null, nota_fiscal: '99' })).toBe('NF 99');
+    expect(complementoDe({})).toBe('');
+  });
+});

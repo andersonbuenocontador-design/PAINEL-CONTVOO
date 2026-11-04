@@ -1,5 +1,6 @@
 'use client';
 import { Comprovantes } from './Comprovantes';
+import { complementoDe } from '@/lib/complemento';
 import { MaisParticipante, type Participante } from './Participante';
 import { Fragment, useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
@@ -38,7 +39,7 @@ export function ConciliacaoTabela({ linhas, plano, bancos, admin, somenteLeitura
     const q = norm(F.q);
     return linhas.filter((l) => (F.conf === 'todas' || (F.conf === 'nota' ? !l.nota_fiscal && !l.sem_nota : F.conf === 'participante' ? faltaPart(l) : F.conf === 'correcao' ? l.correcao_pedida : F.conf === 'revisar' ? !l.revisado && l.confianca !== 'A' : l.confianca === F.conf))
       && (F.tipo === 'todos' || (F.tipo === 'C') === l.valor > 0) && (F.banco === 'todos' || l.conta_bancaria_id === F.banco)
-      && (!q || norm(`${l.participante_nome ?? ''} ${l.conta_nome ?? ''} ${l.conta_grupo ?? ''} ${l.nota_fiscal ?? ''} ${l.complemento ?? ''} ${l.motivo ?? ''} ${l.observacao ?? ''} ${l.descricao_original} ${num(l.valor)}`).includes(q))).slice(0, 1500);
+      && (!q || norm(`${l.participante_nome ?? ''} ${l.conta_nome ?? ''} ${l.conta_grupo ?? ''} ${l.nota_fiscal ?? ''} ${complementoDe(l)} ${l.motivo ?? ''} ${l.observacao ?? ''} ${l.descricao_original} ${num(l.valor)}`).includes(q))).slice(0, 1500);
   }, [linhas, F, plano]); // eslint-disable-line react-hooks/exhaustive-deps
   const todosMarcados = vis.length > 0 && vis.every((l) => sel.has(l.id));
   const roda = (fn: () => Promise<{ ok: boolean; erro?: string }>, depois?: () => void) => start(async () => { const r = await fn(); if (!r.ok) setErro(r.erro ?? 'Erro'); else { setErro(null); depois?.(); router.refresh(); } });
@@ -52,7 +53,7 @@ export function ConciliacaoTabela({ linhas, plano, bancos, admin, somenteLeitura
         {rs.correcoes > 0 && chip('correcao', `Correção pedida (${rs.correcoes})`, 'baixa')}{chip('revisar', `Para revisar (${rs.naoRev})`, 'baixa')}{chip('B', `Baixa (${rs.baixa})`, 'baixa')}{chip('M', `Média (${rs.media})`, 'media')}{chip('A', `Alta (${rs.alta})`, 'alta')}{chip('todas', `Todas (${rs.linhas})`, 'neutro')}{faltaNota > 0 && chip('nota', `Falta nota (${faltaNota})`, 'baixa')}{nFaltaPart > 0 && chip('participante', `Falta cliente/fornecedor (${nFaltaPart})`, 'baixa')}
         {(bancos.length > 1 || bancoInicial) && <select aria-label="Banco" value={F.banco} onChange={(e) => setF({ ...F, banco: e.target.value })} style={{ width: 'auto' }}><option value="todos">Todos os bancos</option>{bancos.map((b) => <option key={b.id} value={b.id}>{b.nome}</option>)}</select>}
         <select aria-label="Tipo" value={F.tipo} onChange={(e) => setF({ ...F, tipo: e.target.value as Filtro['tipo'] })} style={{ width: 'auto' }}><option value="todos">Recebimentos e pagamentos</option><option value="C">Só recebimentos (entradas)</option><option value="D">Só pagamentos (saídas)</option></select>
-        <input type="search" placeholder="Buscar conta, complemento, valor…" aria-label="Buscar" value={F.q} onChange={(e) => setF({ ...F, q: e.target.value })} style={{ width: 'auto', minWidth: 220 }} />
+        <input type="search" placeholder="Buscar categoria, fornecedor, nota, valor…" aria-label="Buscar" value={F.q} onChange={(e) => setF({ ...F, q: e.target.value })} style={{ width: 'auto', minWidth: 220 }} />
       </div>
       <div className="muted" style={{ fontSize: 13 }}>{vis.length} de {linhas.length} lançamentos{pend && ' · salvando…'}</div>
     </div>
@@ -79,7 +80,7 @@ export function ConciliacaoTabela({ linhas, plano, bancos, admin, somenteLeitura
           <td className="conta">{l.conta_codigo != null ? <>{l.conta_grupo && <span className="cod">{l.conta_grupo} › </span>}{l.conta_nome}</> : <><span className="prefixo">REVISAR</span>{ent ? 'Entrada' : 'Saída'} sem categoria</>}
             {l.participante_nome ? <div className="part-nome">{(exige(l) ?? (ent ? 'cliente' : 'fornecedor')) === 'cliente' ? 'Cliente' : 'Fornecedor'}: {l.participante_nome}</div>
               : faltaPart(l) ? <div className="falta-nota">Falta {exige(l)}</div> : null}</td>
-          <td className="comp">{(l.complemento || l.descricao_original).toUpperCase().slice(0, 140)}</td>
+          <td className="comp">{(complementoDe(l) || l.descricao_original).toUpperCase().slice(0, 140)}</td>
           <td className="r num">{ent ? num(l.valor) : ''}</td><td className="r num">{!ent ? num(l.valor) : ''}</td>
           <td className="nota">{notaTxt(l) ?? <span className="falta-nota" title="Informe o número da nota ou marque Sem nota">Falta</span>}{(l.comprovantes?.length ?? 0) > 0 && <div className="comp-qtd" onClick={(e) => e.stopPropagation()}>{l.comprovantes!.map((c, i) => <a key={c.id} href={`/api/conciliacao/comprovante/${c.id}`} title={`Baixar ${c.nome}`}>{l.comprovantes!.length > 1 ? `Comprovante ${i + 1}` : 'Comprovante'}</a>)}</div>}</td>
           <td><span className={`chip ${CONF[l.confianca] === 'Alta' ? 'alta' : CONF[l.confianca] === 'Média' ? 'media' : 'baixa'}`}>{CONF[l.confianca]}</span></td>
@@ -90,12 +91,12 @@ export function ConciliacaoTabela({ linhas, plano, bancos, admin, somenteLeitura
           {pode && aberta === l.id && <Editor l={l} plano={plano} pend={pend} empresaId={empresaId} lista={lista} onCriado={(p) => setLista((x) => [...x, p])} onParticipante={(id) => roda(() => acaoDefinirParticipante([l.id], id))} onSalvar={(d) => roda(() => acaoEditarLinha(l.id, d), () => setAberta(null))} />}</Fragment>);
       })}
       {!vis.length && <tr><td colSpan={pode ? 10 : 9}><div className="vazio">Nenhum lançamento neste filtro.</div></td></tr>}</tbody></table></div>
-    <p className="muted" style={{ fontSize: 13, margin: 0 }}>Marque várias linhas (use a busca/filtros e a caixa do cabeçalho para marcar todas) e classifique de uma vez. Clique numa linha para trocar a categoria, o complemento ou informar a nota fiscal. "OK" confirma a classificação e ensina o sistema para os próximos meses deste cliente.</p>
+    <p className="muted" style={{ fontSize: 13, margin: 0 }}>Marque várias linhas (use a busca/filtros e a caixa do cabeçalho para marcar todas) e classifique de uma vez. Clique numa linha para trocar a categoria, informar o cliente/fornecedor (botão +) ou a nota fiscal. O complemento da planilha é montado sozinho: nome do cliente/fornecedor + número da nota. "OK" confirma a classificação e ensina o sistema para os próximos meses deste cliente.</p>
   </>);
 }
 
 function Editor({ l, plano, pend, onSalvar, empresaId, lista, onCriado, onParticipante }: { l: Linha; plano: ContaPlano[]; pend: boolean; empresaId: string; lista: Participante[]; onCriado: (p: Participante) => void; onParticipante: (id: string | null) => void; onSalvar: (d: { contaCodigo?: number | null; complemento?: string; observacao?: string; notaFiscal?: string; semNota?: boolean }) => void }) {
-  const [conta, setConta] = useState(l.conta_codigo != null ? String(l.conta_codigo) : ''); const [comp, setComp] = useState(l.complemento ?? ''); const [obs, setObs] = useState(l.observacao ?? '');
+  const [conta, setConta] = useState(l.conta_codigo != null ? String(l.conta_codigo) : ''); const [obs, setObs] = useState(l.observacao ?? '');
   const [nota, setNota] = useState(l.nota_fiscal ?? ''); const [semNota, setSemNota] = useState(l.sem_nota);
   const desc = plano.find((c) => String(c.codigo) === conta)?.descricao;
   const exigido = plano.find((c) => String(c.codigo) === conta)?.participante ?? null; const tipoPart = exigido ?? (l.valor > 0 ? 'cliente' : 'fornecedor');
@@ -112,9 +113,8 @@ function Editor({ l, plano, pend, onSalvar, empresaId, lista, onCriado, onPartic
         {desc && <span className="dica">{desc}</span>}</div>
       <label className="campo">Nº da nota fiscal *<input type="text" value={nota} maxLength={60} disabled={semNota} placeholder={semNota ? 'Sem nota' : 'Ex.: 1234'} onChange={(e) => setNota(e.target.value)} />
         <span className="dica"><label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontWeight: 400 }}><input type="checkbox" style={{ width: 'auto' }} checked={semNota} onChange={(e) => { setSemNota(e.target.checked); if (e.target.checked) setNota(''); }} /> Sem nota</label></span></label>
-      <label className="campo">Complemento<input type="text" value={comp} maxLength={300} onChange={(e) => setComp(e.target.value)} /></label>
       <label className="campo">Observação<input type="text" value={obs} maxLength={1000} onChange={(e) => setObs(e.target.value)} /></label></div>
     <div className="campo">Comprovante<Comprovantes movimentacaoId={l.id} inicial={l.comprovantes ?? []} editavel /></div>
-    <div className="linha-flex"><button className="btn pri" disabled={pend} onClick={() => onSalvar({ contaCodigo: conta ? Number(conta) : null, complemento: comp, observacao: obs, notaFiscal: nota.trim(), semNota })}>Salvar</button>
+    <div className="linha-flex"><button className="btn pri" disabled={pend} onClick={() => onSalvar({ contaCodigo: conta ? Number(conta) : null, observacao: obs, notaFiscal: nota.trim(), semNota })}>Salvar</button>
       <span className="muted" style={{ fontSize: 13 }}>Informe o número da nota fiscal ou marque "Sem nota" — é obrigatório para enviar ao escritório.</span></div></td></tr>);
 }
