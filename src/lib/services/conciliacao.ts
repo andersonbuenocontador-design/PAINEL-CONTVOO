@@ -250,22 +250,47 @@ export async function reabrirConciliacao(actor: Actor, empresaId: string, compet
 }
 
 /** Conferência de saldos por conta (só afirma "confere" quando há saldo inicial e final no arquivo; senão: sem dados). */
-export type SaldoConta = { contaId: string; banco: string; conta: string | null; lancamentos: number; entradas: number; saidas: number; saldoInicial: number | null; saldoCalculado: number | null; saldoFinalExtrato: number | null; confere: boolean | null; diferenca: number | null };
+export type SaldoConta = { contaId: string; banco: string; conta: string | null; lancamentos: number; entradas: number; saidas: number; saldoInicial: number | null; saldoInicialDoExtrato: number | null; saldoInicialInformado: boolean; saldoCalculado: number | null; saldoFinalExtrato: number | null; confere: boolean | null; diferenca: number | null };
 export async function conferenciaSaldos(actor: Actor, empresaId: string, competencia: string): Promise<SaldoConta[]> {
   const e = await obterEmpresa(actor, empresaId); competenciaSchema.parse(competencia);
   const somas = (await query(
     `SELECT cb.id, cb.banco, cb.conta, count(m.id)::int n, coalesce(sum(m.valor_centavos) FILTER (WHERE m.valor_centavos>0),0)::text ent, coalesce(sum(m.valor_centavos) FILTER (WHERE m.valor_centavos<0),0)::text sai
        FROM contas_bancarias cb JOIN movimentacoes m ON m.conta_id=cb.id AND m.competencia=$2 WHERE cb.empresa_id=$1 GROUP BY cb.id ORDER BY cb.banco, cb.conta`, [e.id, competencia])).rows;
   const imps = (await query(`SELECT conta_id, resumo FROM importacoes WHERE empresa_id=$1 AND competencia=$2 AND status='confirmada' ORDER BY resumo->'periodo'->>0, criado_em`, [e.id, competencia])).rows;
+  const informados = new Map((await query('SELECT conta_id, saldo_anterior::text v FROM saldos_informados WHERE empresa_id=$1 AND competencia=$2', [e.id, competencia])).rows.map((r) => [r.conta_id as string, Number(r.v)]));
   return somas.map((s) => {
     const mine = imps.filter((i) => i.conta_id === s.id).map((i) => i.resumo as { saldoFinalInformado?: number | null; conferenciaSaldo?: { saldoAnterior: number | null; saldoFinalInformado: number | null } | null });
-    const ini = mine.find((r) => r.conferenciaSaldo?.saldoAnterior != null)?.conferenciaSaldo?.saldoAnterior ?? null;
+    const doExtrato = mine.find((r) => r.conferenciaSaldo?.saldoAnterior != null)?.conferenciaSaldo?.saldoAnterior ?? null;
+    const ini = informados.get(s.id) ?? doExtrato; // o informado na tela vale mais que o lido do extrato
     const ultimo = [...mine].reverse().find((r) => r.conferenciaSaldo?.saldoFinalInformado != null || r.saldoFinalInformado != null);
     const fim = ultimo ? (ultimo.conferenciaSaldo?.saldoFinalInformado ?? ultimo.saldoFinalInformado ?? null) : null;
     const entradas = Number(s.ent), saidas = Number(s.sai);
     const calc = ini != null ? ini + entradas + saidas : null;
     const confere = calc != null && fim != null ? calc === fim : null;
-    return { contaId: s.id, banco: s.banco, conta: s.conta, lancamentos: s.n, entradas, saidas, saldoInicial: ini, saldoCalculado: calc, saldoFinalExtrato: fim, confere, diferenca: calc != null && fim != null ? calc - fim : null };
+    return { contaId: s.id, banco: s.banco, conta: s.conta, lancamentos: s.n, entradas, saidas, saldoInicial: ini, saldoInicialDoExtrato: doExtrato, saldoInicialInformado: informados.has(s.id), saldoCalculado: calc, saldoFinalExtrato: fim, confere, diferenca: calc != null && fim != null ? calc - fim : null };
+  });
+}
+
+/** Campo "Saldo anterior" do cartão do banco: o cliente (enquanto a competência está com ele) ou o escritório informa o saldo de abertura;
+ *  vazio volta a usar o saldo lido do extrato. Aceita "24.481,05", "-1.200,00" ou "24481.05". */
+export function lerValorBr(txt: string): number | null {
+  const t = txt.trim().replace(/^R\$\s*/i, '').replace(/\s/g, '');
+  if (!t) return null;
+  const n = /,\d{1,2}$/.test(t) || t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t;
+  if (!/^-?\d+(\.\d{1,2})?$/.test(n)) throw new AppError('Valor inválido. Use, por exemplo, 24.481,05');
+  return Math.round(Number(n) * 100);
+}
+export async function informarSaldoAnterior(actor: Actor, empresaId: string, contaId: string, competencia: string, valorTxt: string) {
+  const e = await obterEmpresa(actor, empresaId); competenciaSchema.parse(competencia);
+  if (!z.string().uuid().safeParse(contaId).success || !(await query('SELECT 1 FROM contas_bancarias WHERE id=$1 AND empresa_id=$2', [contaId, e.id])).rowCount) throw new AppError('Conta bancária não encontrada.', 'nao_encontrado');
+  await exigirEditavel(actor, e.id, competencia);
+  if (actor.papel === 'admin' && (await query(`SELECT 1 FROM conciliacoes WHERE empresa_id=$1 AND competencia=$2 AND status='concluida'`, [e.id, competencia])).rowCount) throw new AppError('A competência já foi concluída. Reabra para o cliente antes de alterar o saldo.');
+  const v = lerValorBr(valorTxt);
+  await tx(async (c) => {
+    if (v == null) await c.query('DELETE FROM saldos_informados WHERE conta_id=$1 AND competencia=$2', [contaId, competencia]);
+    else await c.query(`INSERT INTO saldos_informados(conta_id,competencia,empresa_id,saldo_anterior,informado_por) VALUES ($1,$2,$3,$4,$5)
+      ON CONFLICT (conta_id,competencia) DO UPDATE SET saldo_anterior=EXCLUDED.saldo_anterior, informado_por=EXCLUDED.informado_por, informado_em=now()`, [contaId, competencia, e.id, v, actor.id]);
+    await registrar(c, { usuarioId: actor.id, empresaId: e.id, acao: 'conciliacao.saldo_anterior', entidade: 'conta_bancaria', entidadeId: contaId, detalhes: { competencia, saldo_anterior_centavos: v } });
   });
 }
 

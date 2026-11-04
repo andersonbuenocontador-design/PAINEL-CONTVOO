@@ -20,7 +20,7 @@ import { AppError } from '@/lib/errors';
 import { brl, dataBr } from '@/lib/format';
 import { Avisos, Topo } from './components';
 import { acaoAtivarConta, acaoCancelarImportacao, acaoConfirmarImportacao, acaoCriarConta, acaoEnviarExtrato } from './extratos-actions';
-import { acaoConcluirConciliacao, acaoDevolverConciliacao, acaoEnviarConferencia, acaoReabrirConciliacao } from './conciliacao-actions';
+import { acaoSaldoAnterior, acaoConcluirConciliacao, acaoDevolverConciliacao, acaoEnviarConferencia, acaoReabrirConciliacao } from './conciliacao-actions';
 
 type SP = { competencia?: string; erro?: string; ok?: string; pendentes?: string; conta?: string };
 async function empresaOu404(u: UsuarioSessao, id: string) { try { return await obterEmpresa(u, id); } catch (e) { if (e instanceof AppError) notFound(); throw e; } }
@@ -94,7 +94,16 @@ export async function ExtratosPagina({ u, empresaId, comp, sp, base, voltar }: {
             {g.itens.map((it) => { const r = it.resumo as Res; const cs = r.conferenciaSaldo; return (<tr key={it.id}><td className="num">{r.periodo ? `${dm(r.periodo[0])}–${dm(r.periodo[1])}/${r.periodo[1].slice(2, 4)}` : it.nome_arquivo}</td>
               <td className="r num">{n2(cs?.saldoAnterior)}</td><td className="r num">{n2(r.entradas)}</td><td className="r num">{n2(Math.abs(r.saidas))}</td><td className="r num">{n2(cs?.saldoFinalInformado ?? r.saldoFinalInformado)}</td>
               <td>{cs?.confere === true ? <span className="conf-ok">✓</span> : cs?.confere === false ? <span className="conf-erro" title="Diferença">dif. {n2(cs.diferenca)}</span> : <span className="muted" title="O arquivo não traz saldo inicial e final">sem saldo</span>}
-                {(admin ? status !== 'concluida' : !somenteLeitura) && <ExcluirExtrato id={it.id} empresaId={empresaId} competencia={comp} arquivo={it.nome_arquivo} />}</td></tr>); })}</tbody></table></div>
+                {admin && status !== 'concluida' && <ExcluirExtrato id={it.id} empresaId={empresaId} competencia={comp} arquivo={it.nome_arquivo} />}</td></tr>); })}</tbody></table></div>
+          {(() => { const sc = saldos.find((x) => x.contaId === cid); if (!sc) return null; const podeSaldo = admin ? status !== 'concluida' : !somenteLeitura;
+            return (<div className="saldo-banco">
+              {podeSaldo ? (<form action={acaoSaldoAnterior} className="saldo-form"><input type="hidden" name="empresaId" value={empresaId} /><input type="hidden" name="competencia" value={comp} /><input type="hidden" name="contaId" value={cid} />
+                <label className="campo">Saldo anterior do extrato<input name="saldo" inputMode="decimal" defaultValue={sc.saldoInicial != null ? n2(sc.saldoInicial) : ''} placeholder="Ex.: 24.481,05" aria-label={`Saldo anterior de ${g.nome}`} /></label>
+                <button className="btn">Salvar</button></form>)
+                : <div className="saldo-form"><span className="muted">Saldo anterior</span> <strong className="num">{brl2(sc.saldoInicial)}</strong></div>}
+              <div className="ficou"><span>Ficou no banco</span><strong className="num">{brl2(sc.saldoCalculado)}</strong>
+                <small className="muted">{sc.saldoCalculado == null ? 'Informe o saldo anterior para calcular.' : 'saldo anterior + entradas − saídas'}{sc.confere === false ? ` · o extrato mostra ${brl2(sc.saldoFinalExtrato)}` : ''}</small></div>
+            </div>); })()}
           <div className="muted" style={{ fontSize: 12 }}>{nl.length} lançamentos · {nl.filter((l) => l.confianca !== 'A').length} para revisar</div></div>); })}</div>}
 
       {admin && !somenteLeitura && <details className="painel" open={linhas.length === 0 || !!sp.erro}><summary><strong>Enviar extrato e contas bancárias</strong></summary>

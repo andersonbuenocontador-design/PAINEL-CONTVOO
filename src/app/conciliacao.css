@@ -190,3 +190,8 @@
 .conc .excluir-extrato{display:inline;margin-left:8px}.conc .btn.link.perigo-txt{color:var(--erro);padding:0;font-size:12px}
 .conc .btn.excluir-linha{background:transparent;border:1px solid transparent;color:var(--faint);padding:4px 6px;margin-left:4px;vertical-align:middle;box-shadow:none}
 .conc .btn.excluir-linha:hover{color:var(--erro);border-color:var(--line)}
+/* saldo anterior informado e "ficou no banco" (cartão do banco) */
+.conc .saldo-banco{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:10px;margin-top:6px}
+.conc .saldo-form{display:flex;align-items:flex-end;gap:8px;margin:0}.conc .saldo-form .campo{margin:0}.conc .saldo-form input{width:160px;text-align:right;font-family:var(--f-num)}
+.conc .ficou{display:grid;justify-items:end;gap:2px}.conc .ficou>span{font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;color:var(--muted)}
+.conc .ficou strong{font-size:1.25rem}.conc .ficou small{font-size:12px}

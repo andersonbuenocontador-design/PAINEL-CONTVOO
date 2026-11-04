@@ -133,8 +133,9 @@ export async function cancelarImportacao(actor: Actor, id: string) {
   });
 }
 /** Retira da conciliação um extrato já gravado (ex.: entrou por engano): apaga os lançamentos dele.
- *  Escritório: enquanto a competência não estiver concluída. Cliente: só enquanto ela estiver com ele (em revisão ou devolvida). */
+ *  Só o escritório, enquanto a competência não estiver concluída. */
 export async function excluirImportacao(actor: Actor, id: string) {
+  exigirAdmin(actor); // a pedido do escritório, só ele exclui um extrato inteiro
   const i = await carregarImportacao(actor, id);
   if (i.status !== 'confirmada') throw new AppError('Este extrato não está na conciliação.');
   await tx(async (c) => {

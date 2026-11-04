@@ -2,7 +2,7 @@
 import { redirect } from 'next/navigation';
 import { exigirUsuario } from '@/lib/session';
 import { executar, mensagemDeErro } from '@/lib/actions-util';
-import { classificarEmLote, concluirConciliacao, confirmarLinhas, definirContaPlanoAtiva, devolverParaCorrecao, editarLinha, enviarParaConferencia, importarPlano, limparCorrecao, pedirCorrecao, reabrirConciliacao, reclassificarNaoRevisadas, salvarContaPlano, marcarSemNota, anexarComprovante, removerComprovante, criarParticipante, definirParticipante, excluirLinhas, type Participante } from '@/lib/services/conciliacao';
+import { classificarEmLote, concluirConciliacao, confirmarLinhas, definirContaPlanoAtiva, devolverParaCorrecao, editarLinha, enviarParaConferencia, importarPlano, limparCorrecao, pedirCorrecao, reabrirConciliacao, reclassificarNaoRevisadas, salvarContaPlano, marcarSemNota, anexarComprovante, removerComprovante, criarParticipante, definirParticipante, excluirLinhas, informarSaldoAnterior, type Participante } from '@/lib/services/conciliacao';
 
 type R = { ok: true } | { ok: false; erro: string };
 const rodar = async (fn: () => Promise<unknown>): Promise<R> => { try { await fn(); return { ok: true }; } catch (e) { return { ok: false, erro: mensagemDeErro(e) }; } };
@@ -39,6 +39,10 @@ const voltarPara = (papel: string, e: string, c: string) => `${baseDe(papel, e)}
 export async function acaoEnviarConferencia(fd: FormData) {
   const u = await exigirUsuario(); const e = s(fd, 'empresaId'), c = s(fd, 'competencia');
   await executar(voltarPara(u.papel, e, c), 'Competência enviada ao escritório para conferência.', () => enviarParaConferencia(u, e, c));
+}
+export async function acaoSaldoAnterior(fd: FormData) {
+  const u = await exigirUsuario(); const e = s(fd, 'empresaId'), c = s(fd, 'competencia');
+  await executar(voltarPara(u.papel, e, c), 'Saldo anterior salvo.', () => informarSaldoAnterior(u, e, s(fd, 'contaId'), c, s(fd, 'saldo')));
 }
 export async function acaoConcluirConciliacao(fd: FormData) {
   const u = await exigirUsuario('admin'); const e = s(fd, 'empresaId'), c = s(fd, 'competencia');

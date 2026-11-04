@@ -280,7 +280,7 @@ describe('conferência de saldos e fila do escritório', () => {
   const pdf = readFileSync('tests/fixtures/extratos-pdf/banrisul_ficticio.pdf');
   it('PDF com saldos: confere; falta de lançamento gera divergência com a diferença; OFX sem saldo inicial: sem dados', async () => {
     await importar(ua, empA, contaA, 'extrato.pdf', pdf);
-    expect(await K.conferenciaSaldos(ua, empA, C)).toEqual([{ contaId: contaA, banco: 'Banrisul', conta: '123-4', lancamentos: 4, entradas: 210000, saidas: -48990, saldoInicial: 200000, saldoCalculado: 361010, saldoFinalExtrato: 361010, confere: true, diferenca: 0 }]);
+    expect(await K.conferenciaSaldos(ua, empA, C)).toEqual([{ contaId: contaA, banco: 'Banrisul', conta: '123-4', lancamentos: 4, entradas: 210000, saidas: -48990, saldoInicial: 200000, saldoInicialDoExtrato: 200000, saldoInicialInformado: false, saldoCalculado: 361010, saldoFinalExtrato: 361010, confere: true, diferenca: 0 }]);
     await query(`DELETE FROM movimentacoes WHERE id=(SELECT id FROM movimentacoes WHERE valor_centavos=-3990)`);
     expect((await K.conferenciaSaldos(ua, empA, C))[0]).toMatchObject({ confere: false, diferenca: 3990, lancamentos: 3 });
     await query('TRUNCATE movimentacoes, importacoes CASCADE');
@@ -419,15 +419,14 @@ describe('o que vai para a conciliação', () => {
     const r = await X.puxarExtratosDosDocumentos(ua, empA);
     expect(r.length).toBe(1); expect(r[0].gravadas).toBeGreaterThan(0);
     const imp = (await query(`SELECT id FROM importacoes WHERE empresa_id=$1 AND status='confirmada'`, [empA])).rows[0].id;
-    await expect(X.excluirImportacao(ub, imp)).rejects.toThrow(/não encontrad/); // outra empresa
-    await X.excluirImportacao(ua, imp); // o próprio cliente exclui enquanto a competência está com ele
+    await expect(X.excluirImportacao(ua, imp)).rejects.toThrow(); // cliente não exclui extrato inteiro
+    await X.excluirImportacao(admin, imp);
     expect((await query('SELECT count(*)::int n FROM movimentacoes WHERE empresa_id=$1', [empA])).rows[0].n).toBe(0);
     await expect(X.excluirImportacao(admin, imp)).rejects.toThrow(/não está na conciliação/);
     // depois de enviada ao escritório, o cliente não exclui mais; o escritório sim
     const r2 = await X.importarDireto(ua, { empresaId: empA, contaId: contaA, competencia: C, nome: 'e2.csv', dados: csv(['05/10/2026;TARIFA;-10,00']) });
     const imp2 = (await query(`SELECT id FROM importacoes WHERE empresa_id=$1 AND status='confirmada'`, [empA])).rows[0].id; expect(r2.gravadas).toBe(1);
     const [l] = await K.listarConciliacao(ua, empA, C); await K.classificarEmLote(ua, [l.id], 21); await K.marcarSemNota(ua, [l.id]); await K.enviarParaConferencia(ua, empA, C);
-    await expect(X.excluirImportacao(ua, imp2)).rejects.toThrow(/já foi enviada ao escritório/);
     await X.excluirImportacao(admin, imp2);
   });
 });
@@ -445,5 +444,20 @@ describe('excluir lançamento', () => {
     await expect(K.excluirLinhas(ua, [t])).rejects.toThrow(/enviada ao escritório/);
     await K.concluirConciliacao(admin, empA, C);
     await expect(K.excluirLinhas(admin, [t])).rejects.toThrow(/já foi concluída/);
+  });
+});
+
+describe('saldo anterior informado', () => {
+  it('cliente informa o saldo anterior e vê quanto ficou no banco; vazio volta ao do extrato', async () => {
+    expect(K.lerValorBr('24.481,05')).toBe(2448105); expect(K.lerValorBr('-1.200,5')).toBe(-120050); expect(K.lerValorBr('100.25')).toBe(10025); expect(K.lerValorBr(' ')).toBeNull();
+    expect(() => K.lerValorBr('abc')).toThrow(/Valor inválido/);
+    await X.importarDireto(ua, { empresaId: empA, contaId: contaA, competencia: C, nome: 's.csv', dados: csv(['02/10/2026;PIX RECEBIDO;1.000,00', '03/10/2026;TARIFA;-50,00']) });
+    expect((await K.conferenciaSaldos(ua, empA, C))[0]).toMatchObject({ saldoInicial: null, saldoCalculado: null });
+    await K.informarSaldoAnterior(ua, empA, contaA, C, '24.481,05');
+    expect((await K.conferenciaSaldos(ua, empA, C))[0]).toMatchObject({ saldoInicial: 2448105, saldoInicialInformado: true, saldoCalculado: 2448105 + 100000 - 5000 });
+    await expect(K.informarSaldoAnterior(ub, empA, contaA, C, '1,00')).rejects.toThrow(/não encontrada/);
+    await expect(K.informarSaldoAnterior(ua, empA, contaB, C, '1,00')).rejects.toThrow(/não encontrada/);
+    await K.informarSaldoAnterior(ua, empA, contaA, C, '');
+    expect((await K.conferenciaSaldos(ua, empA, C))[0]).toMatchObject({ saldoInicial: null, saldoInicialInformado: false });
   });
 });
