@@ -72,3 +72,34 @@ tr.linha-vencida td{background:#fef3f2}.tag.vencida{background:#fef3f2;color:var
 .aviso-lucros p{margin:6px 0;line-height:1.5}
 :root[data-theme="dark"] .aviso-lucros{background:#2e2410;border-color:#7a5a1e;border-left-color:#f59e0b;color:#f3e3c3}:root[data-theme="dark"] .aviso-lucros h2{color:#fbbf24}
 .excluir-arquivo{display:inline;margin-left:8px}button.link-perigo{background:none;border:0;padding:0;color:var(--err);font-size:.85rem;text-decoration:underline;cursor:pointer}
+/* Documentos do mês (cliente) */
+.docs-resumo{display:grid;gap:10px}.docs-resumo-topo{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.docs-resumo-topo h2{margin:0}
+.docs-selo{font-size:.8rem;font-weight:600;padding:4px 10px;border-radius:99px}.docs-selo.ok{background:#ecfdf3;color:var(--ok)}.docs-selo.erro{background:#fef3f2;color:var(--err)}.docs-selo.alerta{background:#fff4e5;color:#b54708}.docs-selo.info{background:#eef2ff;color:var(--pri)}
+.docs-barra{height:8px;background:#eef1f5;border-radius:99px;overflow:hidden}.docs-barra>div{height:100%;background:var(--ok);border-radius:99px;transition:width .3s}
+.docs-conta{margin:0;font-size:.85rem}
+.docs-lista,.avulsos{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:10px}
+.doc-item{display:grid;grid-template-columns:40px 1fr auto;gap:14px;align-items:start;border:1px solid var(--bd);border-radius:12px;padding:14px 16px;background:var(--card)}
+.doc-icone{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:#f2f4f7;color:var(--mut)}.doc-icone svg{width:20px;height:20px}
+.st-aprovado .doc-icone{background:#ecfdf3;color:var(--ok)}.st-rejeitado .doc-icone{background:#fef3f2;color:var(--err)}.st-enviado .doc-icone,.st-em_conferencia .doc-icone{background:#eef2ff;color:var(--pri)}.st-pendente .doc-icone{background:#fff4e5;color:#b54708}
+.doc-item.st-rejeitado{border-color:#f5c2bd}.doc-item.st-aprovado{border-color:#b7e4cc}
+.doc-info{display:grid;gap:4px;min-width:0}.doc-nome{font-size:1rem}.doc-nome .tag{margin-left:6px}
+.doc-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.85rem}
+.tag.st-aprovado{background:#ecfdf3;color:var(--ok)}.tag.st-rejeitado{background:#fef3f2;color:var(--err)}.tag.st-enviado,.tag.st-em_conferencia{background:#eef2ff;color:var(--pri)}.tag.st-pendente{background:#fff4e5;color:#b54708}
+.doc-arquivo{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:.9rem;color:var(--mut)}.doc-arquivo a{font-weight:500}
+.doc-motivo{margin:4px 0 0}
+.doc-acao{align-self:center}.doc-aprovado{display:inline-block;font-weight:600;color:var(--ok);background:#ecfdf3;border-radius:8px;padding:8px 12px;font-size:.9rem}
+.doc-envio{display:grid;gap:8px;justify-items:end;min-width:260px}
+.doc-envio input[type=file],.docs-upload input[type=file]{width:100%;padding:6px;border:1px dashed var(--bd);border-radius:10px;background:#f9fafb;font-size:.85rem;color:var(--mut);cursor:pointer}
+input[type=file]::file-selector-button{font:inherit;font-weight:600;border:1px solid var(--bd);background:#fff;color:var(--tx);border-radius:8px;padding:6px 12px;margin-right:10px;cursor:pointer}
+input[type=file]::file-selector-button:hover{border-color:var(--pri);color:var(--pri)}
+.docs-upload{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:center;margin:8px 0 4px}
+.avulsos li{display:grid;grid-template-columns:40px 1fr auto;gap:12px;align-items:center;border:1px solid var(--bd);border-radius:12px;padding:10px 14px;background:var(--card)}
+.pdf-icone{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:#fef3f2;color:#b42318;font-size:.7rem;font-weight:800;letter-spacing:.03em}
+.avulsos .doc-info a{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:700px){.doc-item{grid-template-columns:36px 1fr}.doc-acao{grid-column:1 / -1}.doc-envio{justify-items:stretch;min-width:0}.docs-upload{grid-template-columns:1fr}.avulsos li{grid-template-columns:36px 1fr}.avulsos li>form,.avulsos li>.tag{grid-column:2}}
+:root[data-theme="dark"] .doc-icone{background:#1a2a3e}:root[data-theme="dark"] .st-aprovado .doc-icone,:root[data-theme="dark"] .tag.st-aprovado,:root[data-theme="dark"] .doc-aprovado,:root[data-theme="dark"] .docs-selo.ok{background:#103323}
+:root[data-theme="dark"] .st-rejeitado .doc-icone,:root[data-theme="dark"] .tag.st-rejeitado,:root[data-theme="dark"] .docs-selo.erro,:root[data-theme="dark"] .pdf-icone{background:#3b1715;color:#f97066}
+:root[data-theme="dark"] .st-enviado .doc-icone,:root[data-theme="dark"] .st-em_conferencia .doc-icone,:root[data-theme="dark"] .tag.st-enviado,:root[data-theme="dark"] .tag.st-em_conferencia,:root[data-theme="dark"] .docs-selo.info{background:#1b2c4a}
+:root[data-theme="dark"] .st-pendente .doc-icone,:root[data-theme="dark"] .tag.st-pendente,:root[data-theme="dark"] .docs-selo.alerta{background:#3d2a10;color:#f7b267}
+:root[data-theme="dark"] .doc-item.st-rejeitado{border-color:#6b2a24}:root[data-theme="dark"] .doc-item.st-aprovado{border-color:#1d5b3d}:root[data-theme="dark"] .docs-barra{background:#1f3044}
+:root[data-theme="dark"] .doc-envio input[type=file],:root[data-theme="dark"] .docs-upload input[type=file]{background:#0f1c2b}:root[data-theme="dark"] input[type=file]::file-selector-button{background:#1a2a3e;color:var(--tx)}
