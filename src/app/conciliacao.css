@@ -188,3 +188,5 @@
 .conc .part-nome .btn.link{padding:0 0 0 6px;font-size:12px}
 .conc .ed .campo>.part-nome,.conc .ed .campo>.falta-nota,.conc .ed .campo>.dica{display:block;margin-top:4px}
 .conc .excluir-extrato{display:inline;margin-left:8px}.conc .btn.link.perigo-txt{color:var(--erro);padding:0;font-size:12px}
+.conc .btn.excluir-linha{background:transparent;border:1px solid transparent;color:var(--faint);padding:4px 6px;margin-left:4px;vertical-align:middle;box-shadow:none}
+.conc .btn.excluir-linha:hover{color:var(--erro);border-color:var(--line)}

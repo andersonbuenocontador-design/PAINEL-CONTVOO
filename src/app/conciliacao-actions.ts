@@ -2,7 +2,7 @@
 import { redirect } from 'next/navigation';
 import { exigirUsuario } from '@/lib/session';
 import { executar, mensagemDeErro } from '@/lib/actions-util';
-import { classificarEmLote, concluirConciliacao, confirmarLinhas, definirContaPlanoAtiva, devolverParaCorrecao, editarLinha, enviarParaConferencia, importarPlano, limparCorrecao, pedirCorrecao, reabrirConciliacao, reclassificarNaoRevisadas, salvarContaPlano, marcarSemNota, anexarComprovante, removerComprovante, criarParticipante, definirParticipante, type Participante } from '@/lib/services/conciliacao';
+import { classificarEmLote, concluirConciliacao, confirmarLinhas, definirContaPlanoAtiva, devolverParaCorrecao, editarLinha, enviarParaConferencia, importarPlano, limparCorrecao, pedirCorrecao, reabrirConciliacao, reclassificarNaoRevisadas, salvarContaPlano, marcarSemNota, anexarComprovante, removerComprovante, criarParticipante, definirParticipante, excluirLinhas, type Participante } from '@/lib/services/conciliacao';
 
 type R = { ok: true } | { ok: false; erro: string };
 const rodar = async (fn: () => Promise<unknown>): Promise<R> => { try { await fn(); return { ok: true }; } catch (e) { return { ok: false, erro: mensagemDeErro(e) }; } };
@@ -11,6 +11,7 @@ const rodar = async (fn: () => Promise<unknown>): Promise<R> => { try { await fn
 export async function acaoClassificarLote(ids: number[], contaCodigo: number): Promise<R> { const u = await exigirUsuario(); return rodar(() => classificarEmLote(u, ids, contaCodigo)); }
 export async function acaoConfirmarLinhas(ids: number[]): Promise<R> { const u = await exigirUsuario(); return rodar(() => confirmarLinhas(u, ids)); }
 export async function acaoEditarLinha(id: number, d: { contaCodigo?: number | null; complemento?: string; observacao?: string; notaFiscal?: string; semNota?: boolean }): Promise<R> { const u = await exigirUsuario(); return rodar(() => editarLinha(u, id, d)); }
+export async function acaoExcluirLinhas(ids: number[]): Promise<R> { const u = await exigirUsuario(); return rodar(() => excluirLinhas(u, ids)); }
 export async function acaoSemNota(ids: number[]): Promise<R> { const u = await exigirUsuario(); return rodar(() => marcarSemNota(u, ids)); }
 
 /** Comprovante por lançamento (PDF ou foto). Devolve o comprovante criado para a tela mostrar sem recarregar. */

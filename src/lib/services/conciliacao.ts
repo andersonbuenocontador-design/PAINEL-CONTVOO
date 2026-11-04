@@ -345,6 +345,22 @@ export async function editarLinha(actor: Actor, id: number, input: { contaCodigo
   if (d.contaCodigo && d.contaCodigo !== l.conta) await classificarEmLote(actor, [id], d.contaCodigo);
 }
 
+/** Excluir lançamentos um a um ou em lote (ex.: linha que não é da empresa). Fica registrado na auditoria com data, descrição e valor.
+ *  Cliente: enquanto a competência estiver com ele. Escritório: enquanto não estiver concluída. */
+export async function excluirLinhas(actor: Actor, idsIn: number[]) {
+  const ls = await linhasAcessiveis(actor, idsIn, { paraEditar: true });
+  await tx(async (c) => {
+    for (const k of new Set(ls.map((l) => `${l.empresaId}|${l.competencia}`))) {
+      const [emp, comp] = k.split('|');
+      const st = (await c.query('SELECT status FROM conciliacoes WHERE empresa_id=$1 AND competencia=$2', [emp, comp])).rows[0]?.status;
+      if (st === 'concluida') throw new AppError('A competência já foi concluída. Reabra para o cliente antes de excluir lançamentos.');
+    }
+    const apagadas = (await c.query('DELETE FROM movimentacoes WHERE id=ANY($1) RETURNING id, data::text data, descricao_original, valor_centavos::text valor', [ls.map((l) => l.id)])).rows;
+    for (const r of apagadas) await registrar(c, { usuarioId: actor.id, empresaId: ls[0].empresaId, acao: 'conciliacao.excluir_lancamento', entidade: 'movimentacao', entidadeId: String(r.id), detalhes: { data: r.data, descricao: r.descricao_original, valor_centavos: Number(r.valor) } });
+  });
+  return ls.length;
+}
+
 /* ================= Clientes e fornecedores (cadastro feito pelo próprio cliente ao conciliar) ================= */
 export type Participante = { id: string; tipo: 'cliente' | 'fornecedor'; nome: string; documento: string | null };
 const participanteSchema = z.object({

@@ -431,3 +431,19 @@ describe('o que vai para a conciliação', () => {
     await X.excluirImportacao(admin, imp2);
   });
 });
+
+describe('excluir lançamento', () => {
+  it('cliente exclui um a um ou em lote enquanto a competência está com ele; fica na auditoria; outra empresa não', async () => {
+    await X.importarDireto(ua, { empresaId: empA, contaId: contaA, competencia: C, nome: 'x.csv', dados: csv(['01/10/2026;PEDAGIO VIASUL;-20,70', '01/10/2026;PEDAGIO VIASUL SUL;-34,50', '02/10/2026;TARIFA;-10,00']) });
+    const [a, b, t] = (await K.listarConciliacao(ua, empA, C)).map((l) => l.id);
+    await expect(K.excluirLinhas(ub, [a])).rejects.toThrow(/não encontrad/);
+    expect(await K.excluirLinhas(ua, [a])).toBe(1);
+    expect(await K.excluirLinhas(ua, [b])).toBe(1);
+    expect((await K.listarConciliacao(ua, empA, C)).map((l) => l.id)).toEqual([t]);
+    expect((await query(`SELECT count(*)::int n FROM auditoria WHERE acao='conciliacao.excluir_lancamento' AND detalhes->>'descricao' LIKE 'PEDAGIO%'`)).rows[0].n).toBe(2);
+    await K.classificarEmLote(ua, [t], 21); await K.marcarSemNota(ua, [t]); await K.enviarParaConferencia(ua, empA, C);
+    await expect(K.excluirLinhas(ua, [t])).rejects.toThrow(/enviada ao escritório/);
+    await K.concluirConciliacao(admin, empA, C);
+    await expect(K.excluirLinhas(admin, [t])).rejects.toThrow(/já foi concluída/);
+  });
+});
