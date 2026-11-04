@@ -374,7 +374,8 @@ describe('resumo do mês do cliente', () => {
     const ls = await K.listarConciliacao(ua, empA, C);
     await K.classificarEmLote(ua, [ls.find((l) => /TRANSF/.test(l.descricao_original))!.id], cod('SOC006'));
     const f = await resumoFinanceiro(ua, empA, C);
-    expect(f).toMatchObject({ entradas: 100000, saidas: 25000, resultado: 75000, anterior: null });
+    expect(f).toMatchObject({ entradas: 100000, saidas: 25000, resultado: 75000, anterior: null, ficouNoBanco: null, contasSemSaldo: 1 });
+    await K.informarSaldoAnterior(ua, empA, contaA, C, '500,00'); expect((await resumoFinanceiro(ua, empA, C)).ficouNoBanco).toBe(50000 + 100000 - 20000 - 5000 - 40000);
     expect(f.maioresGastos.every((g) => g.categoria && g.categoria !== 'Não sei identificar')).toBe(true); expect(f.maioresGastos.reduce((t, g) => t + g.valor, 0) + f.semCategoria).toBe(25000);
     await expect(resumoFinanceiro(ub, empA, C)).rejects.toThrow(/não encontrada/);
   });

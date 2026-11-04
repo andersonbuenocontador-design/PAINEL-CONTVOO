@@ -1,7 +1,7 @@
 import { query } from '../db';
 import { Actor, exigirAdmin } from '../errors';
 import { competenciaSchema, situacaoCompetencia, visaoGeral } from './documentos';
-import { obterStatusConciliacao } from './conciliacao';
+import { conferenciaSaldos, obterStatusConciliacao } from './conciliacao';
 import { resumoPendencias } from './pendencias';
 import { obterEmpresa } from './empresas';
 
@@ -43,11 +43,14 @@ export async function resumoFinanceiro(actor: Actor, empresaId: string, competen
      WHERE mv.empresa_id=$1 AND mv.competencia=$2 AND (p.codigo IS NULL OR (coalesce(p.tipo,'') <> 'T' AND p.nome <> ALL($3)))`;
   const tot = async (c: string) => (await query(
     `SELECT count(*)::int n, coalesce(sum(valor_centavos) FILTER (WHERE valor_centavos>0),0)::bigint entradas, coalesce(-sum(valor_centavos) FILTER (WHERE valor_centavos<0),0)::bigint saidas ${base}`, [e.id, c, TRANSFERENCIAS])).rows[0];
-  const [atual, anterior, gastos] = await Promise.all([tot(competencia), tot(ant), query(
+  const [atual, anterior, saldos, gastos] = await Promise.all([tot(competencia), tot(ant), conferenciaSaldos(actor, e.id, competencia), query(
     `SELECT coalesce(p.nome,'') categoria, -sum(mv.valor_centavos)::bigint valor, count(*)::int n ${base} AND mv.valor_centavos<0
       GROUP BY 1 ORDER BY 2 DESC`, [e.id, competencia, TRANSFERENCIAS])]);
   const num = (v: unknown) => Number(v);
   return {
+    // quanto ficou no banco: soma do saldo calculado de cada conta (saldo anterior + entradas - saídas); null se alguma conta não tem saldo anterior
+    ficouNoBanco: saldos.length && saldos.every((x) => x.saldoCalculado != null) ? saldos.reduce((t, x) => t + (x.saldoCalculado ?? 0), 0) : null,
+    contasSemSaldo: saldos.filter((x) => x.saldoCalculado == null).length,
     movimentacoes: atual.n as number, entradas: num(atual.entradas), saidas: num(atual.saidas), resultado: num(atual.entradas) - num(atual.saidas),
     anterior: anterior.n ? { entradas: num(anterior.entradas), saidas: num(anterior.saidas) } : null,
     // gastos ainda sem categoria (ou "Não sei identificar") ficam fora do ranking e aparecem à parte

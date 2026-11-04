@@ -52,7 +52,10 @@ function ResumoMes({ f, mes, ano, href }: { f: Awaited<ReturnType<typeof resumoF
     <div className="resumo-kpis">
       <div className="kpi"><span>Entrou</span><strong className="pos">{reais(f.entradas)}</strong><Variacao atual={f.entradas} antes={f.anterior?.entradas} bomSubir /></div>
       <div className="kpi"><span>Saiu</span><strong className="neg">{reais(f.saidas)}</strong><Variacao atual={f.saidas} antes={f.anterior?.saidas} bomSubir={false} /></div>
-      <div className="kpi"><span>Resultado do mês</span><strong className={f.resultado >= 0 ? 'pos' : 'neg'}>{reais(f.resultado)}</strong><span className="var neutra">{f.resultado >= 0 ? 'entrou mais do que saiu' : 'saiu mais do que entrou'}</span></div>
+      <div className="kpi"><span>Ficou no banco</span>{f.ficouNoBanco != null
+        ? <strong className={f.ficouNoBanco >= 0 ? 'pos' : 'neg'}>{reais(f.ficouNoBanco)}</strong>
+        : <strong className="neutro">—</strong>}
+        <span className="var neutra">{f.ficouNoBanco != null ? <>resultado do mês: <b className={f.resultado >= 0 ? 'pos-t' : 'neg-t'}>{reais(f.resultado)}</b></> : <>Informe o saldo anterior {f.contasSemSaldo > 1 ? `de ${f.contasSemSaldo} contas` : 'da conta'} em <Link href={href}>Extratos</Link></>}</span></div>
     </div>
     {f.maioresGastos.length > 0 && <><h3>Maiores gastos</h3><ol className="gastos">{f.maioresGastos.map((g) => (
       <li key={g.categoria}><div className="gasto-lin"><span>{g.categoria}</span><strong>{reais(g.valor)}</strong></div>
