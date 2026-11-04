@@ -132,6 +132,19 @@ export async function cancelarImportacao(actor: Actor, id: string) {
     await registrar(c, { usuarioId: actor.id, empresaId: i.empresa_id, acao: 'importacao.cancelar', entidade: 'importacao', entidadeId: id });
   });
 }
+/** Escritório retira da conciliação um extrato já gravado (ex.: entrou por engano): apaga os lançamentos dele. Não vale em competência concluída. */
+export async function excluirImportacao(actor: Actor, id: string) {
+  exigirAdmin(actor);
+  const i = await carregarImportacao(actor, id);
+  if (i.status !== 'confirmada') throw new AppError('Este extrato não está na conciliação.');
+  await tx(async (c) => {
+    const st = (await c.query('SELECT status FROM conciliacoes WHERE empresa_id=$1 AND competencia=$2', [i.empresa_id, i.competencia])).rows[0]?.status;
+    if (st === 'concluida') throw new AppError('A competência já foi concluída. Reabra para o cliente antes de excluir o extrato.');
+    const r = await c.query('DELETE FROM movimentacoes WHERE importacao_id=$1', [id]);
+    await c.query(`UPDATE importacoes SET status='cancelada' WHERE id=$1`, [id]);
+    await registrar(c, { usuarioId: actor.id, empresaId: i.empresa_id, acao: 'importacao.excluir', entidade: 'importacao', entidadeId: id, detalhes: { lancamentos: r.rowCount, arquivo: i.nome_arquivo } });
+  });
+}
 /** Grava as movimentações. Duplicadas certas e fora do período nunca entram; possíveis duplicadas só se listadas em `incluirPossiveis` (índices). */
 export async function confirmarImportacao(actor: Actor, id: string, incluirPossiveis: number[] = []) {
   const i = await carregarImportacao(actor, id);
@@ -221,13 +234,13 @@ export const urlConciliacao = (base: string, r: { competencia: string; contaId?:
  *  Cada arquivo é verificado uma vez; só vira lançamento o que for extrato de banco reconhecido. */
 export async function puxarExtratosDosDocumentos(actor: Actor, empresaId: string) {
   const emp = await obterEmpresa(actor, empresaId);
+  // só os arquivos enviados num documento que o escritório configurou como extrato (nome ou categoria com "extrato");
+  // "Outros documentos" e os demais documentos pedidos nunca vão para a conciliação
   const pend = (await query(
-    `SELECT 'arquivos' t, id, competencia, nome_original, chave_storage FROM arquivos
-      WHERE empresa_id=$1 AND extrato_verificado_em IS NULL AND situacao<>'substituido' AND descartado_em IS NULL AND nome_original ~* '\\.(pdf|ofx)$'
-     UNION ALL
-     SELECT 'documentos_avulsos', id, competencia, nome_original, chave_storage FROM documentos_avulsos
-      WHERE empresa_id=$1 AND extrato_verificado_em IS NULL AND removido_em IS NULL AND descartado_em IS NULL AND nome_original ~* '\\.(pdf|ofx)$'
-     LIMIT 20`, [emp.id])).rows as { t: 'arquivos' | 'documentos_avulsos'; id: string; competencia: string; nome_original: string; chave_storage: string }[];
+    `SELECT 'arquivos' t, a.id, a.competencia, a.nome_original, a.chave_storage FROM arquivos a JOIN exigencias x ON x.id=a.exigencia_id
+      WHERE a.empresa_id=$1 AND a.extrato_verificado_em IS NULL AND a.situacao<>'substituido' AND a.descartado_em IS NULL AND a.nome_original ~* '\\.(pdf|ofx)$'
+        AND (x.nome || ' ' || coalesce(x.categoria,'')) ~* 'extrato'
+      LIMIT 20`, [emp.id])).rows as { t: 'arquivos'; id: string; competencia: string; nome_original: string; chave_storage: string }[];
   const resultados: NonNullable<Awaited<ReturnType<typeof importarDireto>>>[] = [];
   for (const a of pend) {
     let dados: Buffer | null = null;

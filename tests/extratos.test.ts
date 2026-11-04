@@ -404,3 +404,24 @@ describe('cliente e fornecedor do lançamento', () => {
     expect((await K.listarConciliacao(ua, empA, '2026-11'))[0]).toMatchObject({ conta_codigo: cod('REC003'), participante_id: p.id });
   });
 });
+
+describe('o que vai para a conciliação', () => {
+  it('só o documento pedido como extrato; "Outros documentos" e outros pedidos não; escritório pode excluir um extrato', async () => {
+    const D = await import('../src/lib/services/documentos');
+    const ofx = fx('exemplo_ofx_nao_oficial.ofx');
+    const exExtrato = await D.criarExigencia(admin, empA, { nome: 'Extrato conta corrente', instituicao: 'Banrisul', formatos: ['pdf', 'ofx'] });
+    const exNota = await D.criarExigencia(admin, empA, { nome: 'Notas de compra', formatos: ['pdf', 'ofx'] });
+    await D.enviarAvulsos(ua, { empresaId: empA, competencia: C, arquivos: [{ nome: 'extrato.pdf', dados: readFileSync('tests/fixtures/extratos-pdf/tabela_generica_ficticia.pdf') }] }); // extrato em "Outros documentos"
+    await D.enviarArquivo(ua, { empresaId: empA, exigenciaId: exNota, competencia: C, nome: 'nota.ofx', dados: ofx });
+    expect(await X.puxarExtratosDosDocumentos(ua, empA)).toEqual([]);
+    expect((await query('SELECT count(*)::int n FROM movimentacoes WHERE empresa_id=$1', [empA])).rows[0].n).toBe(0);
+    await D.enviarArquivo(ua, { empresaId: empA, exigenciaId: exExtrato, competencia: C, nome: 'extrato.ofx', dados: ofx });
+    const r = await X.puxarExtratosDosDocumentos(ua, empA);
+    expect(r.length).toBe(1); expect(r[0].gravadas).toBeGreaterThan(0);
+    const imp = (await query(`SELECT id FROM importacoes WHERE empresa_id=$1 AND status='confirmada'`, [empA])).rows[0].id;
+    await expect(X.excluirImportacao(ua, imp)).rejects.toThrow();
+    await X.excluirImportacao(admin, imp);
+    expect((await query('SELECT count(*)::int n FROM movimentacoes WHERE empresa_id=$1', [empA])).rows[0].n).toBe(0);
+    await expect(X.excluirImportacao(admin, imp)).rejects.toThrow(/não está na conciliação/);
+  });
+});

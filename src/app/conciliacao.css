@@ -187,3 +187,4 @@
 .conc .mais-pop .participante-novo{border:0;padding:0}
 .conc .part-nome .btn.link{padding:0 0 0 6px;font-size:12px}
 .conc .ed .campo>.part-nome,.conc .ed .campo>.falta-nota,.conc .ed .campo>.dica{display:block;margin-top:4px}
+.conc .excluir-extrato{display:inline;margin-left:8px}.conc .btn.link.perigo-txt{color:var(--erro);padding:0;font-size:12px}

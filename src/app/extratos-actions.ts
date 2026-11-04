@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { exigirUsuario } from '@/lib/session';
 import { executar, mensagemDeErro } from '@/lib/actions-util';
 import { AppError } from '@/lib/errors';
-import { cancelarImportacao, confirmarImportacao, criarConta, criarPrevia, definirContaAtiva, importarDireto, resumoImportacao, urlConciliacao } from '@/lib/services/extratos';
+import { cancelarImportacao, excluirImportacao, confirmarImportacao, criarConta, criarPrevia, definirContaAtiva, importarDireto, resumoImportacao, urlConciliacao } from '@/lib/services/extratos';
 
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? '');
 const baseDe = (papel: string, empresaId: string) => (papel === 'admin' ? `/admin/empresas/${empresaId}/extratos` : `/cliente/${empresaId}/extratos`);
@@ -33,6 +33,10 @@ export async function acaoCancelarImportacao(fd: FormData) {
   await executar(`${baseDe(u.papel, empresaId)}?competencia=${competencia}`, 'Importação cancelada. Nada foi gravado.', () => cancelarImportacao(u, s(fd, 'id')));
 }
 /* --- somente escritório --- */
+export async function acaoExcluirImportacao(fd: FormData) {
+  const u = await exigirUsuario('admin'); const empresaId = s(fd, 'empresaId'), competencia = s(fd, 'competencia');
+  await executar(`${baseDe(u.papel, empresaId)}?competencia=${competencia}`, 'Extrato retirado da conciliação.', () => excluirImportacao(u, s(fd, 'id')));
+}
 export async function acaoCriarConta(fd: FormData) {
   const u = await exigirUsuario('admin'); const e = s(fd, 'empresaId');
   await executar(`/admin/empresas/${e}/extratos`, 'Conta cadastrada.', () => criarConta(u, e, { banco: s(fd, 'banco'), apelido: s(fd, 'apelido'), agencia: s(fd, 'agencia'), conta: s(fd, 'conta') }));
