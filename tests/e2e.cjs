@@ -31,6 +31,12 @@ const ok = (c, m) => { console.log((c ? 'OK   ' : 'FALHA'), m); if (!c) process.
   await cli.goto(B + '/login'); await cli.fill('#email', 'alfa@cliente.com'); await cli.fill('#senha', 'Provisoria#Sol2026'); await cli.click('button');
   await cli.waitForURL('**/trocar-senha'); await cli.fill('#atual', 'Provisoria#Sol2026'); await cli.fill('#nova', 'Cavalo#Verde2026!'); await cli.fill('#confirma', 'Cavalo#Verde2026!'); await cli.click('button');
   await cli.waitForURL(/\/cliente\/[0-9a-f-]{36}/); ok(await cli.locator('h1.ola:has-text("Empresa Alfa Ltda")').count() > 0 && await cli.locator('text=Empresa Beta').count() === 0, 'cliente vê somente a Alfa');
+  // manual em vídeo: cliente vê as aulas dele, escritório vê todas, sem login não abre; o vídeo é servido em partes (Range)
+  await cli.goto(B + '/ajuda'); ok(await cli.locator('article.aula video').count() === 6 && await cli.locator('text=Para o escritório').count() === 0, 'Ajuda: cliente vê só as 6 aulas dele');
+  const rv = await cli.request.get(B + '/ajuda-videos/c1-primeiro-acesso.mp4', { headers: { Range: 'bytes=0-99' } }); ok(rv.status() === 206 && /video\/mp4/.test(rv.headers()['content-type']), 'Ajuda: vídeo mp4 servido em partes');
+  await adm.goto(B + '/ajuda'); ok(await adm.locator('article.aula video').count() === 11 && await adm.locator('h2:has-text("Para o escritório")').count() === 1, 'Ajuda: escritório vê as 11 aulas');
+  const anon = await (await br.newContext()).newPage(); await anon.goto(B + '/ajuda'); ok(anon.url().includes('/login'), 'Ajuda: sem login volta para o login');
+  ok(await cli.locator('header.top a:has-text("Ajuda")').count() === 1, 'link Ajuda no topo');
   const r1 = await cli.goto(B + '/cliente/' + idBeta.split('/').pop()); ok(r1.status() === 404, 'cliente -> empresa Beta = 404 (' + r1.status() + ')');
   const r2 = await cli.goto(B + idBeta); ok(!(await cli.url()).includes('/admin/empresas/') , 'cliente barrado em /admin (' + cli.url() + ')');
   await cli.goto(B + '/admin/auditoria'); ok(!cli.url().includes('/admin/auditoria'), 'cliente não vê auditoria');
