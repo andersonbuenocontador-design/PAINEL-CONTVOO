@@ -7,8 +7,8 @@ import type { Actor } from '../src/lib/errors';
 
 let admin: Actor, ua: Actor, ub: Actor, empA: string, empB: string;
 const C = '2026-10';
-const l = (o: Partial<{ data: string; socio: string; tipo: 'pro_labore' | 'lucros' | 'outras'; valor: string; observacao: string }> = {}) =>
-  ({ data: '2026-10-05', socio: 'Maria Souza', tipo: 'pro_labore' as const, valor: '1.500,00', ...o });
+const l = (o: Partial<{ data: string; socio: string; tipo: 'lucros'; valor: string; observacao: string }> = {}) =>
+  ({ data: '2026-10-05', socio: 'Maria Souza', tipo: 'lucros' as const, valor: '1.500,00', ...o });
 
 beforeEach(async () => {
   for (const t of ['no_update', 'no_truncate']) await query(`ALTER TABLE auditoria DISABLE TRIGGER auditoria_${t}`);
@@ -31,10 +31,10 @@ describe('retiradas dos sócios (o cliente informa)', () => {
   it('cliente lança, vê totais por sócio e tipo; nomes viram sugestão', async () => {
     await lancarRetirada(ua, empA, C, l());
     await lancarRetirada(ua, empA, C, l({ tipo: 'lucros', valor: '10.000,00', data: '2026-10-20' }));
-    await lancarRetirada(ua, empA, C, l({ socio: 'João Lima', tipo: 'outras', valor: '250,50', observacao: 'PIX' }));
+    await lancarRetirada(ua, empA, C, l({ socio: 'João Lima', valor: '250,50', observacao: 'PIX' }));
     const r = await listarRetiradas(admin, empA, C);
     expect(r.itens).toHaveLength(3); expect(r.total).toBe(11750.5); expect(r.envio).toBeUndefined();
-    expect(r.totais.find((t) => t.socio === 'Maria Souza')).toMatchObject({ pro_labore: 1500, lucros: 10000, outras: 0, total: 11500 });
+    expect(r.totais.find((t) => t.socio === 'Maria Souza')).toMatchObject({ pro_labore: 0, lucros: 11500, outras: 0, total: 11500 });
     expect(await sugestoesSocios(ua, empA)).toEqual(['João Lima', 'Maria Souza']);
     expect((await listarRetiradas(ua, empA, '2026-09')).itens).toHaveLength(0);
   });
@@ -44,7 +44,8 @@ describe('retiradas dos sócios (o cliente informa)', () => {
     await expect(lancarRetirada(ua, empA, C, l({ valor: '0' }))).rejects.toThrow(/Valor inválido/);
     await expect(lancarRetirada(ua, empA, C, l({ valor: 'mil reais' }))).rejects.toThrow(/Valor inválido/);
     await expect(lancarRetirada(ua, empA, C, l({ socio: ' ' }))).rejects.toThrow(/nome do sócio/);
-    await expect(lancarRetirada(ua, empA, C, { ...l(), tipo: 'salario' as 'outras' })).rejects.toThrow(/tipo/);
+    await expect(lancarRetirada(ua, empA, C, { ...l(), tipo: 'salario' as 'lucros' })).rejects.toThrow(/distribuição de lucros/);
+    for (const t of ['pro_labore', 'outras']) await expect(lancarRetirada(ua, empA, C, { ...l(), tipo: t as 'lucros' })).rejects.toThrow(/só se informa distribuição de lucros/);
     expect((await listarRetiradas(ua, empA, C)).itens).toHaveLength(0);
   });
   it('cliente de outra empresa não vê nem mexe', async () => {

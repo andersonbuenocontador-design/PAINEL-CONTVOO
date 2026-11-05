@@ -19,7 +19,8 @@ export function valorBR(t: string): number {
 const lancamento = z.object({
   data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Informe a data.'),
   socio: z.string().trim().min(2, 'Informe o nome do sócio.').max(120, 'Nome do sócio muito longo.'),
-  tipo: z.enum(['pro_labore', 'lucros', 'outras'], { message: 'Escolha o tipo da retirada.' }),
+  // a pedido do escritório, só se lança distribuição de lucros (pró-labore e outras ficaram de fora; os rótulos seguem para os registros antigos)
+  tipo: z.enum(['lucros'], { message: 'Aqui só se informa distribuição de lucros.' }),
   valor: z.string().transform((v, ctx) => { const n = valorBR(v); if (!(n > 0) || n > 999_999_999) { ctx.addIssue({ code: 'custom', message: 'Valor inválido. Use, por exemplo, 1.500,00.' }); return z.NEVER; } return n; }),
   observacao: z.string().trim().max(200, 'Observação muito longa (máx. 200).').optional().transform((v) => v || null),
 });

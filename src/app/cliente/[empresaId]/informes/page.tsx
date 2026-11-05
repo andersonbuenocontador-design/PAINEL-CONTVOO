@@ -28,7 +28,7 @@ export default async function Retiradas({ params, searchParams }: { params: Prom
       <p>Por isso, solicitamos que todas as retiradas sejam informadas corretamente nesta aba, para que possamos acompanhar os valores mensais e realizar os procedimentos fiscais necessários.</p>
       <p>Em caso de dúvidas ou previsão de retiradas acima desse limite, <strong>entre em contato com nosso escritório antes de realizar a distribuição</strong>.</p>
     </section>
-    <p className="soon">Informe aqui tudo o que cada sócio retirou da empresa no mês: pró-labore, distribuição de lucros e outras retiradas. Depois clique em <strong>Enviar ao escritório</strong>.</p>
+    <p className="soon">Informe aqui toda distribuição de lucros feita a cada sócio no mês. Depois clique em <strong>Enviar ao escritório</strong>.</p>
     <CompetenciaSeletor atual={comp} />
     {r.envio && <div className="msg-ok">{r.envio.sem_retiradas ? 'Você informou que não houve retiradas' : 'Retiradas enviadas ao escritório'} em {new Date(r.envio.enviado_em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}. Para corrigir, fale com o escritório.</div>}
     {aberto && <div className="card"><h2>Lançar retirada de {mes}/{ano}</h2>
@@ -37,7 +37,7 @@ export default async function Retiradas({ params, searchParams }: { params: Prom
           <div><label htmlFor="data">Data *</label><input id="data" name="data" type="date" required min={`${comp}-01`} max={fimDoMes(comp)} /></div>
           <div><label htmlFor="socio">Sócio *</label><input id="socio" name="socio" list="socios" required minLength={2} maxLength={120} placeholder="Nome do sócio" />
             <datalist id="socios">{nomes.map((n) => <option key={n} value={n} />)}</datalist></div>
-          <div><label htmlFor="tipo">Tipo *</label><select id="tipo" name="tipo" required defaultValue="">{<option value="" disabled>Escolha…</option>}{Object.entries(TIPOS_RETIRADA).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
+          <div><label htmlFor="tipo">Tipo *</label><select id="tipo" name="tipo" required defaultValue="lucros"><option value="lucros">{TIPOS_RETIRADA.lucros}</option></select></div>
           <div><label htmlFor="valor">Valor (R$) *</label><input id="valor" name="valor" required inputMode="decimal" placeholder="1.500,00" /></div>
           <div><label htmlFor="observacao">Observação</label><input id="observacao" name="observacao" maxLength={200} placeholder="Opcional (ex.: PIX, conta pessoal)" /></div>
         </div><p><button>Lançar retirada</button></p></form></div>}
@@ -47,9 +47,9 @@ export default async function Retiradas({ params, searchParams }: { params: Prom
           <td>{aberto && <form action={acaoRemoverRetirada}>{ocultos}<input type="hidden" name="id" value={i.id} /><button className="sec">Excluir</button></form>}</td></tr>))}
         {!r.itens.length && <tr><td colSpan={6} className="soon">{r.envio?.sem_retiradas ? 'Não houve retiradas neste mês.' : 'Nenhuma retirada lançada neste mês.'}</td></tr>}
       </tbody></table>
-      {r.totais.length > 0 && <><h3>Total por sócio</h3><table><thead><tr><th>Sócio</th><th style={{ textAlign: 'right' }}>Pró-labore</th><th style={{ textAlign: 'right' }}>Lucros</th><th style={{ textAlign: 'right' }}>Outras</th><th style={{ textAlign: 'right' }}>Total</th></tr></thead><tbody>
-        {r.totais.map((t) => <tr key={t.socio}><td>{t.socio}</td><td style={{ textAlign: 'right' }}>{brl(t.pro_labore)}</td><td style={{ textAlign: 'right' }}>{brl(t.lucros)}</td><td style={{ textAlign: 'right' }}>{brl(t.outras)}</td><td style={{ textAlign: 'right' }}><strong>{brl(t.total)}</strong></td></tr>)}
-        <tr><td><strong>Total do mês</strong></td><td colSpan={3}></td><td style={{ textAlign: 'right' }}><strong>{brl(r.total)}</strong></td></tr></tbody></table></>}
+      {r.totais.length > 0 && <><h3>Total por sócio</h3><table><thead><tr><th>Sócio</th><th style={{ textAlign: 'right' }}>Distribuição de lucros</th></tr></thead><tbody>
+        {r.totais.map((t) => <tr key={t.socio}><td>{t.socio}</td><td style={{ textAlign: 'right' }}><strong>{brl(t.total)}</strong></td></tr>)}
+        <tr><td><strong>Total do mês</strong></td><td style={{ textAlign: 'right' }}><strong>{brl(r.total)}</strong></td></tr></tbody></table></>}
       <div className="row" style={{ marginTop: 12 }}>
         {aberto && r.itens.length > 0 && <form action={acaoEnviarRetiradas}>{ocultos}<button>Enviar ao escritório</button></form>}
         {aberto && !r.itens.length && <form action={acaoEnviarRetiradas}>{ocultos}<input type="hidden" name="sem" value="1" /><button className="sec">Não houve retiradas neste mês</button></form>}
