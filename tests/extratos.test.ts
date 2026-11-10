@@ -537,3 +537,18 @@ describe('cliente apaga os extratos do mês', () => {
     expect((await K.listarConciliacao(ua, empA, C)).length).toBeGreaterThan(0);
   });
 });
+
+describe('salvar no editor confirma a linha', () => {
+  it('linha com categoria sugerida (Baixa/Média) vira Alta e revisada ao salvar sem trocar a categoria; sem categoria continua como está', async () => {
+    await K.importarPlano(admin, empA, PLANO);
+    await importar(ua, empA, contaA, 'a.csv', csv(['03/10/2026;PIX CLIENTE SOLANGE;110,00', '04/10/2026;ALGO ESTRANHO;-5,00']));
+    const [a, b] = await K.listarConciliacao(ua, empA, C);
+    await query(`UPDATE movimentacoes SET conta_codigo=31, confianca='B', revisado=false WHERE id=$1`, [a.id]); // sugestão automática de baixa confiança
+    await query(`UPDATE movimentacoes SET conta_codigo=NULL, confianca='B', revisado=false WHERE id=$1`, [b.id]);
+    await K.editarLinha(ua, a.id, { contaCodigo: 31, notaFiscal: '', semNota: true, observacao: '' });
+    await K.editarLinha(ua, b.id, { observacao: 'ver com o cliente' });
+    const ls = await K.listarConciliacao(ua, empA, C);
+    expect(ls.find((l) => l.id === a.id)).toMatchObject({ conta_codigo: 31, confianca: 'A', revisado: true, sem_nota: true });
+    expect(ls.find((l) => l.id === b.id)).toMatchObject({ conta_codigo: null, confianca: 'B', revisado: false });
+  });
+});

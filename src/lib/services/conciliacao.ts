@@ -353,7 +353,7 @@ export async function confirmarLinhas(actor: Actor, idsIn: number[]) {
   });
   return ls.length;
 }
-/** Editor da linha: complemento e observação (e, se informada, a conta). */
+/** Editor da linha (botão Salvar): complemento, observação, nota e, se informada, a conta. Linha com categoria fica confirmada (Alta). */
 const notaSchema = z.string().trim().max(60, 'Número da nota muito longo.').regex(/^[\w./ -]*$/, 'Use só números, letras, ponto, barra ou hífen no número da nota.');
 export async function editarLinha(actor: Actor, id: number, input: { contaCodigo?: number | null; complemento?: string; observacao?: string; notaFiscal?: string; semNota?: boolean }) {
   const d = z.object({ contaCodigo: z.number().int().positive().nullish(), complemento: z.string().max(300).optional(), observacao: z.string().max(1000).optional(), notaFiscal: notaSchema.optional(), semNota: z.boolean().optional() }).parse(input);
@@ -367,7 +367,9 @@ export async function editarLinha(actor: Actor, id: number, input: { contaCodigo
     if (actor.papel === 'cliente') await c.query('UPDATE movimentacoes SET correcao_pedida=false WHERE id=$1', [id]);
     await registrar(c, { usuarioId: actor.id, empresaId: l.empresaId, acao: 'conciliacao.editar', entidade: 'movimentacao', entidadeId: String(id) });
   });
+  // Salvar no editor = a pessoa conferiu a linha: com categoria, vira confiança Alta (revisada) e ensina o sistema.
   if (d.contaCodigo && d.contaCodigo !== l.conta) await classificarEmLote(actor, [id], d.contaCodigo);
+  else if (l.conta != null) await confirmarLinhas(actor, [id]);
 }
 
 /** Excluir lançamentos um a um ou em lote (ex.: linha que não é da empresa). Fica registrado na auditoria com data, descrição e valor.
