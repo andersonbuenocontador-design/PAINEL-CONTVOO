@@ -46,7 +46,7 @@ export default async function DocumentosCliente({ params, searchParams }: { para
               {i.situacao === 'enviado' && <ExcluirArquivo id={i.arquivo_id} empresaId={empresaId} competencia={comp} nome={i.nome_original} />}</div>}
             {i.situacao === 'rejeitado' && <div className="msg-err doc-motivo">Motivo: {i.motivo_rejeicao}</div>}
           </div>
-          <div className="doc-acao">{i.situacao === 'aprovado' ? <span className="doc-aprovado">Aprovado</span> : (
+          <div className="doc-acao">{i.situacao === 'aprovado' ? <><span className="doc-aprovado">Aprovado</span><div className="soon">Enviou o arquivo errado? Fale com o escritório para reabrir este documento.</div></> : (
             <form action={acaoEnviarArquivo} className="doc-envio"><input type="hidden" name="empresaId" value={empresaId} /><input type="hidden" name="competencia" value={comp} /><input type="hidden" name="exigenciaId" value={i.exigencia_id} />
               <input type="file" name="arquivo" required accept={i.formatos.map((f: string) => '.' + f).join(',')} aria-label={`Arquivo de ${i.nome}`} />
               <button className={i.arquivo_id ? 'sec' : ''}>{i.arquivo_id ? 'Enviar novo arquivo' : 'Enviar arquivo'}</button></form>)}</div>

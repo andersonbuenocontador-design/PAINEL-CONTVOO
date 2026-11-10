@@ -201,6 +201,34 @@ export async function importarDireto(actor: Actor, p: { empresaId: string; conta
   return { competencia, contaId, gravadas: r.gravadas, jaExistiam: res.duplicadasCertas + res.duplicadasPossiveis, outroMes: res.foraPeriodo, banco: prev.conta?.banco as string | undefined, saldoConfere: res.conferenciaSaldo?.confere ?? null };
 }
 
+/** Barra extrato do período errado: se nenhum lançamento cai no mês pedido, o cliente provavelmente escolheu o arquivo errado.
+ *  Arquivo ilegível ou sem lançamentos passa (o escritório confere). */
+export async function conferirPeriodoExtrato(nome: string, dados: Buffer, competencia: string) {
+  let datas: string[];
+  try { datas = (await lerExtrato(nome, dados)).movimentos.map((m) => m.data).filter(Boolean).sort(); } catch { return; }
+  if (!datas.length || datas.some((d) => d.slice(0, 7) === competencia)) return;
+  const br = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
+  const mes = (c: string) => `${c.slice(5, 7)}/${c.slice(0, 4)}`;
+  throw new AppError(`Este extrato é de outro período (${br(datas[0])} a ${br(datas[datas.length - 1])}), mas você está enviando o documento de ${mes(competencia)}. Confira se escolheu o arquivo certo. Se ele for mesmo de outro mês, troque o mês no topo da página antes de enviar.`);
+}
+
+/** Escritório: tira da conciliação os lançamentos importados de um arquivo (ex.: extrato do período errado aprovado por engano). */
+export async function retirarLancamentosDoArquivo(actor: Actor, arquivoId: string) {
+  exigirAdmin(actor);
+  const a = (await query('SELECT * FROM arquivos WHERE id=$1', [arquivoId])).rows[0];
+  if (!a) throw new AppError('Arquivo não encontrado.', 'nao_encontrado');
+  return tx(async (c) => {
+    const imps = (await c.query(`SELECT id FROM importacoes WHERE empresa_id=$1 AND sha256=$2 AND status='confirmada'`, [a.empresa_id, a.sha256])).rows;
+    let lancamentos = 0;
+    for (const i of imps) {
+      lancamentos += (await c.query('DELETE FROM movimentacoes WHERE importacao_id=$1', [i.id])).rowCount ?? 0;
+      await c.query(`UPDATE importacoes SET status='cancelada' WHERE id=$1`, [i.id]);
+    }
+    await registrar(c, { usuarioId: actor.id, empresaId: a.empresa_id, acao: 'arquivo.retirar_lancamentos', entidade: 'arquivo', entidadeId: a.id, detalhes: { nome: a.nome_original, lancamentos_retirados: lancamentos } });
+    return lancamentos;
+  });
+}
+
 /** Frase para o usuário depois do envio direto. */
 export function resumoImportacao(r: Awaited<ReturnType<typeof importarDireto>>, mesPedido?: string) {
   const mes = (c: string) => `${c.slice(5)}/${c.slice(0, 4)}`;

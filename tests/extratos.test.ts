@@ -480,3 +480,28 @@ describe('cliente exclui o documento que enviou', () => {
     await expect(X.excluirArquivoEnviado(ua, arq2)).rejects.toThrow(/já foi aprovado/);
   });
 });
+
+describe('extrato do período errado', () => {
+  it('cliente é barrado ao enviar extrato de outro mês; arquivo ilegível passa', async () => {
+    const ofx = fx('exemplo_ofx_nao_oficial.ofx'); // lançamentos de 10/2026
+    await expect(X.conferirPeriodoExtrato('a.ofx', ofx, '2026-10')).resolves.toBeUndefined();
+    await expect(X.conferirPeriodoExtrato('a.ofx', ofx, '2025-10')).rejects.toThrow(/outro período \(01\/10\/2026 a .*10\/2026\).*10\/2025/);
+    await expect(X.conferirPeriodoExtrato('a.pdf', Buffer.from('%PDF-1'), '2025-10')).resolves.toBeUndefined();
+  });
+  it('escritório desfaz aprovação e retira os lançamentos do extrato errado da conciliação', async () => {
+    const D = await import('../src/lib/services/documentos');
+    const ofx = fx('exemplo_ofx_nao_oficial.ofx');
+    const ex = await D.criarExigencia(admin, empA, { nome: 'Extrato conta corrente', formatos: ['ofx'] });
+    const arq = await D.enviarArquivo(ua, { empresaId: empA, exigenciaId: ex, competencia: C, nome: 'extrato.ofx', dados: ofx });
+    await X.puxarExtratosDosDocumentos(ua, empA);
+    const antes = (await K.listarConciliacao(ua, empA, C)).length;
+    expect(antes).toBeGreaterThan(0);
+    await D.conferirArquivo(admin, arq, 'aprovado');
+    await expect(X.retirarLancamentosDoArquivo(ua, arq)).rejects.toMatchObject({ code: 'proibido' });
+    await D.conferirArquivo(admin, arq, 'rejeitado', 'Período errado');
+    expect(await X.retirarLancamentosDoArquivo(admin, arq)).toBe(antes);
+    expect((await K.listarConciliacao(ua, empA, C)).length).toBe(0);
+    const novo = await D.enviarArquivo(ua, { empresaId: empA, exigenciaId: ex, competencia: C, nome: 'extrato.ofx', dados: ofx });
+    expect(novo).toBeTruthy();
+  });
+});

@@ -5,6 +5,7 @@ import { cobrarDocumentos } from '@/lib/services/cobranca';
 import { executar, mensagemDeErro } from '@/lib/actions-util';
 import { aplicarModelo, conferirArquivo, criarExigencia, criarModeloDeEmpresa, definirExigenciaAtiva, editarExigencia, enviarArquivo, removerAvulso } from '@/lib/services/documentos';
 import { AppError } from '@/lib/errors';
+import { retirarLancamentosDoArquivo } from '@/lib/services/extratos';
 
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? '');
 const item = (fd: FormData) => ({
@@ -34,7 +35,11 @@ export async function acaoAplicarModelo(fd: FormData) {
 export async function acaoConferir(fd: FormData) {
   const a = await exigirUsuario('admin'); const e = s(fd, 'empresaId'); const c = s(fd, 'competencia');
   const d = s(fd, 'decisao') as 'em_conferencia' | 'aprovado' | 'rejeitado';
-  await executar(`/admin/empresas/${e}/documentos?competencia=${c}`, 'Conferência registrada.', () => conferirArquivo(a, s(fd, 'arquivoId'), d, s(fd, 'motivo')));
+  const retirar = s(fd, 'retirarLancamentos') === 'on';
+  await executar(`/admin/empresas/${e}/documentos?competencia=${c}`, retirar ? 'Conferência registrada e lançamentos do arquivo retirados da conciliação.' : 'Conferência registrada.', async () => {
+    await conferirArquivo(a, s(fd, 'arquivoId'), d, s(fd, 'motivo'));
+    if (retirar) await retirarLancamentosDoArquivo(a, s(fd, 'arquivoId'));
+  });
 }
 export async function acaoEnviarPeloEscritorio(fd: FormData) {
   const a = await exigirUsuario('admin'); const e = s(fd, 'empresaId'); const c = s(fd, 'competencia');

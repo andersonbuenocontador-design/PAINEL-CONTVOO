@@ -4,7 +4,7 @@ import { exigirUsuario } from '@/lib/session';
 import { executar, mensagemDeErro } from '@/lib/actions-util';
 import { AppError } from '@/lib/errors';
 import { enviarArquivo, enviarAvulsos, exigenciaEhExtrato, removerAvulso } from '@/lib/services/documentos';
-import { excluirArquivoEnviado, importarDireto, marcarExtratoVerificado, resumoImportacao, urlConciliacao } from '@/lib/services/extratos';
+import { conferirPeriodoExtrato, excluirArquivoEnviado, importarDireto, marcarExtratoVerificado, resumoImportacao, urlConciliacao } from '@/lib/services/extratos';
 
 export async function acaoEnviarArquivo(fd: FormData) {
   const u = await exigirUsuario('cliente');
@@ -23,6 +23,7 @@ export async function acaoEnviarArquivo(fd: FormData) {
   }
   // Extrato bancário: os lançamentos vão direto para a conciliação e o arquivo fica registrado como documento entregue
   const dados = Buffer.from(await f.arrayBuffer());
+  try { await conferirPeriodoExtrato(f.name, dados, competencia); } catch (e) { redirect(`${voltar}&erro=${encodeURIComponent(mensagemDeErro(e))}`); }
   let imp: Awaited<ReturnType<typeof importarDireto>> | null = null, erroLeitura = '', erroArquivo = '';
   try { imp = await importarDireto(u, { empresaId, competencia, nome: f.name, dados }); } catch (e) { erroLeitura = mensagemDeErro(e); }
   try { await marcarExtratoVerificado('arquivos', await enviarArquivo(u, { empresaId, exigenciaId, competencia, nome: f.name, dados })); } catch (e) { erroArquivo = mensagemDeErro(e); }
