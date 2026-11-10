@@ -2,10 +2,12 @@ import { notFound } from 'next/navigation';
 import { exigirUsuario } from '@/lib/session';
 import { obterEmpresa } from '@/lib/services/empresas';
 import { listarAvulsos, situacaoCompetencia } from '@/lib/services/documentos';
+import { contarExtratosDoMes } from '@/lib/services/extratos';
 import { AppError } from '@/lib/errors';
 import { Avisos, CompetenciaSeletor, ROTULO, Topo, competenciaDe } from '../../../components';
 import { acaoEnviarArquivo, acaoEnviarAvulsos, acaoRemoverAvulso } from '../../actions';
 import { ExcluirArquivo } from '../../ExcluirArquivo';
+import { ApagarExtratosMes } from '../../ApagarExtratosMes';
 
 
 export default async function DocumentosCliente({ params, searchParams }: { params: Promise<{ empresaId: string }>; searchParams: Promise<{ competencia?: string; erro?: string; ok?: string }> }) {
@@ -14,7 +16,7 @@ export default async function DocumentosCliente({ params, searchParams }: { para
   const comp = competenciaDe(sp.competencia);
   let e, s;
   try { e = await obterEmpresa(u, empresaId); s = await situacaoCompetencia(u, empresaId, comp); } catch (x) { if (x instanceof AppError) notFound(); throw x; }
-  const [ano, mes] = comp.split('-'); const ind = s.indicadores; const avulsos = await listarAvulsos(u, empresaId, comp);
+  const [ano, mes] = comp.split('-'); const ind = s.indicadores; const [avulsos, ext] = await Promise.all([listarAvulsos(u, empresaId, comp), contarExtratosDoMes(u, empresaId, comp)]);
   const ICONE_ST: Record<string, React.ReactNode> = {
     aprovado: <path d="m5 12.5 4.5 4.5L19 7.5" />,
     rejeitado: <path d="M7 7l10 10M17 7 7 17" />,
@@ -54,6 +56,10 @@ export default async function DocumentosCliente({ params, searchParams }: { para
         {!s.itens.length && <li className="soon docs-vazio">Nenhum documento pedido nesta competência.</li>}
       </ul>
     </section>
+
+    {(ext.extratos > 0 || ext.lancamentos > 0) && <section className="card" aria-labelledby="apagar-ext-t"><h2 id="apagar-ext-t">Enviou extrato errado?</h2>
+      <p className="soon">Apaga todos os extratos enviados em {mes}/{ano} ({ext.extratos}), mesmo os já aprovados, e a conciliação do mês ({ext.lancamentos} lançamento(s)). Depois é só enviar os extratos certos.</p>
+      <ApagarExtratosMes empresaId={empresaId} competencia={comp} extratos={ext.extratos} lancamentos={ext.lancamentos} /></section>}
 
     <section className="card" id="outros" aria-labelledby="outros-t"><h2 id="outros-t">Outros documentos (PDF)</h2>
       <p className="soon">Envie aqui qualquer outro PDF para o escritório (notas, recibos, contratos, guias…). Pode selecionar vários de uma vez, até 20 MB no total.</p>

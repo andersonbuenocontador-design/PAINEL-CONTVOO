@@ -505,3 +505,35 @@ describe('extrato do período errado', () => {
     expect(novo).toBeTruthy();
   });
 });
+
+describe('cliente apaga os extratos do mês', () => {
+  it('apaga extratos (inclusive aprovado), lançamentos e a conciliação do mês; documento volta a pendente', async () => {
+    const D = await import('../src/lib/services/documentos');
+    const ofx = fx('exemplo_ofx_nao_oficial.ofx');
+    const ex = await D.criarExigencia(admin, empA, { nome: 'Extrato conta corrente', formatos: ['ofx'] });
+    const outro = await D.criarExigencia(admin, empA, { nome: 'Folha de pagamento', formatos: ['pdf'] });
+    const arq = await D.enviarArquivo(ua, { empresaId: empA, exigenciaId: ex, competencia: C, nome: 'extrato.ofx', dados: ofx });
+    await D.enviarArquivo(ua, { empresaId: empA, exigenciaId: outro, competencia: C, nome: 'folha.pdf', dados: Buffer.from('%PDF-1.4 x') });
+    await X.puxarExtratosDosDocumentos(ua, empA);
+    await D.conferirArquivo(admin, arq, 'aprovado');
+    const n = (await K.listarConciliacao(ua, empA, C)).length;
+    expect(await X.contarExtratosDoMes(ua, empA, C)).toEqual({ extratos: 1, lancamentos: n });
+    await expect(X.apagarExtratosDoMes(ub, empA, C)).rejects.toThrow(/não encontrad/);
+    expect(await X.apagarExtratosDoMes(ua, empA, C)).toEqual({ extratos: 1, lancamentos: n });
+    expect((await K.listarConciliacao(ua, empA, C)).length).toBe(0);
+    const s = await D.situacaoCompetencia(ua, empA, C);
+    expect(s.itens.find((i) => i.exigencia_id === ex)!.situacao).toBe('pendente');
+    expect(s.itens.find((i) => i.exigencia_id === outro)!.situacao).toBe('enviado'); // outros documentos ficam
+    expect(await X.contarExtratosDoMes(ua, empA, C)).toEqual({ extratos: 0, lancamentos: 0 });
+    await expect(D.enviarArquivo(ua, { empresaId: empA, exigenciaId: ex, competencia: C, nome: 'extrato.ofx', dados: ofx })).resolves.toBeTruthy();
+  });
+  it('cliente não apaga se a conciliação já foi concluída pelo escritório', async () => {
+    const D = await import('../src/lib/services/documentos');
+    const ex = await D.criarExigencia(admin, empA, { nome: 'Extrato', formatos: ['ofx'] });
+    await D.enviarArquivo(ua, { empresaId: empA, exigenciaId: ex, competencia: C, nome: 'extrato.ofx', dados: fx('exemplo_ofx_nao_oficial.ofx') });
+    await X.puxarExtratosDosDocumentos(ua, empA);
+    await query(`INSERT INTO conciliacoes(empresa_id,competencia,status) VALUES ($1,$2,'concluida') ON CONFLICT (empresa_id,competencia) DO UPDATE SET status='concluida'`, [empA, C]);
+    await expect(X.apagarExtratosDoMes(ua, empA, C)).rejects.toThrow(/concluída/);
+    expect((await K.listarConciliacao(ua, empA, C)).length).toBeGreaterThan(0);
+  });
+});

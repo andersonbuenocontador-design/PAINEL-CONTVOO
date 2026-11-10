@@ -229,6 +229,49 @@ export async function retirarLancamentosDoArquivo(actor: Actor, arquivoId: strin
   });
 }
 
+/** Extratos do mês (Documentos do mês com "extrato" no nome/categoria + PDFs avulsos que viraram importação). */
+type Runner = Pick<import('pg').PoolClient, 'query'>;
+async function extratosDoMes(r: Runner, empresaId: string, competencia: string) {
+  const arquivos = (await r.query(
+    `SELECT a.id, a.sha256, a.chave_storage, a.situacao FROM arquivos a JOIN exigencias x ON x.id=a.exigencia_id
+      WHERE a.empresa_id=$1 AND a.competencia=$2 AND (x.nome || ' ' || coalesce(x.categoria,'')) ~* 'extrato'`, [empresaId, competencia])).rows;
+  const avulsos = (await r.query(
+    `SELECT d.id, d.sha256, d.chave_storage FROM documentos_avulsos d
+      WHERE d.empresa_id=$1 AND d.competencia=$2 AND d.sha256 IN (SELECT sha256 FROM importacoes WHERE empresa_id=$1 AND status='confirmada')`, [empresaId, competencia])).rows;
+  return { arquivos, avulsos };
+}
+export async function contarExtratosDoMes(actor: Actor, empresaId: string, competencia: string) {
+  const emp = await obterEmpresa(actor, empresaId); competenciaSchema.parse(competencia);
+  const { arquivos, avulsos } = await extratosDoMes({ query } as unknown as Runner, emp.id, competencia);
+  const lancamentos = Number((await query('SELECT count(*) n FROM movimentacoes WHERE empresa_id=$1 AND competencia=$2', [emp.id, competencia])).rows[0].n);
+  return { extratos: arquivos.filter((a) => a.situacao !== 'substituido').length + avulsos.length, lancamentos };
+}
+
+/** Cliente (ou escritório) apaga todos os extratos enviados no mês, mesmo aprovados, e zera a conciliação do mês.
+ *  Também tira lançamentos desses extratos que tenham ido para outro mês (ex.: extrato do período errado).
+ *  Para o cliente, só enquanto a conciliação não foi enviada ao escritório nem concluída. */
+export async function apagarExtratosDoMes(actor: Actor, empresaId: string, competencia: string) {
+  const emp = await obterEmpresa(actor, empresaId); competenciaSchema.parse(competencia);
+  const r = await tx(async (c) => {
+    const { arquivos, avulsos } = await extratosDoMes(c, emp.id, competencia);
+    const shas = [...new Set([...arquivos, ...avulsos].map((a) => a.sha256 as string))];
+    const imps = (await c.query(`SELECT id, competencia FROM importacoes WHERE empresa_id=$1 AND (competencia=$2 OR sha256 = ANY($3::char(64)[]))`, [emp.id, competencia, shas])).rows;
+    const comps = new Set<string>([competencia, ...imps.map((i) => i.competencia as string)]);
+    for (const comp of comps) await exigirEditavel(actor, emp.id, comp, c);
+    const ids = imps.map((i) => i.id as string);
+    const lancamentos = ids.length ? (await c.query('DELETE FROM movimentacoes WHERE importacao_id = ANY($1::uuid[])', [ids])).rowCount ?? 0 : 0;
+    if (ids.length) await c.query('DELETE FROM importacoes WHERE id = ANY($1::uuid[])', [ids]);
+    await c.query('DELETE FROM conciliacoes WHERE empresa_id=$1 AND competencia=$2', [emp.id, competencia]);
+    if (arquivos.length) await c.query('DELETE FROM arquivos WHERE id = ANY($1::uuid[])', [arquivos.map((a) => a.id)]);
+    if (avulsos.length) await c.query('DELETE FROM documentos_avulsos WHERE id = ANY($1::uuid[])', [avulsos.map((a) => a.id)]);
+    await registrar(c, { usuarioId: actor.id, empresaId: emp.id, acao: 'extratos.apagar_mes', entidade: 'empresa', entidadeId: emp.id,
+      detalhes: { competencia, arquivos: arquivos.length, avulsos: avulsos.length, aprovados: arquivos.filter((a) => a.situacao === 'aprovado').length, lancamentos, outros_meses: [...comps].filter((x) => x !== competencia) } });
+    return { extratos: arquivos.filter((a) => a.situacao !== 'substituido').length + avulsos.length, lancamentos, chaves: [...arquivos, ...avulsos].map((a) => a.chave_storage as string) };
+  });
+  for (const k of r.chaves) await apagar(k).catch(() => {});
+  return { extratos: r.extratos, lancamentos: r.lancamentos };
+}
+
 /** Frase para o usuário depois do envio direto. */
 export function resumoImportacao(r: Awaited<ReturnType<typeof importarDireto>>, mesPedido?: string) {
   const mes = (c: string) => `${c.slice(5)}/${c.slice(0, 4)}`;

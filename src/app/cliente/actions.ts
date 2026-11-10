@@ -4,7 +4,7 @@ import { exigirUsuario } from '@/lib/session';
 import { executar, mensagemDeErro } from '@/lib/actions-util';
 import { AppError } from '@/lib/errors';
 import { enviarArquivo, enviarAvulsos, exigenciaEhExtrato, removerAvulso } from '@/lib/services/documentos';
-import { conferirPeriodoExtrato, excluirArquivoEnviado, importarDireto, marcarExtratoVerificado, resumoImportacao, urlConciliacao } from '@/lib/services/extratos';
+import { apagarExtratosDoMes, conferirPeriodoExtrato, excluirArquivoEnviado, importarDireto, marcarExtratoVerificado, resumoImportacao, urlConciliacao } from '@/lib/services/extratos';
 
 export async function acaoEnviarArquivo(fd: FormData) {
   const u = await exigirUsuario('cliente');
@@ -57,4 +57,9 @@ export async function acaoExcluirArquivo(fd: FormData) {
   const u = await exigirUsuario('cliente');
   const empresaId = String(fd.get('empresaId') ?? ''), competencia = String(fd.get('competencia') ?? '');
   await executar(`/cliente/${empresaId}/documentos?competencia=${competencia}`, 'Arquivo excluído. Se era extrato, os lançamentos dele saíram da conciliação.', () => excluirArquivoEnviado(u, String(fd.get('id') ?? '')));
+}
+export async function acaoApagarExtratosMes(fd: FormData) {
+  const u = await exigirUsuario('cliente');
+  const empresaId = String(fd.get('empresaId') ?? ''), competencia = String(fd.get('competencia') ?? '');
+  await executar(`/cliente/${empresaId}/documentos?competencia=${competencia}`, 'Extratos do mês e conciliação apagados. Você já pode enviar os extratos de novo.', () => apagarExtratosDoMes(u, empresaId, competencia));
 }
