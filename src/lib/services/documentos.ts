@@ -228,7 +228,7 @@ export async function conferirArquivo(actor: Actor, arquivoId: string, decisao: 
     const ultima = (await c.query('SELECT max(versao) v FROM arquivos WHERE exigencia_id=$1 AND competencia=$2', [a.exigencia_id, a.competencia])).rows[0].v;
     if (a.versao !== ultima || a.situacao === 'substituido') throw new AppError('Só a versão mais recente pode ser conferida.');
     await c.query(`UPDATE arquivos SET situacao=$2, motivo_rejeicao=$3, conferido_por=$4, conferido_em=now() WHERE id=$1`, [arquivoId, decisao, decisao === 'rejeitado' ? m : null, actor.id]);
-    await registrar(c, { usuarioId: actor.id, empresaId: a.empresa_id, acao: `arquivo.${decisao}`, entidade: 'arquivo', entidadeId: arquivoId, detalhes: decisao === 'rejeitado' ? { motivo: m } : {} });
+    await registrar(c, { usuarioId: actor.id, empresaId: a.empresa_id, acao: `arquivo.${decisao}`, entidade: 'arquivo', entidadeId: arquivoId, detalhes: { ...(decisao === 'rejeitado' ? { motivo: m } : {}), ...(a.situacao === 'aprovado' && decisao !== 'aprovado' ? { desfez_aprovacao: true } : {}) } });
   });
 }
 

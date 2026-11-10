@@ -95,6 +95,19 @@ describe('conferência', () => {
     await expect(enviarArquivo(ua, p)).rejects.toThrow(/já foi aprovado/);
     await expect(enviarArquivo(admin, p)).resolves.toBeTruthy();
   });
+  it('escritório desfaz aprovação feita por engano e cliente pode reenviar', async () => {
+    const p = { empresaId: empA, exigenciaId: exA, competencia: C, nome: 'a.pdf', dados: PDF };
+    const id1 = await enviarArquivo(ua, p);
+    await conferirArquivo(admin, id1, 'aprovado');
+    await expect(enviarArquivo(ua, p)).rejects.toThrow(/já foi aprovado/);
+    await conferirArquivo(admin, id1, 'rejeitado', 'Período errado');
+    const s = await situacaoCompetencia(ua, empA, C);
+    expect(s.itens[0]).toMatchObject({ situacao: 'rejeitado', motivo_rejeicao: 'Período errado' });
+    expect(s.indicadores.concluida).toBe(false);
+    const aud = (await query(`SELECT detalhes FROM auditoria WHERE acao='arquivo.rejeitado' AND entidade_id=$1`, [id1])).rows[0];
+    expect(aud.detalhes).toMatchObject({ motivo: 'Período errado', desfez_aprovacao: true });
+    await expect(enviarArquivo(ua, p)).resolves.toBeTruthy();
+  });
   it('opcional pendente não impede conclusão; obrigatório pendente impede', async () => {
     await criarExigencia(admin, empA, { nome: 'Relatório de vendas', formatos: ['pdf'], obrigatorio: false });
     const id = await enviarArquivo(ua, { empresaId: empA, exigenciaId: exA, competencia: C, nome: 'a.pdf', dados: PDF });
