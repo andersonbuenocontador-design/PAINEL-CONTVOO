@@ -14,6 +14,7 @@ import { acaoEditarEmpresa, acaoSituacaoEmpresa, acaoVincular, acaoCriarUsuario 
 
 const CONC = { revisao: ['Cliente preenchendo', 'neutro'], enviada: ['Aguardando sua conferência', 'conferir'], devolvida: ['Devolvida ao cliente', 'falta'], concluida: ['Concluída', 'ok'] } as const;
 const LUCROS = { atencao: ['Atenção', 'falta'], aguardando_extrato: ['Aguardando extrato', 'conferir'], ok: ['Tudo confere', 'ok'], sem_movimento: ['Sem movimento', 'neutro'] } as const;
+const fone = (w: string) => { const d = w.replace(/^55/, ''); return d.length >= 10 ? `(${d.slice(0, 2)}) ${d.slice(2, -4)}-${d.slice(-4)}` : w; };
 const brl = (c: number) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 /** Painel da empresa: tudo do mês num lugar só (documentos, conciliação, lucros, pendências), acessos e dados cadastrais recolhidos. */
@@ -96,6 +97,7 @@ export default async function EmpresaDetalhe({ params, searchParams }: { params:
           <div><dt>CNPJ</dt><dd>{formatarCnpj(e.cnpj)}</dd></div>
           {e.nome_fantasia && <div><dt>Nome fantasia</dt><dd>{e.nome_fantasia}</dd></div>}
           <div><dt>E-mail de contato</dt><dd>{e.email_contato || <span className="soon">—</span>}</dd></div>
+          <div><dt>WhatsApp</dt><dd>{e.whatsapp ? fone(e.whatsapp) : <span className="soon">— (cadastre para a cobrança pelo Digisac)</span>}</dd></div>
           <div><dt>Responsável</dt><dd>{responsavel || <span className="soon">—</span>}</dd></div>
           <div><dt>Início de uso</dt><dd>{e.inicio_uso ? new Date(e.inicio_uso).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : <span className="soon">—</span>}</dd></div>
         </dl>
@@ -105,6 +107,7 @@ export default async function EmpresaDetalhe({ params, searchParams }: { params:
             <div><label>Nome fantasia</label><input name="nomeFantasia" defaultValue={e.nome_fantasia ?? ''} /></div>
             <div><label>CNPJ *</label><input name="cnpj" defaultValue={e.cnpj} required /></div>
             <div><label>E-mail de contato</label><input name="emailContato" type="email" defaultValue={e.email_contato ?? ''} /></div>
+            <div><label>WhatsApp do cliente</label><input name="whatsapp" inputMode="tel" placeholder="(51) 99999-9999" defaultValue={e.whatsapp ?? ''} /></div>
             <div><label>Responsável</label><select name="responsavelId" defaultValue={e.responsavel_id ?? ''}><option value="">—</option>{admins.rows.map((a) => <option key={a.id} value={a.id}>{a.nome}</option>)}</select></div>
             <div><label>Início de uso</label><input name="inicioUso" type="date" defaultValue={e.inicio_uso ? new Date(e.inicio_uso).toISOString().slice(0, 10) : ''} /></div>
           </div><button>Salvar alterações</button></form>

@@ -8,7 +8,7 @@ import { criarUsuario, definirAtivo, redefinirSenha, vincular } from '@/lib/serv
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? '');
 const dadosEmpresa = (fd: FormData) => ({
   razaoSocial: s(fd, 'razaoSocial'), nomeFantasia: s(fd, 'nomeFantasia'), cnpj: s(fd, 'cnpj'),
-  emailContato: s(fd, 'emailContato'), responsavelId: s(fd, 'responsavelId') || null, inicioUso: s(fd, 'inicioUso'),
+  emailContato: s(fd, 'emailContato'), responsavelId: s(fd, 'responsavelId') || null, inicioUso: s(fd, 'inicioUso'), whatsapp: s(fd, 'whatsapp'),
 });
 
 export async function acaoCriarEmpresa(fd: FormData) {
