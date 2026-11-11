@@ -1,4 +1,5 @@
 import type pg from 'pg';
+import { enviarAoConciliador } from '../enviar-conciliador';
 import { z } from 'zod';
 import { query, tx } from '../db';
 import { chaveNormalizada } from '../chave';
@@ -238,6 +239,8 @@ export async function concluirConciliacao(actor: Actor, empresaId: string, compe
     await c.query(`UPDATE conciliacoes SET status='concluida',concluida_em=now(),atualizado_por=$3,atualizado_em=now() WHERE empresa_id=$1 AND competencia=$2`, [e.id, competencia, actor.id]);
     await registrar(c, { usuarioId: actor.id, empresaId: e.id, acao: 'conciliacao.concluir', entidade: 'conciliacao', entidadeId: `${e.id}:${competencia}`, detalhes: { competencia } });
   });
+  // leva a conciliação concluída ao Conciliador Contvoo (Integrador); falha aqui não desfaz a conclusão
+  await enviarAoConciliador(e, competencia, await listarConciliacao(actor, e.id, competencia));
 }
 export async function reabrirConciliacao(actor: Actor, empresaId: string, competencia: string) {
   exigirAdmin(actor); const e = await obterEmpresa(actor, empresaId); competenciaSchema.parse(competencia);
