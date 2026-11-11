@@ -5,10 +5,11 @@ import { registrar } from './auditoria';
 import { aplicaNaCompetencia, competenciaSchema } from './documentos';
 import { cobrarDocumentos } from './cobranca';
 
-/* Integração com o n8n (cobrança de extratos pelo WhatsApp/Digisac). Acesso só com "Authorization: Bearer <INTEGRACAO_TOKEN>". */
+/* Integração com o n8n (cobrança de extratos pelo WhatsApp/Digisac). Acesso só com "Authorization: Bearer <senha>".
+   A senha é INTEGRACAO_TOKEN ou, se não existir, a mesma do fluxo da conciliação (N8N_CONCILIACAO_TOKEN), já cadastrada no Render. */
 
 export function autorizado(req: Request) {
-  const segredo = process.env.INTEGRACAO_TOKEN;
+  const segredo = process.env.INTEGRACAO_TOKEN || process.env.N8N_CONCILIACAO_TOKEN;
   if (!segredo || segredo.length < 24) return 'sem-token' as const;
   const recebido = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
   const a = Buffer.from(recebido), b = Buffer.from(segredo);

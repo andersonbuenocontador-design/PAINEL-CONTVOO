@@ -48,9 +48,11 @@ describe('integração n8n: cobrança de extratos', () => {
     expect(acoes).toEqual(['cobranca.whatsapp_falhou', 'cobranca.whatsapp_enviada']);
   });
   it('token: sem configurar, errado e certo; WhatsApp editável', async () => {
-    delete process.env.INTEGRACAO_TOKEN;
+    delete process.env.INTEGRACAO_TOKEN; delete process.env.N8N_CONCILIACAO_TOKEN;
     const req = (t?: string) => new Request('http://x', { headers: t ? { authorization: `Bearer ${t}` } : {} });
     expect(autorizado(req('qualquer'))).toBe('sem-token');
+    process.env.N8N_CONCILIACAO_TOKEN = 'senha-da-conciliacao-0123456789';
+    expect(autorizado(req('senha-da-conciliacao-0123456789'))).toBe('ok');
     process.env.INTEGRACAO_TOKEN = 'abcdefghijklmnopqrstuvwxyz123456';
     expect(autorizado(req('errado'))).toBe('negado'); expect(autorizado(req())).toBe('negado');
     expect(autorizado(req('abcdefghijklmnopqrstuvwxyz123456'))).toBe('ok');
