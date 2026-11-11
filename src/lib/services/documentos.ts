@@ -235,17 +235,22 @@ export async function conferirArquivo(actor: Actor, arquivoId: string, decisao: 
 // --- Outros documentos (PDFs avulsos enviados pelo cliente) ---
 export const MAX_AVULSOS_POR_ENVIO = 10;
 
-/** Um ou mais PDFs de uma vez, com descrição opcional. Só PDF de verdade (assinatura %PDF), até 20 MB no total por envio. */
+/** Tipos que nunca são aceitos em "Outros documentos": programas e scripts (podem levar vírus para o escritório). */
+const EXT_BLOQUEADAS = new Set(['exe', 'msi', 'bat', 'cmd', 'com', 'scr', 'pif', 'cpl', 'dll', 'sys', 'ps1', 'psm1', 'vbs', 'vbe', 'js', 'jse', 'wsf', 'wsh', 'hta', 'jar', 'apk', 'app', 'sh', 'bash', 'lnk', 'reg', 'iso', 'img', 'vhd', 'html', 'htm', 'svg', 'xhtml', 'mht']);
+const pareceExecutavel = (b: Buffer) => (b[0] === 0x4d && b[1] === 0x5a) /* MZ (Windows) */ || b.subarray(0, 4).toString('latin1') === '\x7fELF';
+/** Um ou mais arquivos de qualquer tipo (PDF, foto, planilha, Word, XML, ZIP…), com descrição opcional, até 20 MB no total por envio.
+ *  Programas e scripts são recusados; tipos conhecidos precisam ter o conteúdo do formato (ex.: .pdf começa com %PDF). */
 export async function enviarAvulsos(actor: Actor, p: { empresaId: string; competencia: string; descricao?: string; arquivos: { nome: string; dados: Buffer }[] }) {
   const emp = await obterEmpresa(actor, p.empresaId);
   competenciaSchema.parse(p.competencia);
   const arqs = p.arquivos.filter((a) => a.dados.length);
-  if (!arqs.length) throw new AppError('Selecione ao menos um PDF.');
+  if (!arqs.length) throw new AppError('Selecione ao menos um arquivo.');
   if (arqs.length > MAX_AVULSOS_POR_ENVIO) throw new AppError(`Envie no máximo ${MAX_AVULSOS_POR_ENVIO} arquivos por vez.`);
   if (arqs.reduce((t, a) => t + a.dados.length, 0) > TAMANHO_MAX) throw new AppError('Os arquivos somam mais de 20 MB. Envie em partes.');
   for (const a of arqs) {
-    if ((a.nome.split('.').pop() ?? '').toLowerCase() !== 'pdf') throw new AppError(`"${nomeSeguro(a.nome)}" não é PDF. Aqui só são aceitos arquivos PDF.`);
-    if (!assinaturaOk('pdf', a.dados)) throw new AppError(`"${nomeSeguro(a.nome)}" não é um PDF válido.`);
+    const ext = a.nome.includes('.') ? (a.nome.split('.').pop() ?? '').toLowerCase() : '';
+    if (EXT_BLOQUEADAS.has(ext) || pareceExecutavel(a.dados)) throw new AppError(`"${nomeSeguro(a.nome)}" não pode ser enviado: programas e scripts não são aceitos. Envie o documento (PDF, foto, planilha, Word, XML…).`);
+    if (['pdf', 'png', 'jpg', 'xlsx', 'xls', 'zip'].includes(ext) && !assinaturaOk(ext, a.dados)) throw new AppError(`"${nomeSeguro(a.nome)}" parece estar corrompido: o conteúdo não é de um arquivo .${ext}.`);
   }
   const descricao = (p.descricao ?? '').trim().slice(0, 200) || null;
   const ids: string[] = [];

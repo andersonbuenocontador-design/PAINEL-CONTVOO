@@ -14,7 +14,7 @@ export default async function ClienteHub({ params, searchParams }: { params: Pro
   const { empresaId } = await params; const sp = await searchParams; const comp = competenciaDe(sp.competencia); const c = `?competencia=${comp}`;
   let r, f; try { [r, f] = await Promise.all([resumoCliente(u, empresaId, comp), resumoFinanceiro(u, empresaId, comp)]); } catch (x) { if (x instanceof AppError) notFound(); throw x; }
   const varias = (await listarEmpresas(u)).length > 1; const [ano, mes] = comp.split('-'); const d = r.docs; const p = r.pendencias;
-  const docsInfo = !d.exigidos ? (r.pdfs ? `${r.pdfs} PDF(s) enviado(s)` : 'Nenhum documento pedido neste mês')
+  const docsInfo = !d.exigidos ? (r.pdfs ? `${r.pdfs} arquivo(s) enviado(s)` : 'Nenhum documento pedido neste mês')
     : d.concluida ? 'Tudo entregue e aprovado ✓' : d.rejeitados ? `${d.rejeitados} recusado(s): envie de novo` : d.pendentes ? `Faltam ${d.pendentes} de ${d.exigidos}` : `Enviados; aguardando o escritório`;
   return (<><Topo u={u} /><main>
     {varias && <p><Link href="/cliente">← Minhas empresas</Link></p>}
@@ -22,7 +22,7 @@ export default async function ClienteHub({ params, searchParams }: { params: Pro
     <Avisos erro={sp.erro} ok={sp.ok} />
     {p.aguardando > 0 && <div className="msg-err" role="alert"><strong>O escritório aguarda sua resposta em {p.aguardando} solicitação(ões){p.vencidas > 0 ? ` (${p.vencidas} com prazo vencido)` : ''}.</strong> <a href={`/cliente/${empresaId}/pendencias`}>Responder</a></div>}
     <div className="hub">
-      <Atalho href={`/cliente/${empresaId}/documentos${c}`} icone="docs" titulo="Documentos do mês" desc="Envie os documentos pedidos e outros PDFs"
+      <Atalho href={`/cliente/${empresaId}/documentos${c}`} icone="docs" titulo="Documentos do mês" desc="Envie os documentos pedidos e outros arquivos"
         info={docsInfo} alerta={d.rejeitados > 0 || d.pendentes > 0} ok={d.concluida} />
       <Atalho href={`/cliente/${empresaId}/extratos${c}`} icone="banco" titulo="Extratos e conciliação" desc="Identifique as entradas e saídas dos extratos anexados"
         info={r.movimentacoes ? CONC[r.conciliacao] : 'Anexe o extrato em Documentos do mês'} alerta={r.conciliacao === 'devolvida' || (!r.movimentacoes)} ok={r.conciliacao === 'concluida'} />

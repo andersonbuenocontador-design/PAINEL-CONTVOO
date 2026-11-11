@@ -43,7 +43,7 @@ export default async function DocsEmpresa({ params, searchParams }: { params: Pr
           <td>{d.descartado_em ? <span className="soon">{d.nome_original} (descartado)</span> : <a href={`/api/avulsos/${d.id}`}>{d.nome_original}</a>} {!d.visto_em && !d.descartado_em && <span className="tag">Novo</span>}{d.descricao && <div className="soon">{d.descricao}</div>}</td>
           <td>{d.enviado_por} · {new Date(d.enviado_em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</td>
           <td><form action={acaoRemoverAvulsoAdmin}><input type="hidden" name="empresaId" value={id} /><input type="hidden" name="competencia" value={comp} /><input type="hidden" name="id" value={d.id} /><button className="sec">Retirar</button></form></td></tr>))}
-      </tbody></table> : <p className="soon">Nenhum PDF avulso nesta competência.</p>}</div>
+      </tbody></table> : <p className="soon">Nenhum outro documento nesta competência.</p>}</div>
     <div className="card"><h2>Documentos exigidos desta empresa</h2>
       {exigencias.map((x) => (<details key={x.id} style={{ borderBottom: '1px solid var(--bd)', padding: '8px 0' }}>
         <summary><strong>{x.nome}</strong>{x.instituicao && ` — ${x.instituicao}`} · {x.frequencia} · {x.formatos.join('/').toUpperCase()}{!x.obrigatorio && ' · opcional'} {!x.ativo && <span className="tag off">inativo</span>}</summary>

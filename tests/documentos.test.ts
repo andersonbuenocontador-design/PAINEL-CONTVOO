@@ -143,7 +143,7 @@ describe('modelos', () => {
 });
 afterAll(async () => { await getPool().end(); });
 
-describe('outros documentos (PDFs avulsos)', () => {
+describe('outros documentos (avulsos)', () => {
   const pdf = (n: string) => ({ nome: n, dados: Buffer.from('%PDF-1.7 ' + n) });
   it('cliente envia vários PDFs com descrição; escritório vê e baixa', async () => {
     const ids = await enviarAvulsos(ua, { empresaId: empA, competencia: C, descricao: 'notas de compra', arquivos: [pdf('a.pdf'), pdf('B.PDF')] });
@@ -154,13 +154,19 @@ describe('outros documentos (PDFs avulsos)', () => {
     expect((await listarAvulsos(ua, empA, C)).find((d) => d.id === ids[0])?.visto_em).toBeTruthy();
     expect(await listarAvulsos(ua, empA, '2026-09')).toHaveLength(0);
   });
-  it('só aceita PDF verdadeiro e respeita limites', async () => {
-    await expect(enviarAvulsos(ua, { empresaId: empA, competencia: C, arquivos: [{ nome: 'x.docx', dados: Buffer.from('PK..') }] })).rejects.toThrow(/não é PDF/);
-    await expect(enviarAvulsos(ua, { empresaId: empA, competencia: C, arquivos: [{ nome: 'falso.pdf', dados: Buffer.from('MZ executavel') }] })).rejects.toThrow(/não é um PDF válido/);
+  it('aceita qualquer tipo de documento, mas recusa programas, arquivo corrompido e respeita limites', async () => {
+    const ids = await enviarAvulsos(ua, { empresaId: empA, competencia: C, arquivos: [
+      { nome: 'contrato.docx', dados: Buffer.from('PK\x03\x04 word') }, { nome: 'nota.xml', dados: Buffer.from('<nfe/>') },
+      { nome: 'foto.jpeg', dados: Buffer.from([0xff, 0xd8, 0xff, 1]) }, { nome: 'recibo.heic', dados: Buffer.from('ftypheic') }, { nome: 'SEM_EXTENSAO', dados: Buffer.from('abc') }] });
+    expect(ids).toHaveLength(5);
+    await expect(enviarAvulsos(ua, { empresaId: empA, competencia: C, arquivos: [{ nome: 'virus.exe', dados: Buffer.from('MZ..') }] })).rejects.toThrow(/programas e scripts/);
+    await expect(enviarAvulsos(ua, { empresaId: empA, competencia: C, arquivos: [{ nome: 'boleto.docx', dados: Buffer.from('MZ disfarçado') }] })).rejects.toThrow(/programas e scripts/);
+    await expect(enviarAvulsos(ua, { empresaId: empA, competencia: C, arquivos: [{ nome: 'pagina.html', dados: Buffer.from('<script>') }] })).rejects.toThrow(/programas e scripts/);
+    await expect(enviarAvulsos(ua, { empresaId: empA, competencia: C, arquivos: [{ nome: 'falso.pdf', dados: Buffer.from('nada a ver') }] })).rejects.toThrow(/corrompido/);
     await expect(enviarAvulsos(ua, { empresaId: empA, competencia: C, arquivos: [] })).rejects.toThrow(/ao menos um/);
     await expect(enviarAvulsos(ua, { empresaId: empA, competencia: C, arquivos: Array.from({ length: 11 }, (_, i) => pdf(`${i}.pdf`)) })).rejects.toThrow(/no máximo 10/);
     await expect(enviarAvulsos(ua, { empresaId: empA, competencia: C, arquivos: [{ nome: 'g.pdf', dados: Buffer.concat([Buffer.from('%PDF'), Buffer.alloc(20 * 1024 * 1024)]) }] })).rejects.toThrow(/20 MB/);
-    expect(await listarAvulsos(admin, empA, C)).toHaveLength(0);
+    expect(await listarAvulsos(admin, empA, C)).toHaveLength(5);
   });
   it('cliente de outra empresa não vê, não baixa, não envia', async () => {
     const [id] = await enviarAvulsos(ua, { empresaId: empA, competencia: C, arquivos: [pdf('a.pdf')] });

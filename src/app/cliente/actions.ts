@@ -39,14 +39,14 @@ export async function acaoEnviarAvulsos(fd: FormData) {
   const empresaId = String(fd.get('empresaId') ?? ''), competencia = String(fd.get('competencia') ?? '');
   const voltar = `/cliente/${empresaId}/documentos?competencia=${competencia}`;
   const arquivos = fd.getAll('arquivos').filter((f): f is File => f instanceof File && f.size > 0);
-  if (!arquivos.length) redirect(`${voltar}&erro=${encodeURIComponent('Selecione ao menos um PDF.')}#outros`);
+  if (!arquivos.length) redirect(`${voltar}&erro=${encodeURIComponent('Selecione ao menos um arquivo.')}#outros`);
   const lidos = await Promise.all(arquivos.map(async (f) => ({ nome: f.name, dados: Buffer.from(await f.arrayBuffer()) })));
   let ids: string[] = [];
   try { ids = await enviarAvulsos(u, { empresaId, competencia, descricao: String(fd.get('descricao') ?? ''), arquivos: lidos }); }
   catch (e) { redirect(`${voltar}&erro=${encodeURIComponent(mensagemDeErro(e))}#outros`); }
   // "Outros documentos" nunca vão para a conciliação (só os documentos que o escritório configurou como extrato)
   for (const id of ids) await marcarExtratoVerificado('documentos_avulsos', id);
-  redirect(`${voltar}&ok=${encodeURIComponent(lidos.length > 1 ? `${lidos.length} PDFs enviados.` : 'PDF enviado.')}#outros`);
+  redirect(`${voltar}&ok=${encodeURIComponent(lidos.length > 1 ? `${lidos.length} arquivos enviados.` : 'Arquivo enviado.')}#outros`);
 }
 export async function acaoRemoverAvulso(fd: FormData) {
   const u = await exigirUsuario('cliente');
