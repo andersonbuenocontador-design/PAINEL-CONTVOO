@@ -3,7 +3,7 @@ import { getPool, query } from '../src/lib/db';
 import { criarEmpresa, editarEmpresa } from '../src/lib/services/empresas';
 import { criarUsuario } from '../src/lib/services/usuarios';
 import { conferirArquivo, criarExigencia, enviarArquivo } from '../src/lib/services/documentos';
-import { autorizado, extratosPendentes, registrarCobrancaEnviada } from '../src/lib/services/integracao';
+import { autorizado, extratosPendentes, pendenciasDoMes, registrarCobrancaEnviada } from '../src/lib/services/integracao';
 import type { Actor } from '../src/lib/errors';
 
 const C = '2026-10'; const PDF = Buffer.from('%PDF-1.4 x');
@@ -58,5 +58,12 @@ describe('integração n8n: cobrança de extratos', () => {
     expect(autorizado(req('abcdefghijklmnopqrstuvwxyz123456'))).toBe('ok');
     await editarEmpresa(admin, empB, { razaoSocial: 'Empresa B Ltda', cnpj: '45.723.174/0001-10', whatsapp: '51 98888-1111' });
     expect((await extratosPendentes(C)).comWhatsapp.map((e) => e.whatsapp).sort()).toEqual(['5551988881111', '5551999990000']);
+  });
+  it('cobrança pelo WhatsApp normal (Entregas): todos os documentos que faltam, não só extratos', async () => {
+    const r = await pendenciasDoMes(C, false);
+    const a = r.todas.find((x) => x.empresaId === empA)!;
+    expect(a.faltam.map((f) => f.documento)).toEqual(['Extrato Nubank', 'Extrato Sicredi', 'Folha de pagamento']);
+    expect(a.mensagem).toContain('estes documentos'); expect(a.mensagem).toContain('• Folha de pagamento');
+    expect(r.todas.find((x) => x.empresaId === empB)?.whatsapp).toBeNull();
   });
 });

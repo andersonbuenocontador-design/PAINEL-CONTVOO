@@ -3,12 +3,14 @@ import { exigirUsuario } from '@/lib/session';
 import { visaoGeral } from '@/lib/services/documentos';
 import { query } from '@/lib/db';
 import { cobrancasAbertas } from '@/lib/services/cobranca';
-import { acaoCobrarDocumentos } from '../docs-actions';
+import { pendenciasDoMes } from '@/lib/services/integracao';
+import { BotaoCobrar } from './BotaoCobrar';
 import { Avisos, Topo, CompetenciaSeletor, competenciaDe } from '../../components';
 
 export default async function Entregas({ searchParams }: { searchParams: Promise<{ competencia?: string; erro?: string; ok?: string }> }) {
   const u = await exigirUsuario('admin'); const sp = await searchParams; const comp = competenciaDe(sp.competencia);
-  const [v, cobradas] = await Promise.all([visaoGeral(u, comp), cobrancasAbertas(u, comp)]);
+  const [v, cobradas, zap] = await Promise.all([visaoGeral(u, comp), cobrancasAbertas(u, comp), pendenciasDoMes(comp, false)]);
+  const msg = new Map(zap.todas.map((x) => [x.empresaId, x]));
   const novos = new Map((await query(`SELECT empresa_id, count(*)::int n FROM documentos_avulsos WHERE visto_em IS NULL AND removido_em IS NULL AND descartado_em IS NULL GROUP BY empresa_id`)).rows.map((r) => [r.empresa_id as string, r.n as number]));
   const concluidas = v.filter((e) => e.concluida).length, semConfig = v.filter((e) => e.exigidos === 0).length;
   return (<><Topo u={u} /><main>
@@ -41,7 +43,7 @@ export default async function Entregas({ searchParams }: { searchParams: Promise
             </div>
             {estado === 'vermelho' && cb && <div className="ent-cobrado" title={`1ª cobrança em ${dt(cb.criado_em)}. A solicitação está no painel do cliente e se encerra sozinha quando ele enviar tudo.`}>Cobrado {cb.lembretes + 1}x · último em {dt(cb.ultimo)}</div>}</td>
           <td><div className="ent-acoes">
-            {estado === 'vermelho' && <form action={acaoCobrarDocumentos}><input type="hidden" name="empresaId" value={e.id} /><input type="hidden" name="competencia" value={comp} /><button className="ent-btn cobrar">{cb ? 'Cobrar de novo' : 'Cobrar envio'}</button></form>}
+            {estado === 'vermelho' && <BotaoCobrar empresaId={e.id} competencia={comp} rotulo={cb ? 'Cobrar de novo' : 'Cobrar envio'} whatsapp={msg.get(e.id)?.whatsapp} mensagem={msg.get(e.id)?.mensagem} />}
             <Link className={`ent-btn ${aConferir > 0 || nov > 0 ? 'principal' : ''}`} href={`/admin/empresas/${e.id}/documentos?competencia=${comp}`}>{aConferir > 0 ? 'Conferir' : 'Abrir'}</Link></div></td>
         </tr>); })}
       {!v.length && <tr><td colSpan={4} className="soon">Nenhuma empresa ativa.</td></tr>}</tbody></table></div>

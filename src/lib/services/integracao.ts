@@ -21,14 +21,17 @@ export const mesPorExtenso = (c: string) => `${MESES[Number(c.slice(5, 7)) - 1]}
 
 export type ExtratoFaltando = { documento: string; banco: string | null; situacao: 'pendente' | 'rejeitado'; motivo: string | null };
 /** Empresas ativas com extrato obrigatório do mês ainda não enviado (ou recusado), com o WhatsApp e a mensagem pronta. */
-export async function extratosPendentes(competencia: string) {
+export const extratosPendentes = (competencia: string) => pendenciasDoMes(competencia, true);
+
+/** Empresas ativas com documento obrigatório do mês pendente ou recusado (só extratos, ou todos), com WhatsApp e mensagem pronta. */
+export async function pendenciasDoMes(competencia: string, soExtratos: boolean) {
   competenciaSchema.parse(competencia);
   const { rows } = await query(
     `SELECT e.id, e.razao_social, e.nome_fantasia, e.whatsapp, x.nome, x.instituicao, x.frequencia, COALESCE(a.situacao,'pendente') situacao, a.motivo_rejeicao,
             (SELECT u.nome FROM usuario_empresas ue JOIN usuarios u ON u.id=ue.usuario_id AND u.ativo AND u.papel='cliente' WHERE ue.empresa_id=e.id ORDER BY u.criado_em LIMIT 1) contato
-       FROM empresas e JOIN exigencias x ON x.empresa_id=e.id AND x.ativo AND x.obrigatorio AND (x.nome || ' ' || coalesce(x.categoria,'')) ~* 'extrato'
+       FROM empresas e JOIN exigencias x ON x.empresa_id=e.id AND x.ativo AND x.obrigatorio AND (NOT $2 OR (x.nome || ' ' || coalesce(x.categoria,'')) ~* 'extrato')
        LEFT JOIN LATERAL (SELECT situacao, motivo_rejeicao FROM arquivos WHERE exigencia_id=x.id AND competencia=$1 AND situacao<>'substituido' ORDER BY versao DESC LIMIT 1) a ON true
-      WHERE e.situacao='ativa' ORDER BY e.razao_social, x.nome`, [competencia]);
+      WHERE e.situacao='ativa' ORDER BY e.razao_social, x.nome`, [competencia, soExtratos]);
   const base = (process.env.APP_URL ?? '').replace(/\/$/, '');
   const porEmpresa = new Map<string, { empresaId: string; empresa: string; whatsapp: string | null; contato: string | null; faltam: ExtratoFaltando[] }>();
   for (const r of rows) {
@@ -41,11 +44,11 @@ export async function extratosPendentes(competencia: string) {
     const nome = e.contato ? e.contato.trim().split(/\s+/)[0] : '';
     const linhas = e.faltam.map((f) => `• ${f.documento}${f.banco && !f.documento.toLowerCase().includes(f.banco.toLowerCase()) ? ` (${f.banco})` : ''}${f.situacao === 'rejeitado' ? ` — precisa enviar de novo${f.motivo ? `: ${f.motivo}` : ''}` : ''}`);
     const link = base ? `${base}/cliente/${e.empresaId}/documentos?competencia=${competencia}` : null;
-    const mensagem = [`Olá${nome ? `, ${nome}` : ''}! Tudo bem? 😊`, '', `Aqui é da Contvoo Contabilidade. Para fecharmos ${mes} da ${e.empresa}, ainda falta${e.faltam.length > 1 ? 'm' : ''} ${e.faltam.length > 1 ? 'os extratos' : 'o extrato'}:`, ...linhas, '',
+    const mensagem = [`Olá${nome ? `, ${nome}` : ''}! Tudo bem? 😊`, '', `Aqui é da Contvoo Contabilidade. Para fecharmos ${mes} da ${e.empresa}, ainda falta${e.faltam.length > 1 ? 'm' : ''} ${soExtratos ? (e.faltam.length > 1 ? 'os extratos' : 'o extrato') : (e.faltam.length > 1 ? 'estes documentos' : 'este documento')}:`, ...linhas, '',
       link ? `É só enviar pelo painel: ${link}` : 'É só enviar pelo Painel do Cliente, em "Documentos do mês".', '', 'Obrigado!'].join('\n');
     return { ...e, link, mensagem };
   });
-  return { competencia, mes, comWhatsapp: empresas.filter((e) => e.whatsapp), semWhatsapp: empresas.filter((e) => !e.whatsapp).map((e) => ({ empresaId: e.empresaId, empresa: e.empresa })) };
+  return { competencia, mes, todas: empresas, comWhatsapp: empresas.filter((e) => e.whatsapp), semWhatsapp: empresas.filter((e) => !e.whatsapp).map((e) => ({ empresaId: e.empresaId, empresa: e.empresa })) };
 }
 
 /** O n8n avisa que mandou (ou não conseguiu mandar) a mensagem: fica na auditoria e, se enviada, vira a cobrança no painel do cliente ("Cobrado Nx"). */
