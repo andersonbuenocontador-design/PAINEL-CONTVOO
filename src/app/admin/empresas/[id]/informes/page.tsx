@@ -22,12 +22,13 @@ export default async function InformesAdmin({ params, searchParams }: { params: 
     <CompetenciaSeletor atual={comp} />
     <div className="card" id="retiradas"><h2>Retiradas informadas pelo cliente — {comp.slice(5)}/{comp.slice(0, 4)}</h2>
       <p>{ret.envio ? <><span className="tag">{ret.envio.sem_retiradas ? 'Cliente informou: sem retiradas' : 'Enviado pelo cliente'}</span> {ret.envio.enviado_por} · {dt(ret.envio.enviado_em)}</> : <span className="tag off">Cliente ainda não enviou{ret.itens.length ? ' (lançando)' : ''}</span>}</p>
-      <table><thead><tr><th>Data</th><th>Sócio</th><th>Tipo</th><th style={{ textAlign: 'right' }}>Valor</th><th>Observação</th></tr></thead><tbody>
-        {ret.itens.map((i) => <tr key={i.id}><td>{i.data.split('-').reverse().join('/')}</td><td>{i.socio_nome}</td><td>{TIPOS_RETIRADA[i.tipo]}</td><td style={{ textAlign: 'right' }}>{Number(i.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td><td className="soon">{i.observacao}</td></tr>)}
+      <table><thead><tr><th>Data</th><th>Sócio</th><th>De onde saiu</th><th style={{ textAlign: 'right' }}>Valor</th><th>Observação</th></tr></thead><tbody>
+        {ret.itens.map((i) => <tr key={i.id}><td>{i.data.split('-').reverse().join('/')}</td><td>{i.socio_nome}</td><td>{i.origem ?? <span className="soon">{TIPOS_RETIRADA[i.tipo]}</span>}</td><td style={{ textAlign: 'right' }}>{Number(i.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td><td className="soon">{i.observacao}</td></tr>)}
         {!ret.itens.length && <tr><td colSpan={5} className="soon">Nenhuma retirada lançada neste mês.</td></tr>}
         {ret.itens.length > 0 && <tr><td colSpan={3}><strong>Total do mês</strong>{ret.totais.map((t) => <div key={t.socio} className="soon">{t.socio}: {t.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>)}</td><td style={{ textAlign: 'right' }}><strong>{ret.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong></td><td></td></tr>}
       </tbody></table>
       <div className="row" style={{ marginTop: 10 }}>
+<a className="btn" href={`/admin/lucros/${id}?competencia=${comp}`}>Comparar com o extrato</a>
         {ret.itens.length > 0 && <a className="btn sec" href={`/api/retiradas/exportar?empresaId=${id}&competencia=${comp}`}>Baixar Excel</a>}
         {ret.envio && <form action={acaoReabrirRetiradas}><input type="hidden" name="empresaId" value={id} /><input type="hidden" name="competencia" value={comp} /><button className="sec">Devolver ao cliente para correção</button></form>}
       </div></div>

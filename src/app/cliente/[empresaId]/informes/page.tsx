@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { exigirUsuario } from '@/lib/session';
 import { obterEmpresa } from '@/lib/services/empresas';
 import { listarInformesCliente } from '@/lib/services/informes';
-import { listarRetiradas, sugestoesSocios, TIPOS_RETIRADA } from '@/lib/services/retiradas';
+import { listarRetiradas, origensRetirada, sugestoesSocios, TIPOS_RETIRADA } from '@/lib/services/retiradas';
 import { AppError } from '@/lib/errors';
 import { Avisos, CompetenciaSeletor, Topo, competenciaDe } from '../../../components';
 import { acaoEnviarRetiradas, acaoLancarRetirada, acaoRemoverRetirada } from '../../../retiradas-actions';
@@ -14,8 +14,8 @@ const fimDoMes = (c: string) => { const [a, m] = c.split('-').map(Number); retur
 /** Retiradas dos sócios: o cliente informa o que cada sócio retirou no mês e envia ao escritório. */
 export default async function Retiradas({ params, searchParams }: { params: Promise<{ empresaId: string }>; searchParams: Promise<{ competencia?: string; erro?: string; ok?: string }> }) {
   const u = await exigirUsuario('cliente'); const { empresaId } = await params; const sp = await searchParams; const comp = competenciaDe(sp.competencia);
-  let e, r, nomes, informes;
-  try { [e, r, nomes, informes] = await Promise.all([obterEmpresa(u, empresaId), listarRetiradas(u, empresaId, comp), sugestoesSocios(u, empresaId), listarInformesCliente(u, empresaId)]); }
+  let e, r, nomes, informes, contas;
+  try { [e, r, nomes, informes, contas] = await Promise.all([obterEmpresa(u, empresaId), listarRetiradas(u, empresaId, comp), sugestoesSocios(u, empresaId), listarInformesCliente(u, empresaId), origensRetirada(u, empresaId)]); }
   catch (x) { if (x instanceof AppError) notFound(); throw x; }
   const [ano, mes] = comp.split('-'); const aberto = !r.envio; const h = { empresaId, competencia: comp };
   const ocultos = (<>{Object.entries(h).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}</>);
@@ -28,7 +28,7 @@ export default async function Retiradas({ params, searchParams }: { params: Prom
       <p>Por isso, solicitamos que todas as retiradas sejam informadas corretamente nesta aba, para que possamos acompanhar os valores mensais e realizar os procedimentos fiscais necessários.</p>
       <p>Em caso de dúvidas ou previsão de retiradas acima desse limite, <strong>entre em contato com nosso escritório antes de realizar a distribuição</strong>.</p>
     </section>
-    <p className="soon">Informe aqui toda distribuição de lucros feita a cada sócio no mês. Depois clique em <strong>Enviar ao escritório</strong>.</p>
+    <p className="soon">Informe aqui <strong>cada</strong> retirada de lucro, no dia em que aconteceu, e de qual banco (ou se foi em dinheiro). O escritório confere com o extrato do banco no fim do mês. Depois clique em <strong>Enviar ao escritório</strong>.</p>
     <CompetenciaSeletor atual={comp} />
     {r.envio && <div className="msg-ok">{r.envio.sem_retiradas ? 'Você informou que não houve retiradas' : 'Retiradas enviadas ao escritório'} em {new Date(r.envio.enviado_em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}. Para corrigir, fale com o escritório.</div>}
     {aberto && <div className="card"><h2>Lançar retirada de {mes}/{ano}</h2>
@@ -39,11 +39,16 @@ export default async function Retiradas({ params, searchParams }: { params: Prom
             <datalist id="socios">{nomes.map((n) => <option key={n} value={n} />)}</datalist></div>
           <div><label htmlFor="tipo">Tipo *</label><select id="tipo" name="tipo" required defaultValue="lucros"><option value="lucros">{TIPOS_RETIRADA.lucros}</option></select></div>
           <div><label htmlFor="valor">Valor (R$) *</label><input id="valor" name="valor" required inputMode="decimal" placeholder="1.500,00" /></div>
-          <div><label htmlFor="observacao">Observação</label><input id="observacao" name="observacao" maxLength={200} placeholder="Opcional (ex.: PIX, conta pessoal)" /></div>
+          <div><label htmlFor="origem">De onde saiu? *</label><select id="origem" name="origem" required defaultValue={contas.length === 1 ? contas[0].id : ''}>
+            <option value="" disabled>Escolha o banco ou dinheiro</option>
+            {contas.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+            {!contas.length && <option value="banco">Conta bancária da empresa</option>}
+            <option value="dinheiro">Dinheiro (espécie / caixa)</option></select></div>
+          <div><label htmlFor="observacao">Observação</label><input id="observacao" name="observacao" maxLength={200} placeholder="Opcional (ex.: PIX para a conta pessoal)" /></div>
         </div><p><button>Lançar retirada</button></p></form></div>}
     <div className="card"><h2>Retiradas de {mes}/{ano}</h2>
-      <table><thead><tr><th>Data</th><th>Sócio</th><th>Tipo</th><th style={{ textAlign: 'right' }}>Valor</th><th>Observação</th><th></th></tr></thead><tbody>
-        {r.itens.map((i) => (<tr key={i.id}><td>{dataBR(i.data)}</td><td>{i.socio_nome}</td><td>{TIPOS_RETIRADA[i.tipo]}</td><td style={{ textAlign: 'right' }}>{brl(i.valor)}</td><td className="soon">{i.observacao}</td>
+      <table><thead><tr><th>Data</th><th>Sócio</th><th>De onde saiu</th><th style={{ textAlign: 'right' }}>Valor</th><th>Observação</th><th></th></tr></thead><tbody>
+        {r.itens.map((i) => (<tr key={i.id}><td>{dataBR(i.data)}</td><td>{i.socio_nome}</td><td>{i.origem ?? <span className="soon">não informado</span>}</td><td style={{ textAlign: 'right' }}>{brl(i.valor)}</td><td className="soon">{i.observacao}</td>
           <td>{aberto && <form action={acaoRemoverRetirada}>{ocultos}<input type="hidden" name="id" value={i.id} /><button className="sec">Excluir</button></form>}</td></tr>))}
         {!r.itens.length && <tr><td colSpan={6} className="soon">{r.envio?.sem_retiradas ? 'Não houve retiradas neste mês.' : 'Nenhuma retirada lançada neste mês.'}</td></tr>}
       </tbody></table>

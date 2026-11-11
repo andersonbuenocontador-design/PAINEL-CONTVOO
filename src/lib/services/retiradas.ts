@@ -23,6 +23,8 @@ const lancamento = z.object({
   tipo: z.enum(['lucros'], { message: 'Aqui só se informa distribuição de lucros.' }),
   valor: z.string().transform((v, ctx) => { const n = valorBR(v); if (!(n > 0) || n > 999_999_999) { ctx.addIssue({ code: 'custom', message: 'Valor inválido. Use, por exemplo, 1.500,00.' }); return z.NEVER; } return n; }),
   observacao: z.string().trim().max(200, 'Observação muito longa (máx. 200).').optional().transform((v) => v || null),
+  // "De onde saiu": id de uma conta bancária da empresa, "banco" (conta não cadastrada) ou "dinheiro" (espécie)
+  origem: z.string().min(1, 'Informe de onde saiu o dinheiro (banco ou dinheiro).'),
 });
 
 async function envio(empresaId: string, competencia: string) {
@@ -34,10 +36,11 @@ const bloqueioCliente = 'As retiradas deste mês já foram enviadas ao escritór
 export async function listarRetiradas(actor: Actor, empresaId: string, competencia: string) {
   const emp = await obterEmpresa(actor, empresaId); competenciaSchema.parse(competencia);
   const itens = (await query(
-    `SELECT r.id, r.data::text data, r.socio_nome, r.tipo, r.valor::text valor, r.observacao, r.criado_em, u.nome criado_por
-       FROM retiradas r JOIN usuarios u ON u.id=r.criado_por
+    `SELECT r.id, r.data::text data, r.socio_nome, r.tipo, r.valor::text valor, r.observacao, r.criado_em, u.nome criado_por, r.forma, r.conta_id,
+            CASE WHEN r.forma='dinheiro' THEN 'Dinheiro' WHEN cb.id IS NOT NULL THEN cb.banco || coalesce(' · ' || nullif(cb.apelido,''), ' · ' || nullif(cb.conta,''), '') WHEN r.forma='banco' THEN 'Banco (não cadastrado)' ELSE NULL END origem
+       FROM retiradas r JOIN usuarios u ON u.id=r.criado_por LEFT JOIN contas_bancarias cb ON cb.id=r.conta_id
       WHERE r.empresa_id=$1 AND r.competencia=$2 AND r.removido_em IS NULL ORDER BY r.data, r.criado_em`, [emp.id, competencia])).rows as
-    { id: string; data: string; socio_nome: string; tipo: TipoRetirada; valor: string; observacao: string | null; criado_em: Date; criado_por: string }[];
+    { id: string; data: string; socio_nome: string; tipo: TipoRetirada; valor: string; observacao: string | null; criado_em: Date; criado_por: string; forma: 'banco' | 'dinheiro' | null; conta_id: string | null; origem: string | null }[];
   const porSocio = new Map<string, Record<TipoRetirada | 'total', number>>();
   for (const i of itens) {
     const k = i.socio_nome; const t = porSocio.get(k) ?? { pro_labore: 0, lucros: 0, outras: 0, total: 0 };
@@ -45,6 +48,13 @@ export async function listarRetiradas(actor: Actor, empresaId: string, competenc
   }
   const total = Math.round(itens.reduce((s, i) => s + Number(i.valor), 0) * 100) / 100;
   return { itens, totais: [...porSocio].map(([socio, t]) => ({ socio, ...t })), total, envio: await envio(emp.id, competencia) };
+}
+
+/** Opções do campo "De onde saiu": contas bancárias da empresa + dinheiro. */
+export async function origensRetirada(actor: Actor, empresaId: string) {
+  const emp = await obterEmpresa(actor, empresaId);
+  const contas = (await query(`SELECT id, banco || coalesce(' · ' || nullif(apelido,''), ' · ag. ' || nullif(agencia,'') || ' c/c ' || nullif(conta,''), ' · ' || nullif(conta,''), '') nome FROM contas_bancarias WHERE empresa_id=$1 AND ativo ORDER BY banco, apelido`, [emp.id])).rows as { id: string; nome: string }[];
+  return contas;
 }
 
 /** Nomes para sugerir: sócios cadastrados pelo escritório + nomes já usados pelo cliente. */
@@ -61,8 +71,14 @@ export async function lancarRetirada(actor: Actor, empresaId: string, competenci
   return tx(async (c) => {
     await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`retiradas:${emp.id}:${competencia}`]);
     if (actor.papel === 'cliente' && (await c.query('SELECT 1 FROM retiradas_envios WHERE empresa_id=$1 AND competencia=$2', [emp.id, competencia])).rowCount) throw new AppError(bloqueioCliente);
-    const r = await c.query(`INSERT INTO retiradas(empresa_id,competencia,data,socio_nome,tipo,valor,observacao,criado_por) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
-      [emp.id, competencia, d.data, d.socio, d.tipo, d.valor, d.observacao, actor.id]);
+    let forma: 'banco' | 'dinheiro', contaId: string | null = null;
+    if (d.origem === 'dinheiro' || d.origem === 'banco') forma = d.origem;
+    else {
+      if (!z.string().uuid().safeParse(d.origem).success || !(await c.query('SELECT 1 FROM contas_bancarias WHERE id=$1 AND empresa_id=$2', [d.origem, emp.id])).rowCount) throw new AppError('Conta bancária não encontrada.');
+      forma = 'banco'; contaId = d.origem;
+    }
+    const r = await c.query(`INSERT INTO retiradas(empresa_id,competencia,data,socio_nome,tipo,valor,observacao,criado_por,forma,conta_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
+      [emp.id, competencia, d.data, d.socio, d.tipo, d.valor, d.observacao, actor.id, forma, contaId]);
     await registrar(c, { usuarioId: actor.id, empresaId: emp.id, acao: 'retirada.lancar', entidade: 'retirada', entidadeId: r.rows[0].id, detalhes: { competencia, tipo: d.tipo, valor: d.valor } });
     return r.rows[0].id as string;
   });

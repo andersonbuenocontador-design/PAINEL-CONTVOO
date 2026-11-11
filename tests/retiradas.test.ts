@@ -7,8 +7,8 @@ import type { Actor } from '../src/lib/errors';
 
 let admin: Actor, ua: Actor, ub: Actor, empA: string, empB: string;
 const C = '2026-10';
-const l = (o: Partial<{ data: string; socio: string; tipo: 'lucros'; valor: string; observacao: string }> = {}) =>
-  ({ data: '2026-10-05', socio: 'Maria Souza', tipo: 'lucros' as const, valor: '1.500,00', ...o });
+const l = (o: Partial<{ data: string; socio: string; tipo: 'lucros'; valor: string; observacao: string; origem: string }> = {}) =>
+  ({ data: '2026-10-05', socio: 'Maria Souza', tipo: 'lucros' as const, valor: '1.500,00', origem: 'banco', ...o });
 
 beforeEach(async () => {
   for (const t of ['no_update', 'no_truncate']) await query(`ALTER TABLE auditoria DISABLE TRIGGER auditoria_${t}`);

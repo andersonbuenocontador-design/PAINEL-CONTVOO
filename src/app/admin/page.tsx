@@ -18,6 +18,7 @@ export default async function AdminHub({ searchParams }: { searchParams: Promise
         info={r.conciliacoes ? `${plural(r.conciliacoes, 'aguardando', 'aguardando')} sua conferência` : 'Nenhuma aguardando conferência'} alerta={r.conciliacoes > 0} />
       <Atalho href="/admin/pendencias" icone="conversa" titulo="Pendências" desc="Solicitações aos clientes e respostas"
         info={r.pendencias ? `${plural(r.pendencias, 'resposta', 'respostas')} de cliente para ver` : 'Nenhuma resposta nova'} alerta={r.pendencias > 0} />
+      <Atalho href={`/admin/lucros${c}`} icone="dinheiro" titulo="Lucros dos sócios" desc="Retiradas informadas × extrato bancário" info="Veja o que o cliente pode ter esquecido de lançar" />
       <Atalho href="/admin/relatorios" icone="grafico" titulo="Relatórios" desc="Visão geral e exportações em Excel" />
       <Atalho href="/admin/usuarios" icone="pessoas" titulo="Usuários" desc="Acessos do escritório e dos clientes" info={plural(r.usuarios, 'usuário ativo', 'usuários ativos')} />
     </div>

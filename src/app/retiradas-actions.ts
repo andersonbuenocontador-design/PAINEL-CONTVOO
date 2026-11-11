@@ -9,7 +9,7 @@ const voltaCliente = (fd: FormData) => `/cliente/${s(fd, 'empresaId')}/informes?
 export async function acaoLancarRetirada(fd: FormData) {
   const u = await exigirUsuario('cliente');
   await executar(voltaCliente(fd), 'Retirada lançada.', () => lancarRetirada(u, s(fd, 'empresaId'), s(fd, 'competencia'),
-    { data: s(fd, 'data'), socio: s(fd, 'socio'), tipo: s(fd, 'tipo') as 'lucros', valor: s(fd, 'valor'), observacao: s(fd, 'observacao') }));
+    { data: s(fd, 'data'), socio: s(fd, 'socio'), tipo: s(fd, 'tipo') as 'lucros', valor: s(fd, 'valor'), observacao: s(fd, 'observacao'), origem: s(fd, 'origem') }));
 }
 export async function acaoRemoverRetirada(fd: FormData) {
   const u = await exigirUsuario('cliente');
