@@ -22,11 +22,28 @@ export default async function Entregas({ searchParams }: { searchParams: Promise
       <div className="card"><h2>Com rejeitados</h2><strong style={{ fontSize: '2rem' }}>{v.filter((e) => e.rejeitados > 0).length}</strong></div>
       <div className="card"><h2>Sem documentos configurados</h2><strong style={{ fontSize: '2rem' }}>{semConfig}</strong></div>
     </div>
-    <div className="card"><table><thead><tr><th>Empresa</th><th>Exigidos</th><th>Enviados</th><th>Aprovados</th><th>Rejeitados</th><th>Pendentes</th><th>%</th><th></th></tr></thead><tbody>
-      {v.map((e) => { const estado = !e.exigidos ? 'cinza' : e.pendentes || e.rejeitados ? 'vermelho' : 'verde'; return (<tr key={e.id} className={`entrega-${estado}`}><td><Link href={`/admin/empresas/${e.id}`} title="Usuários, documentos, sócios e retiradas da empresa">{e.razao_social}</Link>{novos.get(e.id) ? <> <Link href={`/admin/empresas/${e.id}/documentos#outros`} className="tag" title="PDFs enviados pelo cliente que ainda não foram abertos">{novos.get(e.id)} PDF novo{novos.get(e.id)! > 1 ? 's' : ''}</Link></> : null}</td><td>{e.exigidos}</td><td>{e.enviados}</td><td>{e.aprovados}</td><td>{e.rejeitados}</td><td>{e.pendentes}</td><td>{e.percentual}%</td><td><div className="acoes-entrega"><Link href={`/admin/empresas/${e.id}/documentos?competencia=${comp}`}>Conferir</Link>
-          {estado === 'vermelho' && (() => { const cb = cobradas.get(e.id); const dt = (d: Date) => new Date(d).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }); return (<>
-            {cb && <span className="cobrado" title={`1ª cobrança em ${dt(cb.criado_em)}. A solicitação está no painel do cliente e se encerra sozinha quando ele enviar tudo.`}><strong>Cobrado {cb.lembretes + 1}x</strong> · último em {dt(cb.ultimo)}</span>}
-            <form action={acaoCobrarDocumentos}><input type="hidden" name="empresaId" value={e.id} /><input type="hidden" name="competencia" value={comp} /><button className="danger">{cb ? 'Cobrar de novo' : 'Cobrar envio'}</button></form></>); })()}</div></td></tr>); })}
-      {!v.length && <tr><td colSpan={8} className="soon">Nenhuma empresa ativa.</td></tr>}</tbody></table></div>
+    <div className="card ent-tabela"><table><thead><tr><th>Empresa</th><th>Andamento</th><th>Situação</th><th></th></tr></thead><tbody>
+      {v.map((e) => {
+        const estado = !e.exigidos ? 'cinza' : e.pendentes || e.rejeitados ? 'vermelho' : 'verde';
+        const aConferir = e.enviados - e.aprovados - e.rejeitados; const nov = novos.get(e.id) ?? 0;
+        const cb = cobradas.get(e.id); const dt = (d: Date) => new Date(d).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+        return (<tr key={e.id} className={`ent-linha ent-${estado}`}>
+          <td><Link className="ent-nome" href={`/admin/empresas/${e.id}`} title="Usuários, documentos, sócios e retiradas da empresa">{e.razao_social}</Link>
+            {nov > 0 && <Link href={`/admin/empresas/${e.id}/documentos#outros`} className="ent-novo" title="Arquivos enviados pelo cliente que ainda não foram abertos">{nov} arquivo{nov > 1 ? 's' : ''} novo{nov > 1 ? 's' : ''}</Link>}</td>
+          <td className="ent-andamento">{e.exigidos ? <>
+            <div className="ent-barra" role="progressbar" aria-valuenow={e.percentual} aria-valuemin={0} aria-valuemax={100} aria-label="Documentos aprovados"><div style={{ width: `${e.percentual}%` }} /></div>
+            <span>{e.aprovados} de {e.exigidos} aprovado{e.exigidos > 1 ? 's' : ''}</span></> : <span className="soon">Sem documentos configurados</span>}</td>
+          <td><div className="ent-chips">
+            {e.concluida && <span className="ent-chip ok">Concluída</span>}
+            {e.pendentes > 0 && <span className="ent-chip falta">Falta {e.pendentes}</span>}
+            {e.rejeitados > 0 && <span className="ent-chip recusado">{e.rejeitados} recusado{e.rejeitados > 1 ? 's' : ''}</span>}
+            {aConferir > 0 && <span className="ent-chip conferir">{aConferir} para conferir</span>}
+            </div>
+            {estado === 'vermelho' && cb && <div className="ent-cobrado" title={`1ª cobrança em ${dt(cb.criado_em)}. A solicitação está no painel do cliente e se encerra sozinha quando ele enviar tudo.`}>Cobrado {cb.lembretes + 1}x · último em {dt(cb.ultimo)}</div>}</td>
+          <td><div className="ent-acoes">
+            {estado === 'vermelho' && <form action={acaoCobrarDocumentos}><input type="hidden" name="empresaId" value={e.id} /><input type="hidden" name="competencia" value={comp} /><button className="ent-btn cobrar">{cb ? 'Cobrar de novo' : 'Cobrar envio'}</button></form>}
+            <Link className={`ent-btn ${aConferir > 0 || nov > 0 ? 'principal' : ''}`} href={`/admin/empresas/${e.id}/documentos?competencia=${comp}`}>{aConferir > 0 ? 'Conferir' : 'Abrir'}</Link></div></td>
+        </tr>); })}
+      {!v.length && <tr><td colSpan={4} className="soon">Nenhuma empresa ativa.</td></tr>}</tbody></table></div>
   </main></>);
 }
