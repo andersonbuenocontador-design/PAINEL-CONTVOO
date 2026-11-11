@@ -8,6 +8,7 @@ const { criarUsuario } = await import('../../src/lib/services/usuarios');
 const { criarExigencia, enviarArquivo, enviarAvulsos, conferirArquivo } = await import('../../src/lib/services/documentos');
 const { criarConta } = await import('../../src/lib/services/extratos');
 const { criarPendencia } = await import('../../src/lib/services/pendencias');
+const { criarSocio } = await import('../../src/lib/services/informes');
 
 const OUT = process.env.DADOS_VIDEOS ?? '/tmp/videos-dados'; mkdirSync(OUT, { recursive: true });
 const C = '2026-10';
@@ -29,8 +30,10 @@ await conferirArquivo(adm, arq, 'aprovado');
 await enviarAvulsos(ub, { empresaId: B, competencia: C, descricao: 'Contrato de aluguel', arquivos: [{ nome: 'contrato-aluguel.pdf', dados: pdf('contrato ficticio') }] });
 await criarPendencia(adm, A, { categoria: 'documento', competencia: C, descricao: 'Envie o comprovante do pagamento do DAS de setembro.' } as never);
 void exA;
+// sócia da empresa A (CPF fictício válido), para a comparação de lucros com o extrato
+await criarSocio(adm, A, { nome: 'Maria Exemplo', cpf: '529.712.440-91' } as never);
 
-// Extrato OFX fictício de outubro/2026 (saldo anterior R$ 8.450,00)
+// Extrato OFX fictício de outubro/2026 (saldo anterior R$ 18.450,00)
 const L: [number, number, string][] = [
   [1, 1850, 'RECEBIMENTO PIX - PADARIA ESTRELA LTDA / 12.345.678/0001-95'],
   [1, -420, 'PAGAMENTO PIX - DISTRIBUIDORA SOL NASCENTE LTDA / 98.765.432/0001-10'],
@@ -49,6 +52,7 @@ const L: [number, number, string][] = [
   [13, 450, 'RECEBIMENTO PIX - PEDRO HENRIQUE ALVES / 321.654.987-11'],
   [14, -1980, 'PAGAMENTO PIX - DISTRIBUIDORA SOL NASCENTE LTDA / 98.765.432/0001-10'],
   [15, 3100, 'RECEBIMENTO PIX - JOAO CARLOS PEREIRA / 123.456.789-09'],
+  [15, -5000, 'PIX ENVIADO - MARIA EXEMPLO / ***.712.440-**'],  // retirada que a cliente informa (vídeo c5)
   [16, -12.34, 'IOF OPERACAO DE CREDITO'],
   [17, -275, 'PAGAMENTO PIX - EMBALAGENS SANTA CRUZ LTDA / 44.555.666/0001-77'],
   [18, 820, 'RECEBIMENTO PIX - MARCIA REGINA TEIXEIRA / 741.852.963-00'],
@@ -56,6 +60,7 @@ const L: [number, number, string][] = [
   [20, 1560, 'RECEBIMENTO PIX - PADARIA ESTRELA LTDA / 12.345.678/0001-95'],
   [21, -2300, 'PAGAMENTO PIX - DISTRIBUIDORA SOL NASCENTE LTDA / 98.765.432/0001-10'],
   [22, -430, 'PAGAMENTO PIX - EMBALAGENS SANTA CRUZ LTDA / 44.555.666/0001-77'],
+  [22, -1500, 'PIX ENVIADO - MARIA EXEMPLO / ***.712.440-**'],  // retirada esquecida (vídeo a6)
   [23, 275, 'RECEBIMENTO PIX - CARLOS EDUARDO MENDES / 159.357.486-22'],
   [24, -3200, 'PAGAMENTO PIX - FUNCIONARIA SALARIO ROSA LIMA / 258.147.369-33'],
   [25, 1740, 'RECEBIMENTO PIX - LUCIANA MARTINS COSTA / 111.222.333-96'],
@@ -65,7 +70,7 @@ const L: [number, number, string][] = [
   [29, 390, 'RECEBIMENTO PIX - ANA PAULA RODRIGUES / 987.654.321-00'],
   [30, -1420.5, 'PAGAMENTO PIX - DISTRIBUIDORA SOL NASCENTE LTDA / 98.765.432/0001-10'],
 ];
-const abertura = 8450; const saldoFinal = Math.round((abertura + L.reduce((s, x) => s + x[1], 0)) * 100) / 100;
+const abertura = 18450; const saldoFinal = Math.round((abertura + L.reduce((s, x) => s + x[1], 0)) * 100) / 100;
 const dt = (d: number) => `202610${String(d).padStart(2, '0')}090000`;
 writeFileSync(`${OUT}/extrato-outubro.ofx`, `OFXHEADER:100
 DATA:OFXSGML

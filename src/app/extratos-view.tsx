@@ -12,7 +12,6 @@ import { listarContas, listarImportacoes, obterPrevia } from '@/lib/services/ext
 import { puxarExtratosDosDocumentos } from '@/lib/services/extratos';
 import { query } from '@/lib/db';
 import { bancosConciliacao, conferenciaSaldos, listarConciliacao, listarParticipantes, listarPlano, obterConciliacao, participanteExigido, resumoLinhas } from '@/lib/services/conciliacao';
-import { ConciliacaoTabela } from './ConciliacaoTabela';
 import { ConciliacaoCliente } from './ConciliacaoCliente';
 import { ExcluirExtrato } from './ExcluirExtrato';
 import './conciliacao.css';
@@ -123,7 +122,7 @@ export async function ExtratosPagina({ u, empresaId, comp, sp, base, voltar }: {
           <td>{i.status === 'previa' && <a href={`${base}/importacao/${i.id}`}>Abrir prévia</a>}</td></tr>))}</tbody></table></>}</details>}
 
       <div id="lancamentos" />
-      {admin && <ConciliacaoTabela key={sp.conta ?? 'todas'} empresaId={empresaId} participantes={participantes} linhas={linhas} plano={planoTela} bancos={bancosTela} admin={admin} somenteLeitura={somenteLeitura} bancoInicial={sp.conta && porConta.has(sp.conta) ? sp.conta : undefined} />}
+      {admin && <ConciliacaoCliente admin key={sp.conta ?? 'todas'} empresaId={empresaId} participantes={participantes} linhas={linhas} plano={planoTela} bancos={bancosTela} somenteLeitura={false} semGuiada={status === 'concluida'} bancoInicial={sp.conta && porConta.has(sp.conta) ? sp.conta : undefined} mes={comp} podeEnviar={false} />}
     </div></main></>);
 }
 

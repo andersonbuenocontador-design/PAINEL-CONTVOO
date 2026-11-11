@@ -1,7 +1,7 @@
 'use server';
 import { redirect } from 'next/navigation';
 import { exigirUsuario } from '@/lib/session';
-import { executar, mensagemDeErro } from '@/lib/actions-util';
+import { executar, mensagemDeErro, recarregar } from '@/lib/actions-util';
 import { AppError } from '@/lib/errors';
 import { enviarArquivo, enviarAvulsos, exigenciaEhExtrato, removerAvulso } from '@/lib/services/documentos';
 import { apagarExtratosDoMes, conferirPeriodoExtrato, excluirArquivoEnviado, importarDireto, marcarExtratoVerificado, resumoImportacao, urlConciliacao } from '@/lib/services/extratos';
@@ -10,7 +10,7 @@ export async function acaoEnviarArquivo(fd: FormData) {
   const u = await exigirUsuario('cliente');
   const empresaId = String(fd.get('empresaId') ?? ''), competencia = String(fd.get('competencia') ?? ''), exigenciaId = String(fd.get('exigenciaId') ?? '');
   const f = fd.get('arquivo');
-  const voltar = `/cliente/${empresaId}/documentos?competencia=${competencia}`;
+  const voltar = `/cliente/${empresaId}/documentos?competencia=${competencia}`; recarregar(voltar); recarregar(`/cliente/${empresaId}/extratos`);
   if (!(f instanceof File) || !f.size) redirect(`${voltar}&erro=${encodeURIComponent('Selecione um arquivo.')}`);
   if (!(await exigenciaEhExtrato(u, empresaId, exigenciaId).catch(() => false))) {
     const dados = Buffer.from(await f.arrayBuffer());
@@ -37,7 +37,7 @@ export async function acaoEnviarArquivo(fd: FormData) {
 export async function acaoEnviarAvulsos(fd: FormData) {
   const u = await exigirUsuario('cliente');
   const empresaId = String(fd.get('empresaId') ?? ''), competencia = String(fd.get('competencia') ?? '');
-  const voltar = `/cliente/${empresaId}/documentos?competencia=${competencia}`;
+  const voltar = `/cliente/${empresaId}/documentos?competencia=${competencia}`; recarregar(voltar); recarregar(`/cliente/${empresaId}/extratos`);
   const arquivos = fd.getAll('arquivos').filter((f): f is File => f instanceof File && f.size > 0);
   if (!arquivos.length) redirect(`${voltar}&erro=${encodeURIComponent('Selecione ao menos um arquivo.')}#outros`);
   const lidos = await Promise.all(arquivos.map(async (f) => ({ nome: f.name, dados: Buffer.from(await f.arrayBuffer()) })));
