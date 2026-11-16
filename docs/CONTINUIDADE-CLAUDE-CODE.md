@@ -1,5 +1,5 @@
 # Continuidade — Painel do Cliente Contábil (Contvoo Contabilidade)
-Atualizado em 29/10/2026. Cole este arquivo no Claude Code (ou deixe-o em `docs/`) para retomar o trabalho.
+Atualizado em 16/11/2026. Cole este arquivo no Claude Code (ou deixe-o em `docs/`) para retomar o trabalho. **Comece pela seção "Estado em 16/11/2026" (no fim).**
 
 ## Quem é o usuário e como falar com ele
 - Dono/gestor na Contvoo Contabilidade (Canoas/RS), não é programador. Fala português do Brasil. Quer solução **prática, rápida e sem custo**.
@@ -36,7 +36,7 @@ O usuário pediu "sem banco de dados local". Escolheu **adaptar o código atual*
 - **Nota fiscal obrigatória por lançamento** (migração 016: `nota_fiscal`, `sem_nota`): campo no editor, "Marcar como sem nota" em lote, filtro "Falta nota", e `enviarParaConferencia` bloqueia sem nota. Excel: Grupo, Categoria, Nota fiscal (sem código/classificação).
 - **Sugestão inteligente** (`src/lib/regras-generico.ts`): regras por descrição para o plano genérico + CNPJ da própria empresa = transferência entre contas + nunca sugere sentido contrário; ordem: histórico confirmado → regras → motor antigo. Nos extratos reais: 48 → 125 de 406 com sugestão.
 - **Contvoo AI** (classificação um a um, sem emojis, visual profissional; `src/app/ConciliacaoGuiada.tsx`, `ConciliacaoCliente.tsx`): o cliente abre em modo "um por vez" (pode trocar para a tabela; fica lembrado no navegador). Fila: correções → com sugestão → sem sugestão → só falta nota. Barra de progresso, confirmar com Enter, atalhos 1–6/N/A/S/→/Ctrl+Z, "confirmar este e mais N iguais", nota fiscal no 2º passo, pausa sugerida a cada 20, conquistas discretas. "Não sei identificar" (OUT006) não é aprendido. **Layout da planilha exportada não muda** (pedido do dono).
-- **03/11/2026**: (1) conferência da competência em cartões e seletor de mês ao lado do nome da empresa; (2) **resumo do mês** na tela inicial do cliente (`resumoFinanceiro` em `hub.ts`: entrou/saiu/resultado, variação vs. mês anterior, 5 maiores gastos por categoria; transferências entre contas próprias ficam fora; "sem categoria"/"Não sei" aparecem à parte); (3) **comprovante por lançamento** (migração 017 `movimentacao_comprovantes`, PDF/JPG/PNG até 10 MB, 5 por lançamento, no passo da nota do Contvoo AI e no editor da tabela; download em `/api/conciliacao/comprovante/[id]`; mesma regra de acesso e bloqueio após envio); (4) cobrança pelo WhatsApp foi feita e **retirada a pedido do dono** (Entregas voltou a ter só "Cobrar envio" pelo painel; a coluna `empresas.whatsapp` ficou no banco, sem uso). O escritório usa a G-Click; envio automático só via o serviço de WhatsApp ligado a ela (WhatsContábil, Zap Contábil ou Digisac), se o dono pedir. **Pendente**: "Exportar para o Conciliador Contvoo" (aguardando arquivo de exemplo do formato).
+- **03/11/2026**: (1) conferência da competência em cartões e seletor de mês ao lado do nome da empresa; (2) **resumo do mês** na tela inicial do cliente (`resumoFinanceiro` em `hub.ts`: entrou/saiu/resultado, variação vs. mês anterior, 5 maiores gastos por categoria; transferências entre contas próprias ficam fora; "sem categoria"/"Não sei" aparecem à parte); (3) **comprovante por lançamento** (migração 017 `movimentacao_comprovantes`, PDF/JPG/PNG até 10 MB, 5 por lançamento, no passo da nota do Contvoo AI e no editor da tabela; download em `/api/conciliacao/comprovante/[id]`; mesma regra de acesso e bloqueio após envio); (4) cobrança pelo WhatsApp foi feita e retirada em 03/11; **voltou em 12/11** (ver "Estado em 16/11/2026"). O escritório usa a G-Click; envio automático só via o serviço de WhatsApp ligado a ela (WhatsContábil, Zap Contábil ou Digisac), se o dono pedir. **Pendente**: "Exportar para o Conciliador Contvoo" (aguardando arquivo de exemplo do formato).
 - **Modo dia/noite** (só no painel): botão sol/lua no topo (`TemaBotao.tsx`), cores em `tema-escuro.css` (`html[data-theme=dark]`), escolha guardada no navegador (`localStorage 'tema'`), script no `<head>` do layout evita piscar. Cores fixas de telas viraram classes para o tema escuro alcançar. O Hub Contábil (artifact do Claude) ganhou o cartão "Painel do Cliente" com o link do Render.
 - **Cliente/fornecedor do lançamento** (migração 018 `participantes`, `movimentacoes.participante_id`, `dicionario_classificacao.participante_id`): só o botão "+" colado na categoria (na tabela abre um quadro para escolher ou cadastrar: `MaisParticipante`; no Contvoo AI é uma pergunta depois da categoria); nome e CPF/CNPJ sugeridos da descrição do banco (`Participante.tsx`); obrigatório para enviar quando a categoria é de cliente (REC001–004, OUT002) ou fornecedor (CMP*, DES001/007/010, TRA005, ATI001–005/007) — lista em `conciliacao.ts`; o histórico lembra o participante no mês seguinte. Planilha Excel: layout trocado em 04/11/2026 pelo modelo do dono (aba Conciliação: Data, Descrição do banco, DESCRIÇÃO [=categoria], Nota fiscal, Complemento, Entrada, Saída, Banco, Motivo / observação [=observação]; aba Conferência de saldos igual). Complemento = nome do cliente/fornecedor + " NF " + número (sem nota: só o nome) — `src/lib/complemento.ts`; sem cadastro, usa o nome que está na descrição do banco (PIX/TED "… - NOME / CNPJ", `sugerirParticipante`); o campo Complemento saiu da tela.
 - **04/11/2026 — só extrato pedido vai para a conciliação**: "Outros documentos" e os demais documentos pedidos NUNCA viram lançamentos; só o arquivo enviado num documento cujo nome ou categoria tem "extrato" (configurado pelo escritório por empresa) — `puxarExtratosDosDocumentos` e `cliente/actions.ts`. "Excluir" em cada extrato do cartão do banco, com confirmação (`ExcluirExtrato.tsx` → `excluirImportacao`: apaga os lançamentos e marca a importação como cancelada). Só o escritório (o dono pediu para tirar do cliente), enquanto não concluída.
@@ -59,6 +59,47 @@ O usuário pediu "sem banco de dados local". Escolheu **adaptar o código atual*
 - **2FA oculto para clientes** (`MFA_CLIENTES=1` religa); administradores mantêm.
 - **Outros documentos (PDF)**: cliente envia PDFs avulsos (tabela `documentos_avulsos`, migração 010, `/api/avulsos/[id]`).
 - Recuperar senha do admin sem acesso ao servidor: `REDEFINIR_SENHA_ADMIN=1` + `SEED_ADMIN_PASSWORD` no Render.
+
+## Estado em 16/11/2026 (sessão de 10 a 16/11)
+Tudo abaixo está na `main` (publicado no Render). 199 testes Vitest passando (`npx vitest run`; precisa de Postgres local com usuário `painel`/`painel_dev` e banco `painel_test`). Branch de trabalho usada: `corrigir-aprovacao-documento` (igual à `main`).
+
+**Documentos e extratos**
+- **Corrigir aprovação** (escritório, Empresa → Documentos): documento aprovado por engano pode ser desfeito (rejeitar com motivo ou voltar para "em conferência"); se for extrato, caixinha para retirar os lançamentos dele da conciliação (`retirarLancamentosDoArquivo`). Auditoria marca `desfez_aprovacao`.
+- **Extrato do período errado é barrado no envio do cliente** (`conferirPeriodoExtrato`: nenhum lançamento no mês pedido → recusa com o período do arquivo). Antes, um extrato de 09/2025 enviado em 09/2026 era aceito e os lançamentos iam para 09/2025.
+- **Cliente apaga os extratos do mês** ("Enviou um extrato errado?", no fim de Documentos do mês): apaga todos os extratos do mês (mesmo aprovados), a conciliação do mês e lançamentos desses extratos que foram para outro mês (`apagarExtratosDoMes`). Bloqueado se a conciliação foi enviada/concluída. Confirmação dupla (digitar APAGAR).
+- **Documentos do mês (cliente) redesenhado**: topo amigável ("Falta só 1 documento", "Tudo certo!") com barra; um botão só ("Enviar"/"Enviar de novo"/"Trocar") que envia ao escolher o arquivo (`EnviarDocumento.tsx`); "Rejeitado" virou "Precisa enviar de novo" + "Recado do escritório". CSS com prefixo `.d2-`.
+- **Outros documentos aceita qualquer tipo** (PDF, foto, planilha, Word, XML, ZIP…), recusa programas/scripts (lista `EXT_BLOQUEADAS` + cabeçalho MZ/ELF) e arquivo corrompido (`enviarAvulsos`). Componente `EnviarOutros.tsx`.
+- Correção: após uma ação que volta para o MESMO endereço, a página não atualizava (dois envios seguidos). `recarregar()` em `src/lib/actions-util.ts` (revalidatePath) dentro de `executar` e das ações do cliente.
+
+**Conciliação**
+- **Salvar no editor confirma a linha** (confiança Alta, revisada, aprende) quando ela tem categoria (`editarLinha` chama `confirmarLinhas`).
+- **Contvoo AI também no escritório**: botão "Pedir ajuda ao Contvoo AI" na conciliação do escritório (`ConciliacaoCliente` com `admin`; abre na tabela, lembra em `localStorage 'conciliacao-modo-escritorio'`; desligado em competência concluída).
+
+**Lucros dos sócios (novo)**
+- Cliente informa em cada retirada **"De onde saiu?"** (conta bancária da empresa ou dinheiro). Migração 021: `retiradas.forma`, `retiradas.conta_id`, tabela `retiradas_ignoradas`.
+- Aba do escritório **/admin/lucros** (todas as empresas: Atenção / Aguardando extrato / Tudo confere) e **/admin/lucros/[empresaId]** (detalhe). Motor em `src/lib/services/lucros.ts` (`compararRetiradas`): mesmo valor, até 5 dias, preferência pela conta informada e pela descrição que cita o sócio (nome primeiro+último, CPF inteiro ou mascarado `***.712.440-**`), categoria de lucros/retirada; dinheiro só confere com SAQUE. Mostra possíveis esquecidas, não encontradas, valor diferente, conta diferente e alerta > R$ 50 mil/mês por sócio. "Não é retirada" (com motivo, desfazível) e "Devolver ao cliente para completar".
+
+**Telas do escritório redesenhadas**
+- **Entregas do mês**: tabela limpa (barra "1 de 3 aprovados", etiquetas Falta/recusado/para conferir/Concluída, botões à direita). CSS `.ent-`.
+- **Página da empresa** (`/admin/empresas/[id]`): painel único com 4 cartões do mês (Documentos, Conciliação, Lucros, Pendências), "Quem acessa" com "+ Dar acesso a alguém" recolhido, dados em leitura com "Editar dados" recolhido (inclui desativar). CSS `.emp-`.
+
+**WhatsApp**
+- Campo **WhatsApp do cliente** no cadastro e no "Editar dados" da empresa (coluna `empresas.whatsapp`, só dígitos com 55).
+- **"Cobrar envio" abre o WhatsApp normal** (link wa.me, celular ou WhatsApp Web) com a mensagem pronta e registra a cobrança no painel (`BotaoCobrar.tsx`, mensagem de `pendenciasDoMes` em `src/lib/services/integracao.ts`). Sem API, sem custo. Dono escolheu WhatsApp normal, não Digisac.
+- API para o n8n: `GET /api/integracoes/extratos-pendentes?competencia=AAAA-MM` e `POST /api/integracoes/cobranca-enviada`, com `Authorization: Bearer <INTEGRACAO_TOKEN>` (se não existir, vale `N8N_CONCILIACAO_TOKEN`, que já está no Render).
+- Envio automático "sem abrir o WhatsApp" exige Digisac (já contratado), Z-API/Evolution (QR code, risco de bloqueio do número) ou API oficial da Meta. **Aguardando decisão do dono.**
+
+**n8n (contvoo.app.n8n.cloud)**
+- "Painel Contvoo: conciliacao concluida" (publicado, de outra sessão): recebe a conciliação concluída (`src/lib/enviar-conciliador.ts`).
+- "Painel Contvoo: cobrar extratos pelo Digisac" (id `PdfLEuUeHFPkmzcz`, **desativado**): dias 5/10/15 às 9h (America/Sao_Paulo) busca pendentes no painel e envia pelo Digisac. Testado até o painel (funciona). Faltam no nó "Configuração": ID da conexão do WhatsApp no Digisac e token da API (endereço já preenchido: `https://contvoocontabilidade.digisac.biz`). Formato do POST `/api/v1/messages` (`number`, `serviceId`, `text`, `origin`, `dontOpenTicket`) **não confirmado na documentação oficial**.
+
+**Ajuda em vídeo**: 12 aulas regravadas (nova a6 "Lucros dos sócios"); ver item "Manual em vídeo" acima.
+
+**Outros fatos**
+- Hospedagem: Render grátis (site não expira; dorme após 15 min) + Supabase grátis (banco e documentos; o "apaga em 30 dias" do Render é só do Postgres do Render, que não é usado).
+- Script SQL de limpeza de extratos/conciliações de uma empresa foi entregue ao dono para rodar no Supabase (não versionado).
+- Ideia em aberto: buscar extratos automaticamente pelo **Open Finance** via intermediário (Pluggy/Belvo) — dono ainda não decidiu.
+- O ambiente de nuvem do Claude não acessa onrender.com nem o Digisac; para testar o painel no ar, use o n8n (`execute_workflow`).
 
 ## Próximos passos (na ordem)
 1. Usuário cria GitHub + repositório privado `painel-contvoo` e conecta em claude.ai/connect-github → Claude faz o push (branch `main`).
