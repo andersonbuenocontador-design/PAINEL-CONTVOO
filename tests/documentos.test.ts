@@ -143,6 +143,18 @@ describe('modelos', () => {
 });
 afterAll(async () => { await getPool().end(); });
 
+describe('arquivos de texto (.md e .txt)', () => {
+  it('documento pedido aceita .md e .txt quando o escritório marca o formato; outros documentos também', async () => {
+    const ex = await criarExigencia(admin, empA, { nome: 'Roteiro de mudança', formatos: ['md', 'txt'] });
+    const md = Buffer.from('# Mudar o painel para contas novas\n\n1. Passo um\n');
+    await expect(enviarArquivo(ua, { empresaId: empA, exigenciaId: ex, competencia: C, nome: 'MUDAR-DE-CONTA.md', dados: md })).resolves.toBeTruthy();
+    await expect(enviarArquivo(ua, { empresaId: empA, exigenciaId: ex, competencia: C, nome: 'notas.txt', dados: Buffer.from('texto') })).resolves.toBeTruthy();
+    await expect(enviarArquivo(ua, { empresaId: empA, exigenciaId: ex, competencia: C, nome: 'binario.md', dados: Buffer.from([0x4d, 0x5a, 0, 1]) })).rejects.toThrow(/não corresponde/);
+    await expect(enviarArquivo(ua, { empresaId: empA, exigenciaId: exA, competencia: C, nome: 'x.md', dados: md })).rejects.toThrow(/Formato não aceito/);
+    expect(await enviarAvulsos(ua, { empresaId: empA, competencia: C, arquivos: [{ nome: 'MUDAR-DE-CONTA.md', dados: md }] })).toHaveLength(1);
+  });
+});
+
 describe('outros documentos (avulsos)', () => {
   const pdf = (n: string) => ({ nome: n, dados: Buffer.from('%PDF-1.7 ' + n) });
   it('cliente envia vários PDFs com descrição; escritório vê e baixa', async () => {

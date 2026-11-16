@@ -8,7 +8,7 @@ import { registrar } from './auditoria';
 import { resolverCobrancaSeCompleto } from './cobranca';
 
 export const FREQUENCIAS = ['mensal', 'trimestral', 'anual', 'eventual'] as const;
-export const FORMATOS_PERMITIDOS = ['pdf', 'ofx', 'csv', 'xlsx', 'xls', 'zip', 'xml', 'jpg', 'png'] as const;
+export const FORMATOS_PERMITIDOS = ['pdf', 'ofx', 'csv', 'xlsx', 'xls', 'zip', 'xml', 'jpg', 'png', 'md', 'txt'] as const;
 export const TAMANHO_MAX = 20 * 1024 * 1024;
 export const SITUACOES = ['pendente', 'enviado', 'em_conferencia', 'aprovado', 'rejeitado', 'substituido'] as const;
 
