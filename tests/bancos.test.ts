@@ -5,7 +5,7 @@ import { BANCOS, bancoDe, tipoDocumento } from '../src/lib/bancos';
 describe('marca do banco nos documentos pedidos', () => {
   it('reconhece o banco pelo nome ou instituição (com e sem acento)', () => {
     const casos: [string, string | null][] = [['EXTRATO — NUBANK', 'nubank'], ['Extrato Itaú', 'itau'], ['EXTRATO ITAU', 'itau'], ['Extrato Banco do Brasil', 'bb'], ['Extrato Inter', 'inter'],
-      ['Extrato Intex', null], ['Extrato PagSeguro', 'pagbank'], ['Extrato Sicredi', 'sicredi'], ['Extrato Efí', 'efi'], ['Folha de pagamento', null]];
+      ['Extrato Intex', null], ['Extrato PagSeguro', 'pagbank'], ['Extrato Sicredi', 'sicredi'], ['Extrato Efí', 'efi'], ['Folha de pagamento', null], ['Fatura Sem Parar', 'semparar'], ['SEMPARAR EMPRESAS', 'semparar']];
     for (const [t, k] of casos) expect(bancoDe(t)?.chave ?? null, t).toBe(k);
     expect(bancoDe(null, 'Extrato conta corrente')).toBeNull(); expect(bancoDe('Banrisul', 'Extrato')?.chave).toBe('banrisul');
   });

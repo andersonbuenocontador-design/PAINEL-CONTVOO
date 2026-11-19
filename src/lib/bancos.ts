@@ -57,6 +57,7 @@ export const BANCOS: (Marca & { re: RegExp })[] = [
   { chave: 'contaazul', nome: 'Conta Azul', sigla: 'CA', fundo: '#0066FF', texto: '#fff', re: /conta ?azul/i },
   { chave: 'stark', nome: 'Stark Bank', sigla: 'SB', fundo: '#0F2E4F', texto: '#fff', re: /stark ?bank/i },
   { chave: 'bndes', nome: 'BNDES', sigla: 'BN', fundo: '#00813E', texto: '#fff', re: /\bbndes\b/i },
+  { chave: 'semparar', nome: 'Sem Parar', sigla: 'SP', fundo: '#E4004B', texto: '#fff', re: /sem ?parar/i },
 ];
 /** Bancos com logo em public/bancos (todos os da lista acima). */
 for (const b of BANCOS) b.logo = `/bancos/${b.chave}.png`;
