@@ -41,6 +41,8 @@ export default async function Gclick({ searchParams }: { searchParams: Promise<{
         <div className="row"><button className="doc2-btn primario">Confirmar: ligar empresas e cadastrar as marcadas</button><Link className="doc2-btn leve" href="/admin/gclick">Cancelar</Link></div>
       </form>}
     </section>}
-    {st.ligado && <section className="card emp-bloco"><h2>Baixa de tarefas no G-Click</h2><p className="soon">Em preparação: depende da documentação da API do G-Click para alterar tarefas.</p></section>}
+    {st.ligado && <section className="card emp-bloco"><h2>3. Solicitação de documentos</h2>
+      <p className="soon">Em dois cliques: ✔ no G-Click para os clientes com e-mail (o G-Click manda o e-mail) e a mensagem padrão pelo WhatsApp para quem não tem e-mail.</p>
+      <Link className="doc2-btn primario" href="/admin/gclick/solicitacao">Abrir a solicitação de documentos</Link></section>}
   </main></>);
 }

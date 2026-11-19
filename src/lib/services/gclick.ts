@@ -10,11 +10,11 @@ import { cnpjValido } from '../cnpj';
    Hoje: importar clientes (CNPJ, nome, apelido, telefone) e ligar às empresas do painel. */
 
 export const GCLICK_BASE = 'https://api.gclick.com.br';
-type Cred = { id: string; segredo: string };
-export type GclickCliente = { id: number; nome: string; apelido: string | null; inscricao?: string | null; tipoInscricao?: string | null; status?: string | null; telefones?: { numero?: string | null }[] | null };
+export type Cred = { id: string; segredo: string };
+export type GclickCliente = { id: number; nome: string; apelido: string | null; emails?: { email?: string | null }[] | null; inscricao?: string | null; tipoInscricao?: string | null; status?: string | null; telefones?: { numero?: string | null }[] | null };
 type Pagina<T> = { content: T[]; last?: boolean; totalElements?: number };
 
-async function lerCred(): Promise<Cred | null> {
+export async function lerCred(): Promise<Cred | null> {
   const m = new Map((await query(`SELECT chave, valor FROM configuracoes WHERE chave IN ('gclick_client_id','gclick_client_secret')`)).rows.map((r) => [r.chave as string, r.valor as string]));
   const id = m.get('gclick_client_id'), s = m.get('gclick_client_secret');
   if (!id || !s) return null;
@@ -38,7 +38,7 @@ export async function desligarGclick(actor: Actor) {
   await tx(async (c) => { await c.query(`DELETE FROM configuracoes WHERE chave IN ('gclick_client_id','gclick_client_secret')`); await registrar(c, { usuarioId: actor.id, acao: 'gclick.desligar', entidade: 'configuracao' }); });
 }
 
-async function token(c: Cred) {
+export async function token(c: Cred) {
   let r: Response;
   try { r = await fetch(`${GCLICK_BASE}/oauth/token`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: c.id, client_secret: c.segredo, grant_type: 'client_credentials' }), signal: AbortSignal.timeout(30000) }); }
   catch { throw new AppError('Não foi possível falar com o G-Click agora. Tente de novo em alguns minutos.'); }
@@ -47,7 +47,7 @@ async function token(c: Cred) {
   return ((await r.json()) as { access_token: string }).access_token;
 }
 /** Todos os clientes do G-Click (páginas de 500). */
-async function todosClientes(c: Cred): Promise<GclickCliente[]> {
+export async function todosClientes(c: Cred): Promise<GclickCliente[]> {
   const t = await token(c); const lista: GclickCliente[] = [];
   for (let page = 0; page < 50; page++) {
     let r: Response;
