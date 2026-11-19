@@ -15,14 +15,14 @@ const C = '2026-10';
 const adm = { id: (await query("select id from usuarios where papel='admin' limit 1")).rows[0].id as string, papel: 'admin' as const };
 const pdf = (t: string) => Buffer.from(`%PDF-1.4\n% ${t}\n`);
 
-const A = await criarEmpresa(adm, { razaoSocial: 'Mercadinho Boa Compra Ltda', nomeFantasia: 'Boa Compra', cnpj: '11.222.333/0001-81' });
-const B = await criarEmpresa(adm, { razaoSocial: 'Auto Peças Modelo Ltda', nomeFantasia: 'Auto Peças Modelo', cnpj: '45.723.174/0001-10' });
+const A = await criarEmpresa(adm, { razaoSocial: 'Mercadinho Boa Compra Ltda', nomeFantasia: 'Boa Compra', cnpj: '11.222.333/0001-81', whatsapp: '(51) 99999-0001' });
+const B = await criarEmpresa(adm, { razaoSocial: 'Auto Peças Modelo Ltda', nomeFantasia: 'Auto Peças Modelo', cnpj: '45.723.174/0001-10', whatsapp: '(51) 99999-0002' });
 const ua = { id: await criarUsuario(adm, { nome: 'Maria Exemplo', email: 'maria@exemplo.com', papel: 'cliente', senhaTemporaria: 'Provisoria#Sol2026', empresaIds: [A] }), papel: 'cliente' as const };
 const ub = { id: await criarUsuario(adm, { nome: 'João Exemplo', email: 'joao@exemplo.com', papel: 'cliente', senhaTemporaria: 'Provisoria#Lua2026', empresaIds: [B] }), papel: 'cliente' as const };
 await criarConta(adm, A, { banco: 'Banco Exemplo', agencia: '0001', conta: '12345-6' });
-const exA = await criarExigencia(adm, A, { nome: 'Extrato conta corrente', instituicao: 'Banco Exemplo', formatos: ['pdf', 'ofx'] });
+const exA = await criarExigencia(adm, A, { nome: 'Extrato conta corrente', instituicao: 'Sicredi', formatos: ['pdf', 'ofx'] });
 await criarExigencia(adm, A, { nome: 'Notas fiscais de compra', formatos: ['pdf'] });
-const exB1 = await criarExigencia(adm, B, { nome: 'Extrato conta corrente', instituicao: 'Banco Exemplo', formatos: ['pdf'] });
+const exB1 = await criarExigencia(adm, B, { nome: 'Extrato conta corrente', instituicao: 'Nubank', formatos: ['pdf'] });
 await criarExigencia(adm, B, { nome: 'Notas fiscais de compra', formatos: ['pdf'] });
 // B já entregou o extrato (aprovado) mas falta a nota fiscal; mandou também um PDF em "Outros documentos"
 const arq = await enviarArquivo(ub, { empresaId: B, exigenciaId: exB1, competencia: C, nome: 'extrato-outubro.pdf', dados: pdf('extrato ficticio') });
@@ -30,6 +30,10 @@ await conferirArquivo(adm, arq, 'aprovado');
 await enviarAvulsos(ub, { empresaId: B, competencia: C, descricao: 'Contrato de aluguel', arquivos: [{ nome: 'contrato-aluguel.pdf', dados: pdf('contrato ficticio') }] });
 await criarPendencia(adm, A, { categoria: 'documento', competencia: C, descricao: 'Envie o comprovante do pagamento do DAS de setembro.' } as never);
 void exA;
+// Digisac de demonstração (servidor falso do gravar.cjs na porta 4555): o 'Cobrar envio' funciona nos vídeos sem mandar nada de verdade.
+const { cifrar } = await import('../../src/lib/cripto');
+for (const [k, v] of [['digisac_url', 'http://127.0.0.1:4555'], ['digisac_token', cifrar('token-de-demonstracao')], ['digisac_service_id', 'whats-demo'], ['digisac_service_nome', 'WhatsApp Contvoo']])
+  await query('INSERT INTO configuracoes(chave,valor) VALUES ($1,$2) ON CONFLICT (chave) DO UPDATE SET valor=EXCLUDED.valor', [k, v]);
 // sócia da empresa A (CPF fictício válido), para a comparação de lucros com o extrato
 await criarSocio(adm, A, { nome: 'Maria Exemplo', cpf: '529.712.440-91' } as never);
 

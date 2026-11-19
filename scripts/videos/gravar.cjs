@@ -58,6 +58,12 @@ async function esperar(p, ms = 450) { await p.waitForTimeout(GRAVAR ? ms + 150 :
 async function ir(p, url) { await p.goto(B + url); await p.waitForLoadState('domcontentloaded'); await pausa(500); }
 
 let br; const ESTADO = {};
+// Digisac de mentira para os vídeos: responde como a API (conexões, contato e envio) sem mandar nada de verdade.
+const digisacFalso = require('http').createServer((req, res) => { res.setHeader('content-type', 'application/json');
+  if (req.url.startsWith('/api/v1/services')) return res.end(JSON.stringify({ data: [{ id: 'whats-demo', name: 'WhatsApp Contvoo', type: 'whatsapp' }] }));
+  if (req.url.startsWith('/api/v1/contacts')) return res.end(JSON.stringify({ data: [{ id: 'contato-demo', name: 'João Exemplo', serviceId: 'whats-demo' }] }));
+  if (req.url.startsWith('/api/v1/messages')) { req.resume(); return res.end(JSON.stringify({ id: 'msg-demo' })); }
+  res.statusCode = 404; res.end('{}'); }).listen(4555);
 async function cena(nome, estado, fn, salvarEstado) {
   if (SO.length && !SO.includes(nome)) return;
   passo = 0; const t0 = Date.now(); console.log('>>', nome);
@@ -76,7 +82,7 @@ async function cena(nome, estado, fn, salvarEstado) {
   }
   if (erro) process.exitCode = 1; console.log(`   (${Math.round((Date.now() - t0) / 1000)}s)`);
 }
-const card = (p, titulo) => p.locator(`a.atalho:has-text("${titulo}")`).first();
+const card = (p, titulo) => p.locator(`a.inicio-cartao:has-text("${titulo}"), a.inicio-mini:has-text("${titulo}")`).first();
 const anotar = async (p, legendaTxt, alvo) => { if (alvo) await mover(p, alvo); await legenda(p, legendaTxt); };
 
 (async () => {
@@ -96,13 +102,14 @@ const anotar = async (p, legendaTxt, alvo) => { if (alvo) await mover(p, alvo); 
     await legenda(p, 'No primeiro acesso você cria a sua própria senha. Use letras, números e símbolos');
     await digitar(p, '#atual', 'Provisoria#Sol2026'); await digitar(p, '#nova', 'Cavalo#Verde2026!'); await digitar(p, '#confirma', 'Cavalo#Verde2026!'); await clicar(p, 'form button');
     await p.waitForURL(/\/cliente/); await p.waitForLoadState('domcontentloaded'); await pausa(800);
-    await anotar(p, 'Esta é a tela inicial. Cada cartão é uma tarefa do mês', card(p, 'Documentos do mês'));
+    await anotar(p, 'Esta é a tela inicial. No alto, o quadro azul mostra o que falta você fazer no mês', p.locator('.inicio-atencao'));
+    await anotar(p, 'Cada cartão é uma tarefa do mês, com a situação de cada uma', card(p, 'Documentos do mês'));
     await anotar(p, 'Documentos do mês: envie os documentos que o escritório pediu', card(p, 'Documentos do mês'));
     await anotar(p, 'Extratos e conciliação: identifique as entradas e saídas do banco', card(p, 'Extratos'));
     await anotar(p, 'Retiradas dos sócios: informe a distribuição de lucros', card(p, 'Retiradas'));
     await anotar(p, 'Pendências: pedidos do escritório para você responder', card(p, 'Pendências'));
     await anotar(p, 'Troque o mês aqui. O escritório trabalha por competência (mês de referência)', p.locator('.comp-mini select'));
-    await anotar(p, 'Precisa de ajuda? Os vídeos ficam sempre no link "Ajuda" do topo', p.locator('header.top a:has-text("Ajuda")'));
+    await anotar(p, 'Precisa de ajuda? Os vídeos ficam no botão de ajuda (?) do topo. Para sair, clique no seu nome', p.locator('header.top a[title="Ajuda"]'));
   }, 'cliente');
 
   await cena('c2-documentos', 'cliente', async (p) => {
@@ -110,7 +117,7 @@ const anotar = async (p, legendaTxt, alvo) => { if (alvo) await mover(p, alvo); 
     await legenda(p, 'Na tela inicial, abra o cartão "Documentos do mês"'); await clicar(p, card(p, 'Documentos do mês')); await p.waitForURL(/documentos/);
     await legenda(p, 'Primeiro escolha o mês de referência: o mês que o escritório está pedindo');
     await mover(p, p.locator('.comp-mini select')); await p.locator('.comp-mini select').selectOption(C); await pausa(500); await clicar(p, p.locator('.comp-mini button')); await p.waitForURL(/competencia=2026-10/);
-    await anotar(p, 'No alto, o painel mostra quanto falta para fechar o mês', p.locator('.d2-hero'));
+    await anotar(p, 'No alto, o painel mostra quanto falta para fechar o mês', p.locator('.d2-hero2'));
     await anotar(p, 'Cada documento pedido aparece numa linha, com a situação em palavras simples', p.locator('li.d2-item').first());
     const nota = p.locator('li.d2-item:has-text("Notas fiscais")');
     await legenda(p, 'Para enviar: clique em "Enviar" e escolha o arquivo. Ele vai na hora, sem outro botão');
@@ -219,8 +226,8 @@ const anotar = async (p, legendaTxt, alvo) => { if (alvo) await mover(p, alvo); 
 
   await cena('c6-pendencias-e-noite', 'cliente', async (p) => {
     await ir(p, `/cliente/${A}`); await titulo(p, 'Pendências e modo noite', 'Responder o escritório e deixar a tela escura');
-    await anotar(p, 'Quando o escritório precisa de algo, aparece este aviso na tela inicial', p.locator('.msg-err').first());
-    await clicar(p, p.locator('.msg-err a:has-text("Responder")')); await p.waitForURL(/pendencias/);
+    await anotar(p, 'Quando o escritório precisa de algo, aparece em "Para fazer agora" na tela inicial', p.locator('.inicio-chip:has-text("pedido")').first());
+    await clicar(p, p.locator('.inicio-chip:has-text("pedido")').first()); await p.waitForURL(/pendencias/);
     await anotar(p, 'Leia o pedido do escritório e escreva a sua resposta', p.locator('details').first());
     await digitar(p, p.locator('textarea[name=texto]').first(), 'Enviei o comprovante do DAS na aba Documentos do mês.');
     await clicar(p, p.locator('button:has-text("Enviar resposta")').first()); await p.waitForURL(/ok=/);
@@ -228,7 +235,7 @@ const anotar = async (p, legendaTxt, alvo) => { if (alvo) await mover(p, alvo); 
     await legenda(p, 'Prefere a tela escura? Clique no botão da lua no topo (modo noite)'); await clicar(p, p.locator('.tema-botao'));
     await anotar(p, 'A escolha fica salva neste aparelho. Para voltar ao modo dia, clique no sol', p.locator('.tema-botao'));
     await clicar(p, p.locator('.tema-botao'));
-    await legenda(p, 'Dúvidas? Clique em "Ajuda" no topo para rever os vídeos'); await clicar(p, p.locator('header.top a:has-text("Ajuda")')); await p.waitForURL(/ajuda/);
+    await legenda(p, 'Dúvidas? Clique no botão de ajuda (?) do topo para rever os vídeos'); await clicar(p, p.locator('header.top a[title="Ajuda"]')); await p.waitForURL(/ajuda/);
   });
 
   // ======================= ESCRITÓRIO =======================
@@ -242,9 +249,9 @@ const anotar = async (p, legendaTxt, alvo) => { if (alvo) await mover(p, alvo); 
     await anotar(p, 'Cada empresa mostra a barra de andamento: quantos documentos já foram aprovados', p.locator('tr.ent-linha .ent-andamento').first());
     await anotar(p, 'As etiquetas dizem o que falta: "Falta", "recusado", "para conferir" ou "Concluída"', p.locator('tr.ent-vermelho .ent-chips').first());
     await anotar(p, 'A etiqueta "arquivo novo" avisa que o cliente mandou algo em "Outros documentos"', p.locator('.ent-novo').first());
-    await legenda(p, 'Clique em "Cobrar envio": o cliente recebe a cobrança na tela dele, com a lista do que falta');
+    await legenda(p, 'Clique em "Cobrar envio": a mensagem vai direto para o WhatsApp do cliente, pelo Digisac, com a lista do que falta');
     await clicar(p, p.locator('tr.ent-vermelho button:has-text("Cobrar envio")').first()); await p.waitForURL(/ok=/);
-    await anotar(p, 'Cobrança enviada! Se ele não responder, cobre de novo: o painel conta "Cobrado 2x, 3x…"', p.locator('.ent-cobrado').first());
+    await anotar(p, 'Cobrança enviada no WhatsApp! Se ele não enviar, cobre de novo: o painel conta "Cobrado 2x, 3x…"', p.locator('.ent-cobrado').first());
   });
 
   await cena('a2-cadastrar-empresa', 'admin', async (p) => {
@@ -254,34 +261,36 @@ const anotar = async (p, legendaTxt, alvo) => { if (alvo) await mover(p, alvo); 
     await digitar(p, 'input[name=razaoSocial]', 'Oficina Nova Era Ltda'); await digitar(p, 'input[name=cnpj]', '33.000.167/0001-01');
     await clicar(p, p.locator('button:has-text("Cadastrar")')); await p.waitForURL(/ok=/);
     await clicar(p, p.locator('tr:has-text("Oficina Nova Era") a:has-text("Abrir")').first()); await p.waitForURL(/empresas\/[0-9a-f-]{36}$/);
-    await anotar(p, 'Esta é a página da empresa: o mês inteiro em quatro cartões, cada um com o botão para agir', p.locator('.emp-cartoes'));
+    await anotar(p, 'Esta é a página da empresa: o que fazer agora no alto e o mês em quatro cartões', p.locator('.inicio-grandes'));
     await legenda(p, 'Para criar o acesso do cliente, clique em "+ Dar acesso a alguém"'); await clicar(p, p.locator('summary:has-text("Dar acesso a alguém")'));
     const f = p.locator('form:has(button:has-text("Criar usuário"))');
     await anotar(p, 'Nome, e-mail e uma senha provisória: ele troca a senha no primeiro acesso', f);
     await digitar(p, f.locator('input[name=nome]'), 'Carlos Exemplo'); await digitar(p, f.locator('input[name=email]'), 'carlos@exemplo.com'); await digitar(p, f.locator('input[name=senha]'), 'Provisoria#Mar2026');
     await clicar(p, f.locator('button:has-text("Criar usuário")')); await p.waitForURL(/ok=/);
     await anotar(p, 'Pronto: o cliente aparece em "Quem acessa". Os dados da empresa ficam ao lado, com "Editar dados"', p.locator('.emp-usuarios'));
-    await legenda(p, 'Agora defina os documentos do mês: no cartão "Documentos do mês", clique em "Abrir documentos"'); await clicar(p, p.locator('a:has-text("Abrir documentos")')); await p.waitForURL(/documentos/);
-    const g = p.locator('form:has(button:has-text("Adicionar"))').first();
-    await anotar(p, 'Informe o nome do documento. Para extrato, use a palavra "Extrato": só ele vai para a conciliação', g);
-    await digitar(p, g.locator('input[name=nome]'), 'Extrato conta corrente'); await digitar(p, g.locator('input[name=instituicao]'), 'Banco Exemplo');
-    await legenda(p, 'Marque os formatos aceitos (PDF, OFX...) e clique em "Adicionar"'); await clicar(p, g.locator('input[value=ofx]'));
-    await clicar(p, g.locator('button:has-text("Adicionar")')); await p.waitForURL(/ok=/);
-    await anotar(p, 'Pronto! A empresa já pode enviar o extrato. Repita para os outros documentos', p.locator('text=Extrato conta corrente').first());
+    await legenda(p, 'Agora defina os documentos do mês: clique no cartão "Documentos do mês"'); await clicar(p, card(p, 'Documentos do mês')); await p.waitForURL(/documentos/);
+    const g = p.locator('#pedir form');
+    await anotar(p, 'Em "Pedir documento", clique no banco do cliente: o formulário do extrato se preenche sozinho', p.locator('.doc2-atalhos'));
+    await clicar(p, p.locator('.doc2-banco:has-text("Banrisul")'));
+    await anotar(p, 'Nome, banco, categoria e formatos (PDF e OFX) já vieram preenchidos. Só o que tem "Extrato" no nome vai para a conciliação', g.locator('input[name=nome]'));
+    await clicar(p, g.locator('button:has-text("Adicionar documento")')); await p.waitForURL(/ok=/);
+    await anotar(p, 'Pronto! O extrato aparece com o logo do banco. Repita para os outros documentos', p.locator('article.doc2-card').first());
   });
 
   await cena('a3-conferir-documentos', 'admin', async (p) => {
     await ir(p, `/admin/entregas?competencia=${C}`); await titulo(p, 'Conferir os documentos', 'Aprovar ou recusar o que o cliente enviou');
     await legenda(p, 'Na linha da empresa, clique em "Conferir"'); await clicar(p, p.locator('tr:has-text("Mercadinho Boa Compra") a:has-text("Conferir")')); await p.waitForURL(/documentos/);
     await anotar(p, 'Aqui estão os arquivos enviados. Clique no nome para baixar e conferir', p.locator('a[href^="/api/arquivos/"]').first());
-    await legenda(p, 'Está certo? Clique em "Aprovar"'); await clicar(p, p.locator('tr:has-text("Extrato conta corrente") button:has-text("Aprovar")').first()); await p.waitForURL(/ok=/);
+    await anotar(p, 'Cada documento é um cartão, com o logo do banco e a situação em cores', p.locator('article.doc2-card').first());
+    await legenda(p, 'Está certo? Clique em "Aprovar"'); await clicar(p, p.locator('article.doc2-card:has-text("Extrato conta corrente") button:has-text("Aprovar")').first()); await p.waitForURL(/ok=/);
     await legenda(p, 'Aprovou por engano, por exemplo um extrato do mês errado? Abra "Corrigir aprovação"'); await clicar(p, p.locator('details.corrigir-aprovado summary').first());
-    await anotar(p, 'Dá para desfazer e rejeitar com o motivo, e até tirar os lançamentos desse extrato da conciliação', p.locator('details.corrigir-aprovado').first());
+    await anotar(p, 'Dá para desfazer e recusar com o motivo, e até tirar os lançamentos desse extrato da conciliação', p.locator('details.corrigir-aprovado .doc2-pop-corpo').first());
     await p.locator('details.corrigir-aprovado summary').first().click();
-    await legenda(p, 'Está errado? Escreva o motivo e clique em "Rejeitar": o cliente vê o motivo e envia de novo');
-    const nf = p.locator('tr:has-text("Notas fiscais")'); await digitar(p, nf.locator('input[name=motivo]'), 'Arquivo cortado, envie de novo');
-    await clicar(p, nf.locator('button:has-text("Rejeitar")')); await p.waitForURL(/ok=/);
-    await anotar(p, 'Mais abaixo ficam os "Outros documentos" que o cliente enviou. Baixar conta como "visto"', p.locator('text=Outros documentos enviados pelo cliente').first());
+    await legenda(p, 'Está errado? Clique em "Recusar", escreva o motivo e confirme: o cliente vê o motivo e envia de novo');
+    const nf = p.locator('article.doc2-card:has-text("Notas fiscais")'); await clicar(p, nf.locator('summary:has-text("Recusar")'));
+    await digitar(p, nf.locator('input[name=motivo]'), 'Arquivo cortado, envie de novo');
+    await clicar(p, nf.locator('.doc2-pop-corpo button:has-text("Recusar")')); await p.waitForURL(/ok=/);
+    await anotar(p, 'Mais abaixo ficam os outros arquivos que o cliente enviou. Baixar conta como "visto"', p.locator('#outros h2').first());
   });
 
   await cena('a4-conciliacao', 'admin', async (p) => {
@@ -310,10 +319,12 @@ const anotar = async (p, legendaTxt, alvo) => { if (alvo) await mover(p, alvo); 
   await cena('a5-pendencias-usuarios-relatorios', 'admin', async (p) => {
     await ir(p, `/admin?competencia=${C}`); await titulo(p, 'Pendências, usuários e relatórios', 'O resto do dia a dia do escritório');
     await legenda(p, 'Pendências: peça ao cliente qualquer informação ou documento extra'); await clicar(p, card(p, 'Pendências')); await p.waitForURL(/pendencias/);
-    await anotar(p, 'Veja as respostas dos clientes; o cartão da tela inicial avisa quando chega uma nova', p.locator('table').first());
-    const f = p.locator('form:has(button:has-text("Criar solicitação"))'); await anotar(p, 'Para criar um pedido novo, escolha a empresa e clique em "Criar solicitação"', f);
+    await anotar(p, 'É um mural de avisos: as abas mostram quem respondeu, quem você aguarda e o que venceu', p.locator('.mural-abas'));
+    await anotar(p, 'Cada aviso mostra a empresa, o pedido, a última mensagem e o prazo. Clique para abrir a conversa', p.locator('.mural-card').first());
+    await legenda(p, 'Para criar um pedido novo, clique em "Nova solicitação" e escolha a empresa'); await clicar(p, p.locator('.mural-nova summary'));
+    const f = p.locator('.mural-nova-corpo');
     await mover(p, f.locator('select[name=empresaId]')); await f.locator('select[name=empresaId]').selectOption({ label: 'Auto Peças Modelo Ltda' }); await pausa(500);
-    await clicar(p, f.locator('button:has-text("Criar solicitação")')); await p.waitForURL(/pendencias/);
+    await clicar(p, f.locator('button:has-text("Continuar")')); await p.waitForURL(/pendencias/);
     await legenda(p, 'Escreva o que o cliente precisa fazer e, se quiser, o prazo');
     await digitar(p, p.locator('textarea[name=descricao]'), 'Envie a nota fiscal da compra de peças de outubro.'); await clicar(p, p.locator('button:has-text("Enviar solicitação")')); await p.waitForURL(/ok=/);
     await legenda(p, 'Usuários: crie, bloqueie ou redefina a senha dos acessos'); await ir(p, '/admin'); await clicar(p, card(p, 'Usuários')); await p.waitForURL(/usuarios/);
@@ -336,5 +347,22 @@ const anotar = async (p, legendaTxt, alvo) => { if (alvo) await mover(p, alvo); 
     await clicar(p, p.locator('button:has-text("Devolver ao cliente para completar")')); await p.waitForURL(/ok=/);
     await anotar(p, 'Pronto! O cliente lança o que faltou e envia de novo. Acima de R$ 50 mil no mês por sócio, o painel avisa', p.locator('.msg-ok'));
   });
-  await br.close();
+  await cena('a7-whatsapp-digisac', 'admin', async (p) => {
+    await ir(p, `/admin?competencia=${C}`); await titulo(p, 'Cobrança pelo WhatsApp', 'Digisac e a mensagem de cobrança');
+    await legenda(p, 'Na tela inicial, em "Cadastros e ajustes", abra "WhatsApp (Digisac)"'); await clicar(p, card(p, 'WhatsApp (Digisac)')); await p.waitForURL(/whatsapp/);
+    await anotar(p, 'Passo 1: o endereço da conta Digisac e a chave da API. A chave fica guardada cifrada e não aparece de novo', p.locator('form:has(#token)'));
+    await anotar(p, 'Passo 2: escolha por qual conexão de WhatsApp as cobranças saem', p.locator('#conexao'));
+    await anotar(p, 'Passo 3: faça um envio de teste para o seu número antes de cobrar os clientes', p.locator('form:has(button:has-text("Enviar teste"))'));
+    await anotar(p, 'Mais abaixo, a mensagem de cobrança: escreva do seu jeito', p.locator('#texto'));
+    await legenda(p, 'Clique nos marcadores para inserir: {nome} do contato, {empresa}, {mes}, {documentos} e {link}');
+    const t = p.locator('#texto'); await mover(p, t); await t.fill(''); await digitar(p, t, 'Bom dia, ');
+    await clicar(p, p.locator('.msg-chip:has-text("{nome}")')); await t.pressSequentially('! Para fecharmos ', { delay: 40 });
+    await clicar(p, p.locator('.msg-chip:has-text("{mes}")')); await t.pressSequentially(' ainda falta:\n', { delay: 40 });
+    await clicar(p, p.locator('.msg-chip:has-text("{documentos}")')); await t.pressSequentially('\nEnvie aqui: ', { delay: 40 });
+    await clicar(p, p.locator('.msg-chip:has-text("{link}")'));
+    await anotar(p, 'Ao lado aparece como a mensagem chega no WhatsApp do cliente', p.locator('.msg-balao'));
+    await clicar(p, p.locator('button:has-text("Salvar mensagem")')); await p.waitForURL(/ok=/);
+    await anotar(p, 'Pronto! O botão "Cobrar envio" de Entregas do mês usa esta mensagem', p.locator('.msg-ok'));
+  });
+  await br.close(); digisacFalso.close();
 })().catch((e) => { console.error(e); process.exit(1); });
