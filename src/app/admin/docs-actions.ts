@@ -5,6 +5,10 @@ import { cobrarDocumentos } from '@/lib/services/cobranca';
 import { executar, mensagemDeErro } from '@/lib/actions-util';
 import { aplicarModelo, conferirArquivo, criarExigencia, criarModeloDeEmpresa, definirExigenciaAtiva, editarExigencia, enviarArquivo, removerAvulso } from '@/lib/services/documentos';
 import { AppError } from '@/lib/errors';
+import { digisacPronto, enviarWhatsappDigisac } from '@/lib/services/digisac';
+import { pendenciasDoMes } from '@/lib/services/integracao';
+import { registrar } from '@/lib/services/auditoria';
+import { query } from '@/lib/db';
 import { retirarLancamentosDoArquivo } from '@/lib/services/extratos';
 
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? '');
@@ -55,7 +59,25 @@ export async function acaoRemoverAvulsoAdmin(fd: FormData) {
 export async function acaoCobrarDocumentos(fd: FormData) {
   const a = await exigirUsuario('admin'); const e = s(fd, 'empresaId'); const c = s(fd, 'competencia'); const volta = `/admin/entregas?competencia=${c}`;
   let destino: string;
-  try { const r = await cobrarDocumentos(a, e, c); destino = `${volta}&ok=${encodeURIComponent(r.lembrete ? 'Lembrete enviado ao painel do cliente.' : 'Cobrança enviada ao painel do cliente.')}`; }
-  catch (x) { destino = `${volta}&erro=${encodeURIComponent(mensagemDeErro(x))}`; }
+  try {
+    const r = await cobrarDocumentos(a, e, c);
+    let msg = r.lembrete ? 'Lembrete enviado ao painel do cliente.' : 'Cobrança enviada ao painel do cliente.';
+    // Digisac ligado e empresa com WhatsApp: a mensagem sai sozinha pelo WhatsApp do escritório.
+    if (await digisacPronto()) {
+      const z = (await pendenciasDoMes(c, false)).todas.find((x) => x.empresaId === e);
+      if (z?.whatsapp) {
+        try {
+          await enviarWhatsappDigisac(z.whatsapp, z.mensagem);
+          await registrar({ query } as never, { usuarioId: a.id, empresaId: e, acao: 'cobranca.whatsapp_enviada', entidade: 'empresa', entidadeId: e, detalhes: { competencia: c, canal: 'digisac' } });
+          msg += ' E enviada no WhatsApp pelo Digisac.';
+        } catch (x) {
+          await registrar({ query } as never, { usuarioId: a.id, empresaId: e, acao: 'cobranca.whatsapp_falhou', entidade: 'empresa', entidadeId: e, detalhes: { competencia: c, canal: 'digisac', detalhe: mensagemDeErro(x).slice(0, 300) } });
+          destino = `${volta}&erro=${encodeURIComponent(`${msg} Mas o WhatsApp não foi: ${mensagemDeErro(x)}`)}`; redirect(destino);
+        }
+      } else msg += ' (Sem WhatsApp cadastrado: não foi pelo WhatsApp.)';
+    }
+    destino = `${volta}&ok=${encodeURIComponent(msg)}`;
+  }
+  catch (x) { if (x && typeof x === 'object' && 'digest' in x && String((x as { digest: unknown }).digest).startsWith('NEXT_REDIRECT')) throw x; destino = `${volta}&erro=${encodeURIComponent(mensagemDeErro(x))}`; }
   redirect(destino);
 }

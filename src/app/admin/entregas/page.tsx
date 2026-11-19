@@ -5,17 +5,18 @@ import { query } from '@/lib/db';
 import { cobrancasAbertas } from '@/lib/services/cobranca';
 import { pendenciasDoMes } from '@/lib/services/integracao';
 import { BotaoCobrar } from './BotaoCobrar';
+import { digisacPronto } from '@/lib/services/digisac';
 import { Avisos, Topo, CompetenciaSeletor, competenciaDe } from '../../components';
 
 export default async function Entregas({ searchParams }: { searchParams: Promise<{ competencia?: string; erro?: string; ok?: string }> }) {
   const u = await exigirUsuario('admin'); const sp = await searchParams; const comp = competenciaDe(sp.competencia);
-  const [v, cobradas, zap] = await Promise.all([visaoGeral(u, comp), cobrancasAbertas(u, comp), pendenciasDoMes(comp, false)]);
+  const [v, cobradas, zap, digisac] = await Promise.all([visaoGeral(u, comp), cobrancasAbertas(u, comp), pendenciasDoMes(comp, false), digisacPronto()]);
   const msg = new Map(zap.todas.map((x) => [x.empresaId, x]));
   const novos = new Map((await query(`SELECT empresa_id, count(*)::int n FROM documentos_avulsos WHERE visto_em IS NULL AND removido_em IS NULL AND descartado_em IS NULL GROUP BY empresa_id`)).rows.map((r) => [r.empresa_id as string, r.n as number]));
   const concluidas = v.filter((e) => e.concluida).length, semConfig = v.filter((e) => e.exigidos === 0).length;
   return (<><Topo u={u} /><main>
     <p><Link href="/admin">← Início</Link></p>
-    <div className="saudacao"><h1>Entregas do mês</h1><div className="row"><Link className="btn" href="/admin/empresas/nova">+ Cadastrar nova empresa</Link><Link className="btn sec" href="/admin/empresas">Todas as empresas</Link></div></div>
+    <div className="saudacao"><h1>Entregas do mês</h1><div className="row"><Link className="btn" href="/admin/empresas/nova">+ Cadastrar nova empresa</Link><Link className="btn sec" href="/admin/empresas">Todas as empresas</Link><Link className="btn sec" href="/admin/whatsapp">{digisac ? "WhatsApp: Digisac ligado" : "WhatsApp (Digisac)"}</Link></div></div>
     <Avisos erro={sp.erro} ok={sp.ok} /><CompetenciaSeletor atual={comp} />
     <p className="soon legenda"><span className="ponto verde" /> enviou tudo · <span className="ponto vermelho" /> falta documento ou há recusado · <span className="ponto cinza" /> sem documentos configurados</p>
     <div className="grid">
@@ -43,7 +44,7 @@ export default async function Entregas({ searchParams }: { searchParams: Promise
             </div>
             {estado === 'vermelho' && cb && <div className="ent-cobrado" title={`1ª cobrança em ${dt(cb.criado_em)}. A solicitação está no painel do cliente e se encerra sozinha quando ele enviar tudo.`}>Cobrado {cb.lembretes + 1}x · último em {dt(cb.ultimo)}</div>}</td>
           <td><div className="ent-acoes">
-            {estado === 'vermelho' && <BotaoCobrar empresaId={e.id} competencia={comp} rotulo={cb ? 'Cobrar de novo' : 'Cobrar envio'} whatsapp={msg.get(e.id)?.whatsapp} mensagem={msg.get(e.id)?.mensagem} />}
+            {estado === 'vermelho' && <BotaoCobrar empresaId={e.id} competencia={comp} rotulo={cb ? 'Cobrar de novo' : 'Cobrar envio'} whatsapp={msg.get(e.id)?.whatsapp} mensagem={msg.get(e.id)?.mensagem} automatico={digisac} />}
             <Link className={`ent-btn ${aConferir > 0 || nov > 0 ? 'principal' : ''}`} href={`/admin/empresas/${e.id}/documentos?competencia=${comp}`}>{aConferir > 0 ? 'Conferir' : 'Abrir'}</Link></div></td>
         </tr>); })}
       {!v.length && <tr><td colSpan={4} className="soon">Nenhuma empresa ativa.</td></tr>}</tbody></table></div>
