@@ -1,8 +1,8 @@
 'use client';
-// Menu lateral no estilo do Contvoo Gestão: barra estreita de ícones que se abre ao passar o mouse (no celular, abre pelo botão ☰ do topo).
+// Menu no estilo do Contvoo Gestão: abre pelo botão ☰ do topo como um painel azul à esquerda.
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   BarChart3, Banknote, Bell, Building2, CalendarCheck, ChevronDown, CircleHelp, ClipboardList, FileBarChart, FileText, Home, KeyRound,
   Landmark, LayoutDashboard, Layers, MessageCircle, MessagesSquare, Settings, ShieldCheck, ScrollText, Wallet,
@@ -82,19 +82,11 @@ export function MenuLateral({ papel }: { papel: 'admin' | 'cliente' }) {
   const pathname = usePathname() ?? '';
   const empresaId = papel === 'cliente' ? (pathname.match(/^\/cliente\/([0-9a-f-]{36})/)?.[1] ?? null) : null;
   const grupos = papel === 'admin' ? menuEscritorio() : menuCliente(empresaId);
-  const [aberta, setAberta] = useState(false); const [movel, setMovel] = useState(false);
-  const espera = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const abrir = () => { if (espera.current) clearTimeout(espera.current); espera.current = setTimeout(() => setAberta(true), 120); };
-  const fechar = () => { if (espera.current) clearTimeout(espera.current); espera.current = setTimeout(() => setAberta(false), 180); };
+  const [movel, setMovel] = useState(false);
   useEffect(() => { const h = () => setMovel((m) => !m); window.addEventListener('menu-lateral', h); return () => window.removeEventListener('menu-lateral', h); }, []);
   useEffect(() => { setMovel(false); }, [pathname]);
+  // sem barra fixa na lateral: o menu abre pelo botão ☰ do topo (computador e celular)
   return (<>
-    <aside className="lateral" aria-label="Menu">
-      <div className={`lateral-painel${aberta ? ' aberta' : ''}`} onMouseEnter={abrir} onMouseLeave={fechar}
-        onFocus={() => setAberta(true)} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setAberta(false); }}>
-        <Lista grupos={grupos} compacta={!aberta} onNavegar={() => setAberta(false)} />
-      </div>
-    </aside>
     {movel && <div className="lateral-movel" role="dialog" aria-label="Menu">
       <div className="lateral-movel-fundo" onClick={() => setMovel(false)} />
       <div className="lateral-movel-painel"><Lista grupos={grupos} compacta={false} onNavegar={() => setMovel(false)} /></div>

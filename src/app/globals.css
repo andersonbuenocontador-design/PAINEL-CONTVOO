@@ -255,3 +255,5 @@ main{max-width:1240px}
 body:has(aside.lateral) header.top{margin-left:-64px}
 header.top .tema-botao{border:0!important;box-shadow:none!important}
 @media (max-width:1023px){body:has(aside.lateral) header.top{margin-left:0}}
+/* sem barra fixa na lateral: menu pelo botão ☰ */
+.botao-menu{display:inline-grid!important;place-items:center}
