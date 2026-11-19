@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import {
-  ArrowRight, Banknote, Building2, CircleHelp, ClipboardList, FileBarChart, KeyRound, Landmark, Layers, MessageCircle, MessagesSquare, ScrollText, ShieldCheck,
+  ArrowRight, Banknote, Plus, Building2, CircleHelp, ClipboardList, FileBarChart, KeyRound, Landmark, Layers, MessageCircle, MessagesSquare, ScrollText, ShieldCheck,
 } from 'lucide-react';
 import { exigirUsuario } from '@/lib/session';
 import { resumoEscritorio } from '@/lib/services/hub';
@@ -63,7 +63,8 @@ export default async function AdminHub({ searchParams }: { searchParams: Promise
 
     <h2 className="inicio-secao">Cadastros e ajustes</h2>
     <section className="inicio-pequenos">
-      <Link href="/admin/empresas" className="inicio-mini"><Building2 size={18} /><span><strong>Empresas</strong><small>{plural(r.empresas, 'ativa', 'ativas')} · cadastrar nova</small></span></Link>
+      <Link href="/admin/empresas" className="inicio-mini"><Building2 size={18} /><span><strong>Empresas</strong><small>{plural(r.empresas, 'ativa', 'ativas')}</small></span></Link>
+      <Link href="/admin/empresas/nova" className="inicio-mini"><Plus size={18} /><span><strong>Nova empresa</strong><small>Cadastrar um cliente novo</small></span></Link>
       <Link href="/admin/usuarios" className="inicio-mini"><KeyRound size={18} /><span><strong>Usuários</strong><small>{plural(r.usuarios, 'acesso ativo', 'acessos ativos')}</small></span></Link>
       <Link href="/admin/whatsapp" className="inicio-mini"><MessageCircle size={18} /><span><strong>WhatsApp (Digisac)</strong><small className={zap ? 'ok' : 'alerta'}>{zap ? 'Ligado' : 'Desligado: configurar'}{r.sem_whatsapp ? ` · ${r.sem_whatsapp} sem número` : ''}</small></span></Link>
       <Link href="/admin/relatorios" className="inicio-mini"><FileBarChart size={18} /><span><strong>Relatórios</strong><small>Visão geral e Excel</small></span></Link>
