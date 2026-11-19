@@ -385,3 +385,4 @@ header.top .tema-botao{border:0!important;box-shadow:none!important}
 @media (max-width:760px){.mural-card{grid-template-columns:36px 1fr}.mural-abrir{display:none}.mural-filtros-corpo{grid-template-columns:1fr}.mural-nova-corpo{width:min(92vw,340px)}}
 :root[data-theme="dark"] .mural-card.azul{background:linear-gradient(90deg,#16223a,var(--card) 40%)}:root[data-theme="dark"] .mural-ultima{background:#0f1c2b}:root[data-theme="dark"] .mural-ultima.cliente{background:#1b2c4a}
 :root[data-theme="dark"] .mural-nova-corpo{background:#13233a;border-color:#22345a}:root[data-theme="dark"] .mural-tag,:root[data-theme="dark"] .mural-aba strong{background:#1a2a3e;color:var(--tx)}
+.gclick-lista{max-height:460px;overflow:auto;border:1px solid var(--bd);border-radius:12px}.gclick-lista table th{position:sticky;top:0;background:var(--card)}

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import {
-  ArrowRight, Banknote, Plus, Building2, CircleHelp, ClipboardList, FileBarChart, KeyRound, Landmark, Layers, MessageCircle, MessagesSquare, ScrollText, ShieldCheck,
+  ArrowRight, Banknote, Plus, RefreshCw, Building2, CircleHelp, ClipboardList, FileBarChart, KeyRound, Landmark, Layers, MessageCircle, MessagesSquare, ScrollText, ShieldCheck,
 } from 'lucide-react';
 import { exigirUsuario } from '@/lib/session';
 import { resumoEscritorio } from '@/lib/services/hub';
@@ -67,6 +67,7 @@ export default async function AdminHub({ searchParams }: { searchParams: Promise
       <Link href="/admin/empresas/nova" className="inicio-mini"><Plus size={18} /><span><strong>Nova empresa</strong><small>Cadastrar um cliente novo</small></span></Link>
       <Link href="/admin/usuarios" className="inicio-mini"><KeyRound size={18} /><span><strong>Usuários</strong><small>{plural(r.usuarios, 'acesso ativo', 'acessos ativos')}</small></span></Link>
       <Link href="/admin/whatsapp" className="inicio-mini"><MessageCircle size={18} /><span><strong>WhatsApp (Digisac)</strong><small className={zap ? 'ok' : 'alerta'}>{zap ? 'Ligado' : 'Desligado: configurar'}{r.sem_whatsapp ? ` · ${r.sem_whatsapp} sem número` : ''}</small></span></Link>
+      <Link href="/admin/gclick" className="inicio-mini"><RefreshCw size={18} /><span><strong>G-Click</strong><small>Importar clientes e contatos</small></span></Link>
       <Link href="/admin/relatorios" className="inicio-mini"><FileBarChart size={18} /><span><strong>Relatórios</strong><small>Visão geral e Excel</small></span></Link>
       <Link href="/admin/modelos" className="inicio-mini"><Layers size={18} /><span><strong>Modelos de documentos</strong><small>Listas prontas para aplicar</small></span></Link>
       <Link href="/admin/auditoria" className="inicio-mini"><ScrollText size={18} /><span><strong>Auditoria</strong><small>Quem fez o quê e quando</small></span></Link>
