@@ -79,11 +79,14 @@ export const resolverPendencia = (a: Actor, id: string) => mudar(a, id, ['aberta
 export const reabrirPendencia = (a: Actor, id: string) => mudar(a, id, ['resolvida', 'cancelada'], 'aberta', 'pendencia.reabrir', 'Só dá para reabrir uma pendência encerrada.');
 export const cancelarPendencia = (a: Actor, id: string) => mudar(a, id, ['aberta', 'respondida'], 'cancelada', 'pendencia.cancelar', 'Só dá para cancelar uma pendência em andamento.');
 
-export type Pend = { id: string; empresa_id: string; competencia: string | null; categoria: Categoria; descricao: string; prazo: string | null; situacao: SituacaoPend; criado_em: string; vencida: boolean; responsavel: string | null; mensagens: number };
+export type Pend = { id: string; empresa_id: string; competencia: string | null; categoria: Categoria; descricao: string; prazo: string | null; situacao: SituacaoPend; criado_em: string; vencida: boolean; responsavel: string | null; mensagens: number;
+  ultima_texto?: string | null; ultima_autor?: string | null; ultima_papel?: string | null; ultima_em?: string | null };
 const SEL = `SELECT p.id,p.empresa_id,p.competencia,p.categoria,p.descricao,p.prazo::text prazo,p.situacao,p.criado_em,
    (p.prazo IS NOT NULL AND p.situacao IN ('aberta','respondida') AND p.prazo < (now() AT TIME ZONE 'America/Sao_Paulo')::date) vencida, r.nome responsavel,
-   (SELECT count(*)::int FROM pendencia_mensagens m WHERE m.pendencia_id=p.id) mensagens, e.razao_social
-   FROM pendencias p JOIN empresas e ON e.id=p.empresa_id LEFT JOIN usuarios r ON r.id=p.responsavel_id`;
+   (SELECT count(*)::int FROM pendencia_mensagens m WHERE m.pendencia_id=p.id) mensagens, e.razao_social,
+   um.texto ultima_texto, um.autor ultima_autor, um.papel ultima_papel, um.criado_em ultima_em
+   FROM pendencias p
+   LEFT JOIN LATERAL (SELECT m.texto, u2.nome autor, u2.papel, m.criado_em FROM pendencia_mensagens m JOIN usuarios u2 ON u2.id=m.usuario_id WHERE m.pendencia_id=p.id ORDER BY m.criado_em DESC LIMIT 1) um ON true JOIN empresas e ON e.id=p.empresa_id LEFT JOIN usuarios r ON r.id=p.responsavel_id`;
 export async function listarPendencias(actor: Actor, empresaId: string) {
   const e = await obterEmpresa(actor, empresaId);
   return (await query(`${SEL} WHERE p.empresa_id=$1 ${actor.papel === 'cliente' ? `AND p.situacao<>'cancelada'` : ''} ORDER BY (p.situacao IN ('aberta','respondida')) DESC, vencida DESC, p.prazo NULLS LAST, p.criado_em DESC`, [e.id])).rows as (Pend & { razao_social: string })[];
@@ -97,6 +100,14 @@ export async function resumoPendencias(actor: Actor, empresaId: string) {
   const e = await obterEmpresa(actor, empresaId);
   const r = (await query(`SELECT count(*) FILTER (WHERE situacao='aberta')::int aguardando, count(*) FILTER (WHERE situacao IN ('aberta','respondida') AND prazo < (now() AT TIME ZONE 'America/Sao_Paulo')::date)::int vencidas, count(*) FILTER (WHERE situacao IN ('aberta','respondida'))::int abertas FROM pendencias WHERE empresa_id=$1`, [e.id])).rows[0];
   return r as { aguardando: number; vencidas: number; abertas: number };
+}
+/** Contadores do mural do escritório (empresas ativas). */
+export async function contarPendenciasEscritorio(actor: Actor) {
+  exigirAdmin(actor);
+  return (await query(`SELECT count(*) FILTER (WHERE p.situacao='respondida')::int respondidas, count(*) FILTER (WHERE p.situacao='aberta')::int aguardando,
+      count(*) FILTER (WHERE p.situacao IN ('aberta','respondida') AND p.prazo < (now() AT TIME ZONE 'America/Sao_Paulo')::date)::int vencidas,
+      count(*) FILTER (WHERE p.situacao='resolvida' AND p.atualizado_em > now() - interval '30 days')::int resolvidas30
+    FROM pendencias p JOIN empresas e ON e.id=p.empresa_id AND e.situacao='ativa'`)).rows[0] as { respondidas: number; aguardando: number; vencidas: number; resolvidas30: number };
 }
 export type FiltroPend = { situacao?: SituacaoPend | 'em_andamento'; categoria?: Categoria; vencidas?: boolean; busca?: string; competencia?: string };
 /** Visão do escritório: todas as empresas, com filtros. */

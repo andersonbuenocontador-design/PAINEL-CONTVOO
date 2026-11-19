@@ -353,3 +353,35 @@ header.top .tema-botao{border:0!important;box-shadow:none!important}
 @media (max-width:640px){.d2-item{grid-template-columns:46px 1fr}.d2-hero2{gap:14px}}
 .d2-hero2{margin-bottom:14px}
 .doc2-anel{flex:none}
+/* ===== Mural de pendências (escritório) ===== */
+.mural-nova{position:relative}.mural-nova>summary{list-style:none;cursor:pointer}.mural-nova>summary::-webkit-details-marker{display:none}
+.mural-nova-corpo{position:absolute;right:0;top:calc(100% + 6px);z-index:20;width:340px;background:#fff;border:1px solid var(--bd);border-radius:12px;box-shadow:0 12px 30px rgba(16,24,40,.16);padding:14px;display:grid;gap:8px}
+.mural-abas{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 10px}
+.mural-aba{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:99px;background:var(--card);border:1px solid var(--bd);color:var(--tx);text-decoration:none;font-size:.9rem;font-weight:500}
+.mural-aba strong{background:#f2f4f7;border-radius:99px;padding:0 8px;font-size:.8rem}.mural-aba:hover{border-color:#1f5eff}
+.mural-aba.azul svg{color:#1f5eff}.mural-aba.laranja svg{color:#b54708}.mural-aba.vermelho svg{color:#d92d20}.mural-aba.verde svg{color:#12805c}
+.mural-aba.azul strong{background:#eef2ff;color:#1f5eff}.mural-aba.laranja strong{background:#fff4e5;color:#b54708}.mural-aba.vermelho strong{background:#fef3f2;color:#b42318}.mural-aba.verde strong{background:#ecfdf3;color:#12805c}
+.mural-aba.ativa{background:#0b2a4a;border-color:#0b2a4a;color:#fff}.mural-aba.ativa svg{color:#fff}.mural-aba.ativa strong{background:rgb(255 255 255 / .18);color:#fff}
+.mural-filtros{margin-bottom:14px}.mural-filtros>summary{cursor:pointer;color:var(--mut);font-size:.88rem;display:inline-flex;align-items:center;gap:6px}
+.mural-filtros-corpo{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:end;margin-top:10px;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px}
+.mural-filtros-botoes{display:flex;gap:8px}
+.mural-lista{display:grid;gap:10px}
+.mural-card{display:grid;grid-template-columns:44px 1fr auto;gap:14px;align-items:start;background:var(--card);border:1px solid rgb(227 230 236 / .8);border-left:4px solid #d0d5dd;border-radius:14px;padding:14px 16px;color:inherit;text-decoration:none;box-shadow:0 1px 2px rgba(16,24,40,.04);transition:transform .15s,box-shadow .15s}
+.mural-card:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgb(16 24 40 / .08)}
+.mural-card.azul{border-left-color:#1f5eff;background:linear-gradient(90deg,#f5f8ff,var(--card) 40%)}.mural-card.vermelho{border-left-color:#d92d20}.mural-card.laranja{border-left-color:#f79009}.mural-card.verde{border-left-color:#12805c}
+.mural-icone{display:grid;place-items:center;width:44px;height:44px;border-radius:12px}
+.mural-icone.azul{background:#eef2ff;color:#1f5eff}.mural-icone.vermelho{background:#fef3f2;color:#d92d20}.mural-icone.laranja{background:#fff4e5;color:#b54708}.mural-icone.verde{background:#ecfdf3;color:#12805c}.mural-icone.cinza{background:#f2f4f7;color:var(--mut)}
+.mural-corpo{display:grid;gap:5px;min-width:0}
+.mural-topo{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.mural-empresa{font-size:.98rem}
+.mural-status{font-size:.72rem;font-weight:700;padding:3px 9px;border-radius:99px}
+.mural-status.azul{background:#1f5eff;color:#fff}.mural-status.vermelho{background:#fef3f2;color:#b42318}.mural-status.laranja{background:#fff4e5;color:#b54708}.mural-status.verde{background:#ecfdf3;color:#12805c}.mural-status.cinza{background:#f2f4f7;color:var(--mut)}
+.mural-titulo{font-weight:600;color:var(--tx)}
+.mural-texto{color:var(--mut);font-size:.88rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mural-ultima{font-size:.87rem;background:#f8f9fb;border-radius:10px;padding:8px 10px;color:var(--tx)}.mural-ultima.cliente{background:#eef2ff}
+.mural-meta{display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:.8rem;color:var(--mut)}.mural-meta span{display:inline-flex;align-items:center;gap:4px}.mural-meta .vencida{color:#b42318;font-weight:600}
+.mural-tag{background:#f2f4f7;border-radius:6px;padding:1px 8px;color:#344054}
+.mural-abrir{color:#1f5eff;font-weight:600;font-size:.88rem;white-space:nowrap;align-self:center}
+.mural-vazio{display:grid;justify-items:center;gap:6px;padding:40px;color:var(--ok);background:var(--card);border:1px dashed var(--bd);border-radius:14px}.mural-vazio p{margin:0;color:var(--mut)}
+@media (max-width:760px){.mural-card{grid-template-columns:36px 1fr}.mural-abrir{display:none}.mural-filtros-corpo{grid-template-columns:1fr}.mural-nova-corpo{width:min(92vw,340px)}}
+:root[data-theme="dark"] .mural-card.azul{background:linear-gradient(90deg,#16223a,var(--card) 40%)}:root[data-theme="dark"] .mural-ultima{background:#0f1c2b}:root[data-theme="dark"] .mural-ultima.cliente{background:#1b2c4a}
+:root[data-theme="dark"] .mural-nova-corpo{background:#13233a;border-color:#22345a}:root[data-theme="dark"] .mural-tag,:root[data-theme="dark"] .mural-aba strong{background:#1a2a3e;color:var(--tx)}
