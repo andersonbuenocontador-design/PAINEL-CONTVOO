@@ -2,7 +2,7 @@
 // Botões rápidos para pedir o extrato de um banco: preenchem nome, banco, categoria e formatos do formulário.
 import { BANCOS } from '@/lib/bancos';
 
-const POPULARES = ['nubank', 'itau', 'bradesco', 'santander', 'bb', 'caixa', 'sicredi', 'sicoob', 'inter', 'c6', 'banrisul', 'mercadopago', 'pagbank', 'stone', 'cora', 'btg'];
+const POPULARES = ['nubank', 'itau', 'bradesco', 'santander', 'bb', 'caixa', 'sicredi', 'sicoob', 'inter', 'c6', 'banrisul', 'mercadopago', 'pagbank', 'stone', 'cora', 'btg', 'cresol', 'unicred', 'safra', 'asaas', 'picpay', 'infinitepay', 'getnet', 'cielo'];
 export function AtalhosBancos() {
   const preencher = (el: HTMLElement, nome: string) => {
     const f = el.closest('form'); if (!f) return;
@@ -14,6 +14,6 @@ export function AtalhosBancos() {
   return (<div className="doc2-atalhos"><span className="soon">Pedir extrato de:</span>
     {POPULARES.map((k) => { const b = BANCOS.find((x) => x.chave === k)!; return (
       <button key={k} type="button" className="doc2-banco" onClick={(e) => preencher(e.currentTarget, b.nome)}>
-        <span className="marca-doc" style={{ width: 22, height: 22, background: b.fundo, color: b.texto, fontSize: b.sigla.length > 2 ? 7 : 9 }}>{b.sigla}</span>{b.nome}</button>); })}
+        {b.logo ? <span className="marca-doc com-logo" style={{ width: 24, height: 24 }}><img src={b.logo} alt="" width={19} height={19} /></span> : <span className="marca-doc" style={{ width: 22, height: 22, background: b.fundo, color: b.texto, fontSize: b.sigla.length > 2 ? 7 : 9 }}>{b.sigla}</span>}{b.nome}</button>); })}
   </div>);
 }

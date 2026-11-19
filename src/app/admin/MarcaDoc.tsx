@@ -13,6 +13,7 @@ const TIPO = {
 /** Selo do documento: banco nas cores da marca (sigla) ou ícone pelo tipo (folha, nota, guia…). */
 export function MarcaDoc({ nome, instituicao, categoria, tamanho = 44 }: { nome: string; instituicao?: string | null; categoria?: string | null; tamanho?: number }) {
   const b = bancoDe(instituicao, nome);
+  if (b?.logo) return (<span className="marca-doc com-logo" style={{ width: tamanho, height: tamanho }} title={b.nome}><img src={b.logo} alt={b.nome} width={tamanho * 0.78} height={tamanho * 0.78} loading="lazy" /></span>);
   if (b) return (<span className="marca-doc" style={{ width: tamanho, height: tamanho, background: b.fundo, color: b.texto, fontSize: b.sigla.length > 2 ? tamanho * 0.3 : tamanho * 0.4 }} title={b.nome} aria-label={b.nome}>{b.sigla}</span>);
   const t = TIPO[tipoDocumento(nome, categoria)];
   return <span className="marca-doc" style={{ width: tamanho, height: tamanho, background: t.fundo, color: t.cor }} aria-hidden="true">{t.icone}</span>;
