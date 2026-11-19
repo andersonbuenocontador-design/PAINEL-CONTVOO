@@ -2,17 +2,20 @@ import Link from 'next/link';
 import { exigirUsuario } from '@/lib/session';
 import { listarConexoes, statusDigisac, type Conexao } from '@/lib/services/digisac';
 import { mensagemDeErro } from '@/lib/actions-util';
+import { lerMensagemCobranca } from '@/lib/services/mensagem';
+import { EditorMensagem } from './EditorMensagem';
 import { Avisos, Topo } from '../../components';
 import { acaoDesligarDigisac, acaoEscolherConexao, acaoSalvarDigisac, acaoTesteDigisac } from './actions';
 
 /** Configuração do WhatsApp pelo Digisac: endereço + chave da API (cifrada no banco), conexão e envio de teste. */
 export default async function WhatsappDigisac({ searchParams }: { searchParams: Promise<{ erro?: string; ok?: string }> }) {
-  const u = await exigirUsuario('admin'); const sp = await searchParams; const st = await statusDigisac(u);
+  const u = await exigirUsuario('admin'); const sp = await searchParams; const [st, msg] = await Promise.all([statusDigisac(u), lerMensagemCobranca()]);
   let conexoes: Conexao[] = [], erroLista = '';
   if (st.temChave) { try { conexoes = await listarConexoes(u); } catch (e) { erroLista = mensagemDeErro(e); } }
   return (<><Topo u={u} /><main className="emp">
     <p className="emp-voltar"><Link href="/admin/entregas">← Entregas do mês</Link></p>
     <h1>WhatsApp pelo Digisac {st.pronto ? <span className="emp-situacao ativa">Ligado</span> : <span className="emp-situacao inativa">Desligado</span>}</h1>
+    <p className="soon"><a href="#mensagem">Editar a mensagem de cobrança ↓</a></p>
     <p className="soon">Com o Digisac ligado, o botão <strong>"Cobrar envio"</strong> em Entregas do mês manda a mensagem sozinho pelo WhatsApp do escritório, sem abrir o WhatsApp. Desligado, ele abre o WhatsApp com a mensagem pronta.</p>
     <Avisos erro={sp.erro} ok={sp.ok} />
 
@@ -40,6 +43,10 @@ export default async function WhatsappDigisac({ searchParams }: { searchParams: 
     {st.pronto && <section className="card emp-bloco"><h2>3. Envio de teste</h2>
       <form action={acaoTesteDigisac} className="row"><input name="numero" required inputMode="tel" placeholder="Seu WhatsApp, ex.: (51) 99999-9999" style={{ flex: 1 }} /><button>Enviar teste</button></form>
       <p className="soon">Mande para o seu próprio número antes de cobrar os clientes.</p></section>}
+
+    <section className="card emp-bloco" id="mensagem"><h2>{st.pronto ? '4. ' : ''}Mensagem de cobrança {msg.personalizada ? <span className="emp-situacao ativa">Personalizada</span> : <span className="emp-situacao inativa">Padrão</span>}</h2>
+      <p className="soon">É o texto que o botão "Cobrar envio" manda no WhatsApp. Os marcadores entre chaves são trocados pelos dados de cada cliente.</p>
+      <EditorMensagem inicial={msg.texto} personalizada={msg.personalizada} /></section>
 
     {st.temChave && <form action={acaoDesligarDigisac} style={{ marginTop: 10 }}><button className="link-perigo">Desligar e apagar a chave do Digisac</button></form>}
   </main></>);

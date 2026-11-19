@@ -64,7 +64,7 @@ export async function acaoCobrarDocumentos(fd: FormData) {
     const z = (await pendenciasDoMes(c, false)).todas.find((x) => x.empresaId === e);
     if (!z) throw new AppError('Esta empresa já enviou todos os documentos do mês.');
     if (!z.whatsapp) throw new AppError(`${z.empresa} não tem WhatsApp cadastrado. Abra a empresa → Editar dados → "WhatsApp do cliente".`);
-    try { await enviarWhatsappDigisac(z.whatsapp, z.mensagem); }
+    try { await enviarWhatsappDigisac(z.whatsapp, (nomeContato) => z.mensagemPara(nomeContato)); }
     catch (x) {
       await registrar({ query } as never, { usuarioId: a.id, empresaId: e, acao: 'cobranca.whatsapp_falhou', entidade: 'empresa', entidadeId: e, detalhes: { competencia: c, canal: 'digisac', detalhe: mensagemDeErro(x).slice(0, 300) } });
       throw x;

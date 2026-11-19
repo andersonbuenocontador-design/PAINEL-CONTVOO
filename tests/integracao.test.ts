@@ -4,13 +4,15 @@ import { criarEmpresa, editarEmpresa } from '../src/lib/services/empresas';
 import { criarUsuario } from '../src/lib/services/usuarios';
 import { conferirArquivo, criarExigencia, enviarArquivo } from '../src/lib/services/documentos';
 import { autorizado, extratosPendentes, pendenciasDoMes, registrarCobrancaEnviada } from '../src/lib/services/integracao';
+import { lerMensagemCobranca, salvarMensagemCobranca } from '../src/lib/services/mensagem';
+import { MENSAGEM_PADRAO, montarMensagem } from '../src/lib/mensagem-cobranca';
 import type { Actor } from '../src/lib/errors';
 
 const C = '2026-10'; const PDF = Buffer.from('%PDF-1.4 x');
 let admin: Actor, ua: Actor, empA: string, empB: string, exA: string, exA2: string;
 beforeEach(async () => {
   for (const t of ['no_update', 'no_truncate']) await query(`ALTER TABLE auditoria DISABLE TRIGGER auditoria_${t}`);
-  await query('TRUNCATE pendencia_mensagens, pendencias, arquivos, exigencias, usuario_empresas, empresas, usuarios, auditoria CASCADE');
+  await query('TRUNCATE configuracoes, pendencia_mensagens, pendencias, arquivos, exigencias, usuario_empresas, empresas, usuarios, auditoria CASCADE');
   for (const t of ['no_update', 'no_truncate']) await query(`ALTER TABLE auditoria ENABLE TRIGGER auditoria_${t}`);
   admin = { id: (await query(`INSERT INTO usuarios(nome,email,senha_hash,papel) VALUES ('Admin','admin@x.com','x','admin') RETURNING id`)).rows[0].id, papel: 'admin' };
   empA = await criarEmpresa(admin, { razaoSocial: 'Empresa A Ltda', nomeFantasia: 'Padaria A', cnpj: '11.222.333/0001-81', whatsapp: '(51) 99999-0000' });
@@ -33,7 +35,7 @@ describe('integração n8n: cobrança de extratos', () => {
     const e = r.comWhatsapp[0];
     expect(e).toMatchObject({ empresaId: empA, empresa: 'Padaria A', whatsapp: '5551999990000', contato: 'Joana Prado' });
     expect(e.faltam.map((f) => [f.documento, f.situacao])).toEqual([['Extrato Nubank', 'rejeitado'], ['Extrato Sicredi', 'pendente']]);
-    expect(e.mensagem).toContain('Olá, Joana!'); expect(e.mensagem).toContain('outubro/2026'); expect(e.mensagem).toContain('mês errado');
+    expect(e.mensagem).toContain('Olá, Joana Prado!'); expect(e.mensagemPara('Joana Ribeiro Prado (G-Click)')).toContain('Olá, Joana Ribeiro Prado (G-Click)!'); expect(e.mensagemPara('')).toContain('Olá! Tudo bem?'); expect(e.mensagem).toContain('outubro/2026'); expect(e.mensagem).toContain('mês errado');
     expect(e.mensagem).not.toContain('Folha'); expect(e.mensagem).toContain(`https://painel.exemplo/cliente/${empA}/documentos?competencia=${C}`);
     expect(r.semWhatsapp).toEqual([{ empresaId: empB, empresa: 'Empresa B Ltda' }]);
     await enviarArquivo(ua, { empresaId: empA, exigenciaId: exA, competencia: C, nome: 's.pdf', dados: PDF });
@@ -63,7 +65,20 @@ describe('integração n8n: cobrança de extratos', () => {
     const r = await pendenciasDoMes(C, false);
     const a = r.todas.find((x) => x.empresaId === empA)!;
     expect(a.faltam.map((f) => f.documento)).toEqual(['Extrato Nubank', 'Extrato Sicredi', 'Folha de pagamento']);
-    expect(a.mensagem).toContain('estes documentos'); expect(a.mensagem).toContain('• Folha de pagamento');
+    expect(a.mensagem).toContain('ainda falta:'); expect(a.mensagem).toContain('• Folha de pagamento');
     expect(r.todas.find((x) => x.empresaId === empB)?.whatsapp).toBeNull();
+  });
+  it('mensagem personalizada pelo escritório, com marcadores; sem nome; validação; volta ao padrão', async () => {
+    expect(await lerMensagemCobranca()).toEqual({ texto: MENSAGEM_PADRAO, personalizada: false });
+    await expect(salvarMensagemCobranca(ua, 'oi {documentos}')).rejects.toMatchObject({ code: 'proibido' });
+    await expect(salvarMensagemCobranca(admin, '   ')).rejects.toThrow(/Escreva/);
+    await expect(salvarMensagemCobranca(admin, 'Oi {nome}, mande os extratos')).rejects.toThrow(/\{documentos\}/);
+    await expect(salvarMensagemCobranca(admin, 'x{documentos}'.repeat(200))).rejects.toThrow(/longa/);
+    await salvarMensagemCobranca(admin, 'Bom dia, {nome}!\r\nDa {empresa}, em {mes} falta:\n{documentos}\nLink: {link}\nAtt, Anderson');
+    const a = (await pendenciasDoMes(C, false)).todas.find((x) => x.empresaId === empA)!;
+    expect(a.mensagem).toBe(`Bom dia, Joana Prado!\nDa Padaria A, em outubro/2026 falta:\n• Extrato Nubank\n• Extrato Sicredi\n• Folha de pagamento\nLink: https://painel.exemplo/cliente/${empA}/documentos?competencia=${C}\nAtt, Anderson`);
+    expect(montarMensagem('Olá, {nome}! {documentos}', { nome: '', empresa: 'X', mes: 'm', documentos: ['• a'], link: null })).toBe('Olá! • a');
+    await salvarMensagemCobranca(admin, null);
+    expect((await lerMensagemCobranca()).personalizada).toBe(false);
   });
 });

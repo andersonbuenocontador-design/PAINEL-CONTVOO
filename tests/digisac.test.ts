@@ -42,11 +42,11 @@ describe('WhatsApp pelo Digisac', () => {
     expect(await digisacPronto()).toBe(true);
     // contato achado pelo número (sem o 9 extra, como o WhatsApp guarda): envia para o contato
     vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => { chamadas.push({ url, init });
-      return url.includes('/contacts') ? resp(200, { data: [{ id: 'c9', serviceId: 's1' }] }) : resp(200, { id: 'm1' }); }));
-    await enviarWhatsappDigisac('(51) 99999-0000', 'Olá!');
+      return url.includes('/contacts') ? resp(200, { data: [{ id: 'c9', serviceId: 's1', name: 'Joana Ribeiro Prado' }] }) : resp(200, { id: 'm1' }); }));
+    await enviarWhatsappDigisac('(51) 99999-0000', (nome) => `Olá, ${nome}!`);
     const busca = decodeURIComponent(chamadas.at(-2)!.url);
     expect(busca).toContain('/contacts?query='); expect(busca).toContain('"data.number":{"$in":["5551999990000","555199990000"]}');
-    expect(JSON.parse(chamadas.at(-1)!.init.body as string)).toEqual({ text: 'Olá!', type: 'chat', contactId: 'c9', origin: 'bot' });
+    expect(JSON.parse(chamadas.at(-1)!.init.body as string)).toEqual({ text: 'Olá, Joana Ribeiro Prado!', type: 'chat', contactId: 'c9', origin: 'bot' });
     // sem contato: tenta direto para o número pela conexão
     vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => { chamadas.push({ url, init });
       return url.includes('/contacts') ? resp(200, { data: [] }) : resp(200, { id: 'm2' }); }));

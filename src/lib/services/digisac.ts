@@ -82,22 +82,30 @@ const soNumero = (n: string) => { const d = n.replace(/\D/g, ''); return d.lengt
 /** O WhatsApp às vezes guarda celular brasileiro sem o 9 extra (55 + DDD + 8 dígitos): procura dos dois jeitos. */
 export const variantesNumero = (n: string) => { const v = [n]; if (/^55\d{2}9\d{8}$/.test(n)) v.push(n.slice(0, 4) + n.slice(5)); else if (/^55\d{2}\d{8}$/.test(n)) v.push(`${n.slice(0, 4)}9${n.slice(4)}`); return v; };
 type Pagina<T> = { data?: T[] };
-/** Contato do Digisac com este número (o mesmo jeito de enviar que o Contvoo Gestão usa: para o contato, abrindo o chamado para a equipe). */
-async function contatoPorNumero(c: Config, n: string) {
-  const q = JSON.stringify({ where: { 'data.number': { $in: variantesNumero(n) }, isGroup: false }, attributes: ['id', 'name', 'serviceId'], perPage: 5, page: 1 });
+/** Contato do Digisac com este número (o mesmo jeito de enviar que o Contvoo Gestão usa: para o contato, abrindo o chamado para a equipe).
+ *  O nome é o do contato no Digisac (ligado ao G-Click). */
+async function contatoPorNumero(c: Config, n: string): Promise<{ id: string; nome: string } | null> {
+  const q = JSON.stringify({ where: { 'data.number': { $in: variantesNumero(n) }, isGroup: false }, attributes: ['id', 'name', 'internalName', 'serviceId'], perPage: 5, page: 1 });
   try {
-    const p = await chamar(c, 'GET', `/contacts?query=${encodeURIComponent(q)}`) as Pagina<{ id: string; serviceId?: string }>;
+    const p = await chamar(c, 'GET', `/contacts?query=${encodeURIComponent(q)}`) as Pagina<{ id: string; name?: string | null; internalName?: string | null; serviceId?: string }>;
     const lista = p?.data ?? [];
-    return (lista.find((x) => x.serviceId === c.serviceId) ?? lista[0])?.id ?? null;
+    const x = lista.find((y) => y.serviceId === c.serviceId) ?? lista[0];
+    return x ? { id: x.id, nome: String(x.internalName || x.name || '').trim() } : null;
   } catch { return null; } // busca falhou: tenta mandar direto para o número
 }
-/** Envia uma mensagem de WhatsApp pelo Digisac. Erro vira AppError com a explicação. */
-export async function enviarWhatsappDigisac(numero: string, texto: string) {
+/** Nome completo do contato no Digisac para este número (null se não achar ou se o Digisac não estiver configurado). */
+export async function contatoDigisac(numero: string) {
+  const c = await lerConfig(); if (!c) return null;
+  return contatoPorNumero(c, soNumero(numero));
+}
+/** Envia uma mensagem de WhatsApp pelo Digisac. `texto` pode ser uma função que recebe o nome completo do contato no Digisac. */
+export async function enviarWhatsappDigisac(numero: string, texto: string | ((nomeContato: string) => string)) {
   const c = await lerConfig(); if (!c || !c.serviceId) throw new AppError('O WhatsApp pelo Digisac ainda não foi configurado.');
   const n = soNumero(numero); if (n.length < 12 || n.length > 13) throw new AppError('Número de WhatsApp inválido.');
-  const contactId = await contatoPorNumero(c, n);
-  if (contactId) return chamar(c, 'POST', '/messages', { text: texto, type: 'chat', contactId, origin: 'bot' });
-  try { return await chamar(c, 'POST', '/messages', { text: texto, type: 'chat', number: n, serviceId: c.serviceId, origin: 'bot' }); }
+  const contato = await contatoPorNumero(c, n);
+  const msg = typeof texto === 'function' ? texto(contato?.nome ?? '') : texto;
+  if (contato) return chamar(c, 'POST', '/messages', { text: msg, type: 'chat', contactId: contato.id, origin: 'bot' });
+  try { return await chamar(c, 'POST', '/messages', { text: msg, type: 'chat', number: n, serviceId: c.serviceId, origin: 'bot' }); }
   catch (e) {
     if (e instanceof AppError && /recusou a chave/.test(e.message)) throw e;
     throw new AppError(`Este número não está nos contatos do Digisac e o envio direto não foi aceito. Cadastre o contato no Digisac (ou mande a 1ª mensagem por lá) e tente de novo. Detalhe: ${e instanceof Error ? e.message : String(e)}`);

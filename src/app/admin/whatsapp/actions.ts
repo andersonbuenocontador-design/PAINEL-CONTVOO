@@ -1,6 +1,7 @@
 'use server';
 import { exigirUsuario } from '@/lib/session';
 import { executar } from '@/lib/actions-util';
+import { salvarMensagemCobranca } from '@/lib/services/mensagem';
 import { desligarDigisac, enviarTesteDigisac, escolherConexao, salvarAcessoDigisac } from '@/lib/services/digisac';
 
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? '');
@@ -12,3 +13,5 @@ export async function acaoEscolherConexao(fd: FormData) {
 }
 export async function acaoTesteDigisac(fd: FormData) { const u = await exigirUsuario('admin'); await executar(V, 'Mensagem de teste enviada. Confira no WhatsApp.', () => enviarTesteDigisac(u, s(fd, 'numero'))); }
 export async function acaoDesligarDigisac() { const u = await exigirUsuario('admin'); await executar(V, 'Integração com o Digisac desligada. O botão "Cobrar envio" volta a abrir o WhatsApp.', () => desligarDigisac(u)); }
+export async function acaoSalvarMensagem(fd: FormData) { const u = await exigirUsuario('admin'); await executar(`${V}#mensagem`, 'Mensagem de cobrança salva.', () => salvarMensagemCobranca(u, s(fd, 'texto'))); }
+export async function acaoMensagemPadrao() { const u = await exigirUsuario('admin'); await executar(`${V}#mensagem`, 'Mensagem voltou ao texto padrão.', () => salvarMensagemCobranca(u, null)); }

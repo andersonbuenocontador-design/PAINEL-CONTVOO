@@ -4,6 +4,8 @@ import { AppError, type Actor } from '../errors';
 import { registrar } from './auditoria';
 import { aplicaNaCompetencia, competenciaSchema } from './documentos';
 import { cobrarDocumentos } from './cobranca';
+import { lerMensagemCobranca } from './mensagem';
+import { montarMensagem } from '../mensagem-cobranca';
 
 /* Integração com o n8n (cobrança de extratos pelo WhatsApp/Digisac). Acesso só com "Authorization: Bearer <senha>".
    A senha é INTEGRACAO_TOKEN ou, se não existir, a mesma do fluxo da conciliação (N8N_CONCILIACAO_TOKEN), já cadastrada no Render. */
@@ -39,14 +41,16 @@ export async function pendenciasDoMes(competencia: string, soExtratos: boolean) 
     const e = porEmpresa.get(r.id) ?? { empresaId: r.id as string, empresa: (r.nome_fantasia || r.razao_social) as string, whatsapp: r.whatsapp as string | null, contato: r.contato as string | null, faltam: [] as ExtratoFaltando[] };
     e.faltam.push({ documento: r.nome, banco: r.instituicao, situacao: r.situacao, motivo: r.motivo_rejeicao }); porEmpresa.set(r.id, e);
   }
-  const mes = mesPorExtenso(competencia);
+  const mes = mesPorExtenso(competencia); const modelo = (await lerMensagemCobranca()).texto;
   const empresas = [...porEmpresa.values()].map((e) => {
-    const nome = e.contato ? e.contato.trim().split(/\s+/)[0] : '';
+    const nome = (e.contato ?? '').trim(); // nome completo (no envio pelo Digisac vale o nome do contato de lá)
     const linhas = e.faltam.map((f) => `• ${f.documento}${f.banco && !f.documento.toLowerCase().includes(f.banco.toLowerCase()) ? ` (${f.banco})` : ''}${f.situacao === 'rejeitado' ? ` — precisa enviar de novo${f.motivo ? `: ${f.motivo}` : ''}` : ''}`);
     const link = base ? `${base}/cliente/${e.empresaId}/documentos?competencia=${competencia}` : null;
-    const mensagem = [`Olá${nome ? `, ${nome}` : ''}! Tudo bem? 😊`, '', `Aqui é da Contvoo Contabilidade. Para fecharmos ${mes} da ${e.empresa}, ainda falta${e.faltam.length > 1 ? 'm' : ''} ${soExtratos ? (e.faltam.length > 1 ? 'os extratos' : 'o extrato') : (e.faltam.length > 1 ? 'estes documentos' : 'este documento')}:`, ...linhas, '',
-      link ? `É só enviar pelo painel: ${link}` : 'É só enviar pelo Painel do Cliente, em "Documentos do mês".', '', 'Obrigado!'].join('\n');
-    return { ...e, link, mensagem };
+    const dados = { empresa: e.empresa, mes, documentos: linhas, link };
+    const mensagem = montarMensagem(modelo, { nome, ...dados });
+    /** Mensagem com o nome do contato do Digisac/G-Click (sem contato lá: sai sem nome). */
+    const mensagemPara = (outroNome: string) => montarMensagem(modelo, { nome: outroNome.trim(), ...dados });
+    return { ...e, link, mensagem, mensagemPara };
   });
   return { competencia, mes, todas: empresas, comWhatsapp: empresas.filter((e) => e.whatsapp), semWhatsapp: empresas.filter((e) => !e.whatsapp).map((e) => ({ empresaId: e.empresaId, empresa: e.empresa })) };
 }
