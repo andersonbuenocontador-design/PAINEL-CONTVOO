@@ -15,12 +15,16 @@ export async function resumoEscritorio(actor: Actor, competencia: string) {
             (SELECT count(*) FROM documentos_avulsos d JOIN empresas e ON e.id=d.empresa_id AND e.situacao='ativa' WHERE d.competencia=$1 AND d.visto_em IS NULL AND d.removido_em IS NULL AND d.descartado_em IS NULL)::int pdfs_novos,
             (SELECT count(*) FROM retiradas_envios r JOIN empresas e ON e.id=r.empresa_id AND e.situacao='ativa' WHERE r.competencia=$1)::int retiradas,
             (SELECT count(*) FROM usuarios WHERE ativo)::int usuarios,
-            (SELECT count(*) FROM arquivos a JOIN empresas e ON e.id=a.empresa_id AND e.situacao='ativa' WHERE a.competencia=$1 AND a.situacao IN ('enviado','em_conferencia'))::int a_conferir`, [competencia])]);
+            (SELECT count(*) FROM arquivos a JOIN empresas e ON e.id=a.empresa_id AND e.situacao='ativa' WHERE a.competencia=$1 AND a.situacao IN ('enviado','em_conferencia'))::int a_conferir,
+            (SELECT count(*) FROM pendencias p JOIN empresas e ON e.id=p.empresa_id AND e.situacao='ativa' WHERE p.situacao='aberta')::int pend_aguardando,
+            (SELECT count(*) FROM conciliacoes c JOIN empresas e ON e.id=c.empresa_id AND e.situacao='ativa' WHERE c.competencia=$1 AND c.status='concluida')::int conc_concluidas,
+            (SELECT count(DISTINCT m.empresa_id) FROM movimentacoes m JOIN empresas e ON e.id=m.empresa_id AND e.situacao='ativa' WHERE m.competencia=$1)::int com_extrato,
+            (SELECT count(*) FROM empresas WHERE situacao='ativa' AND whatsapp IS NULL)::int sem_whatsapp`, [competencia])]);
   const r = n.rows[0];
   // "enviou tudo" = mesma regra da linha verde em Entregas do mês: nada pendente nem recusado no mês
   const comDocs = v.filter((e) => e.exigidos > 0);
   return { ...r, entregasConcluidas: v.filter((e) => e.concluida).length, comDocs: comDocs.length, enviaramTudo: comDocs.filter((e) => !e.pendentes && !e.rejeitados).length } as
-    { comDocs: number; enviaramTudo: number; empresas: number; conciliacoes: number; pendencias: number; pdfs_novos: number; retiradas: number; usuarios: number; a_conferir: number; entregasConcluidas: number };
+    { comDocs: number; enviaramTudo: number; empresas: number; conciliacoes: number; pendencias: number; pdfs_novos: number; retiradas: number; usuarios: number; a_conferir: number; entregasConcluidas: number; pend_aguardando: number; conc_concluidas: number; com_extrato: number; sem_whatsapp: number };
 }
 
 /** Situação de cada área para a tela inicial do cliente. */

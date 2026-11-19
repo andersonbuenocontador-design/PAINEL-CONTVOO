@@ -1,18 +1,16 @@
 import Link from 'next/link';
 import { TemaBotao } from './TemaBotao';
-import { BotaoMenu, MenuLateral } from './MenuLateral';
 import { MenuUsuario } from './MenuUsuario';
 import { sair } from './actions';
 import type { UsuarioSessao } from '@/lib/services/usuarios';
 import { mfaDisponivel } from '@/lib/session';
 
-/** Topo e menu lateral no estilo do Contvoo Gestão: barra azul-marinho com marca, ajuda, modo noite e menu do usuário; menu lateral por grupos. */
+/** Topo no estilo do Contvoo Gestão: barra azul-marinho com marca, ajuda, modo noite e menu do usuário. A navegação fica na tela inicial. */
 export function Topo({ u }: { u: UsuarioSessao }) {
   const inicio = u.papel === 'admin' ? '/admin' : '/cliente';
   const nome = u.papel === 'admin' && u.nome === 'Administrador' ? 'Contvoo Contabilidade' : u.nome;
   return (<>
     <header className="top">
-      <BotaoMenu />
       <Link href={inicio} className="marca-topo" title="Voltar à tela inicial">
         <img src="/logo-contvoo.png" alt="Contvoo Contabilidade" height={30} style={{ display: 'block' }} />
         <strong>{u.papel === 'admin' ? 'Painel Contvoo' : 'Painel do Cliente'}</strong>
@@ -22,7 +20,6 @@ export function Topo({ u }: { u: UsuarioSessao }) {
       <TemaBotao />
       <MenuUsuario nome={nome} papel={u.papel === 'admin' ? 'Escritório' : 'Cliente'} email={u.email} seguranca={mfaDisponivel(u)} sair={sair} />
     </header>
-    <MenuLateral papel={u.papel} />
   </>);
 }
 
