@@ -203,3 +203,5 @@
 .btn-robo{display:inline-flex;align-items:center;gap:8px}.btn-robo .ai-robo{width:30px;height:30px;margin-left:-6px;box-shadow:none}
 :root[data-theme="dark"] .ai-robo{background:#e8eef6}
 .conc .sugestao>div:first-of-type{display:grid;gap:2px;flex:1;min-width:200px}
+.conc .btn.btn-robo,.btn.btn-robo{background:linear-gradient(135deg,#2f6bff,#1f4fd6);border-color:#1f4fd6;color:#fff;box-shadow:0 4px 12px rgba(31,94,255,.28)}
+.conc .btn.btn-robo:hover,.btn.btn-robo:hover{background:linear-gradient(135deg,#2a5ff0,#1a44bd)}
