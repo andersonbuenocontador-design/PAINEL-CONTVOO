@@ -12,7 +12,8 @@ import { salvarAcessoGclick } from '../src/lib/services/gclick';
 import { enviarPorGclick, enviarPorWhatsapp, executarAgenda, lerAgenda, lerConfigSolicitacao, previaSolicitacao, proximoEnvio, salvarAgenda, salvarConfigSolicitacao } from '../src/lib/services/gclick-solicitacao';
 import type { Actor } from '../src/lib/errors';
 
-let admin: Actor; let posts: Record<string, string>[]; let respondidas: Set<string>;
+let admin: Actor; let posts: Record<string, string>[]; let estado: Record<string, { c?: string; e?: string }>; let ignorarN = false;
+const COM_EMAIL = new Set(['4.1', '4.4', '4.5']);
 const resp = (status: number, corpo: unknown) => new Response(typeof corpo === 'string' ? corpo : JSON.stringify(corpo), { status });
 const NOME = 'Solicitação de Documentos Contábeis';
 const TAREFAS = [
@@ -37,14 +38,21 @@ beforeEach(async () => {
   await query('TRUNCATE gclick_envios, configuracoes, usuario_empresas, empresas, usuarios, auditoria CASCADE');
   for (const t of ['no_update', 'no_truncate']) await query(`ALTER TABLE auditoria ENABLE TRIGGER auditoria_${t}`);
   admin = { id: (await query(`INSERT INTO usuarios(nome,email,senha_hash,papel) VALUES ('Admin','admin@x.com','x','admin') RETURNING id`)).rows[0].id, papel: 'admin' };
-  posts = []; respondidas = new Set(['4.4']); enviados.length = 0;
+  posts = []; estado = { '4.4': { c: 'S', e: 'S' } }; ignorarN = false; enviados.length = 0;
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
     if (url.endsWith('/oauth/token')) return resp(200, { access_token: 'tk' });
     if (url.includes('/clientes')) return resp(200, { content: url.includes('page=0') ? CLIENTES : [], last: true });
     if (url.includes('/tarefas?')) { const q = new URL(url).searchParams; expect(q.get('dataCompetenciaInicio')).toBe('2026-11-01'); expect(q.get('dataCompetenciaFim')).toBe('2026-11-30'); return resp(200, { content: TAREFAS, last: true }); }
     const m = url.match(/\/tarefas\/([\d.]+)\/atividades$/);
-    if (m) return resp(200, [{ id: `${m[1]}9`, nome: NOME, ordem: '1', tipo: 'C', respondida: respondidas.has(m[1]) }, { id: `${m[1]}8`, nome: 'Enviar para o cliente', ordem: '2', tipo: 'E', respondida: false }]);
-    if (url.endsWith('/atividades/resposta')) { const f = Object.fromEntries((init!.body as FormData).entries()) as Record<string, string>; posts.push(f); return resp(200, '{"status":"sucesso"}'); }
+    if (m) { const st = estado[m[1]] ?? {}; const a = (id: string, nome: string, ordem: string, tipo: string, v?: string) => ({ id, nome, ordem, tipo, respondida: !!v, resposta: v ? { nome: v } : null });
+      return resp(200, [a(`${m[1]}8`, 'Enviar para o cliente', '2', 'E', st.e), a(`${m[1]}9`, NOME, '1', 'C', st.c)]); }
+    if (url.endsWith('/atividades/resposta')) {
+      const f = Object.fromEntries((init!.body as FormData).entries()) as Record<string, string>; posts.push(f);
+      const tarefa = f.idAtividade.slice(0, -1); const st = (estado[tarefa] ??= {});
+      if (f.idAtividade.endsWith('9')) { st.c = 'S'; if (COM_EMAIL.has(tarefa) && !st.e) st.e = 'S'; } // ✔ no checklist: o G-Click manda o e-mail sozinho
+      else st.e = f.resposta === 'N' && !ignorarN ? 'N' : 'S';
+      return resp(200, '{"status":"sucesso"}');
+    }
     return resp(404, {});
   }));
   await salvarAcessoGclick(admin, { clientId: 'cid', segredo: 's' });
@@ -114,11 +122,11 @@ describe('G-Click: solicitação de documentos', () => {
     expect(await executarAgenda(em(3, 15))).toMatchObject({ rodou: false });
     const r = await executarAgenda(em(4, 8));
     expect(r).toMatchObject({ rodou: true, competencia: '2026-11' });
-    expect((r as { resumo: string }).resumo).toMatch(/E-mail pelo G-Click: 2 enviado\(s\).*WhatsApp: 1 enviado\(s\), 1 com erro/);
-    expect(posts).toHaveLength(1); expect(enviados).toHaveLength(1);
+    expect((r as { resumo: string }).resumo).toMatch(/E-mail pelo G-Click: 2 enviado\(s\).*WhatsApp: 1 enviado\(s\), 1 com X\/✔ no G-Click, 1 com erro/);
+    expect(posts).toHaveLength(3); expect(enviados).toHaveLength(1);
     expect(await executarAgenda(em(4, 9))).toEqual({ rodou: false, motivo: 'já rodou nesta competência' });
     expect(await executarAgenda(em(5, 9))).toEqual({ rodou: false, motivo: 'já rodou nesta competência' });
-    expect(posts).toHaveLength(1); expect(enviados).toHaveLength(1);
+    expect(posts).toHaveLength(3); expect(enviados).toHaveLength(1);
     expect((await lerAgenda()).ultima).toMatchObject({ competencia: '2026-11' });
     expect(proximoEnvio(agenda, (await lerAgenda()).ultima, em(4, 10))).toMatchObject({ data: '04/01/2027' });
   });
@@ -126,5 +134,33 @@ describe('G-Click: solicitação de documentos', () => {
     await salvarAgenda(admin, { ativo: true, dia: 4, hora: 8, email: false, whatsapp: true });
     expect(await executarAgenda(new Date(Date.UTC(2026, 11, 7, 12)))).toMatchObject({ rodou: false, motivo: 'fora do dia/hora' });
     expect(await executarAgenda(new Date(Date.UTC(2026, 11, 6, 12)))).toMatchObject({ rodou: true, competencia: '2026-11' });
+  });
+  it('sem e-mail: depois do WhatsApp, X em "Enviar para o cliente" (com o motivo) e ✔ no checklist, nessa ordem; confere no G-Click', async () => {
+    await salvarConfigSolicitacao(admin, { sistema: 'SIS9', usuario: '', tarefa: NOME, motivoSemEmail: '', mensagem: '' });
+    const r = await enviarPorWhatsapp(admin, { competencia: '2026-11', teste: false });
+    expect(r).toMatchObject({ enviados: 1, marcados: 1, erros: 1 }); // Bar F: WhatsApp recusado => não marca no G-Click
+    expect(posts).toEqual([
+      { idAtividade: '4.28', competencia: '202611', inscricao: '45723174000110', usuario: 'gclickbot', sistema: 'SIS9', resposta: 'N', observacao: 'Empresa não tem e-mail cadastrado' },
+      { idAtividade: '4.29', competencia: '202611', inscricao: '45723174000110', usuario: 'gclickbot', sistema: 'SIS9' },
+    ]);
+    expect(estado['4.2']).toEqual({ c: 'S', e: 'N' }); expect(estado['4.7']).toBeUndefined();
+    const p = await previaSolicitacao(admin, '2026-11');
+    expect(p.porWhatsapp.find((x) => x.empresa === 'Oficina B')).toMatchObject({ envio: { status: 'ok' }, gclick: { status: 'ok' } });
+    // 2º clique: nada de novo para a Oficina B
+    await enviarPorWhatsapp(admin, { competencia: '2026-11', teste: false });
+    expect(posts).toHaveLength(2); expect(enviados).toHaveLength(1);
+  });
+  it('sem e-mail: se o G-Click não registrar o X pela API, para (sem ✔) e avisa para marcar à mão; WhatsApp não é reenviado', async () => {
+    await salvarConfigSolicitacao(admin, { sistema: 'SIS9', usuario: '', tarefa: NOME, mensagem: '' });
+    ignorarN = true;
+    const r = await enviarPorWhatsapp(admin, { competencia: '2026-11', teste: false });
+    expect(r).toMatchObject({ enviados: 1, marcados: 0, erros: 2 });
+    expect(r.primeiroErro).toMatch(/Bar F: número recusado/);
+    expect(posts.map((x) => x.idAtividade)).toEqual(['4.28']); // Oficina B: tentou o X e parou antes do ✔
+    const p = await previaSolicitacao(admin, '2026-11'); const of = p.porWhatsapp.find((x) => x.empresa === 'Oficina B')!;
+    expect(of.envio?.status).toBe('ok'); expect(of.gclick).toMatchObject({ status: 'erro' }); expect(of.gclick?.detalhe).toMatch(/não registrou o X.*ficou "S".*à mão/);
+    ignorarN = false; await enviarPorWhatsapp(admin, { competencia: '2026-11', teste: false });
+    expect(enviados.filter((e) => e.numero === '5551988881111')).toHaveLength(1); // WhatsApp não repete; só tenta o G-Click de novo
+    expect((await previaSolicitacao(admin, '2026-11')).porWhatsapp.find((x) => x.empresa === 'Oficina B')!.gclick?.detalhe).toMatch(/está como "S".*troque para X à mão/);
   });
 });

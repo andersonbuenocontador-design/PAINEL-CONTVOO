@@ -15,23 +15,25 @@ import { SOLICITACAO_PADRAO, TAREFA_PADRAO, montarSolicitacao } from '../mensage
    - quem NÃO tem e-mail: o painel manda a mensagem padrão pelo WhatsApp (Digisac).
    Cada tarefa/canal é registrado em gclick_envios: um segundo clique nunca manda de novo. */
 
-export type ConfigSolicitacao = { sistema: string; usuario: string; tarefa: string; mensagem: string; mensagemPersonalizada: boolean };
+export type ConfigSolicitacao = { sistema: string; usuario: string; tarefa: string; motivoSemEmail: string; mensagem: string; mensagemPersonalizada: boolean };
+export const MOTIVO_PADRAO = 'Empresa não tem e-mail cadastrado';
 const CHAVE = 'gclick_solicitacao';
 
 export async function lerConfigSolicitacao(): Promise<ConfigSolicitacao> {
   const v = (await query(`SELECT valor FROM configuracoes WHERE chave=$1`, [CHAVE])).rows[0]?.valor as string | undefined;
   let j: Partial<ConfigSolicitacao> = {}; try { j = v ? JSON.parse(v) : {}; } catch { /* config inválida: usa o padrão */ }
-  return { sistema: j.sistema ?? '', usuario: j.usuario || 'gclickbot', tarefa: j.tarefa || TAREFA_PADRAO, mensagem: j.mensagem || SOLICITACAO_PADRAO, mensagemPersonalizada: !!j.mensagem };
+  return { sistema: j.sistema ?? '', usuario: j.usuario || 'gclickbot', tarefa: j.tarefa || TAREFA_PADRAO, motivoSemEmail: j.motivoSemEmail || MOTIVO_PADRAO, mensagem: j.mensagem || SOLICITACAO_PADRAO, mensagemPersonalizada: !!j.mensagem };
 }
 const configSchema = z.object({
   sistema: z.string().trim().max(100),
   usuario: z.string().trim().max(100).transform((v) => v || 'gclickbot'),
   tarefa: z.string().trim().min(3, 'Informe o nome da tarefa do G-Click.').max(200),
+  motivoSemEmail: z.string().trim().max(200).optional().transform((v) => v || MOTIVO_PADRAO),
   mensagem: z.string().transform((v) => v.replace(/\r\n/g, '\n').trim()).refine((v) => v.length <= 1500, 'Mensagem muito longa (máx. 1500 caracteres).'),
 });
 export async function salvarConfigSolicitacao(actor: Actor, input: z.input<typeof configSchema>) {
   exigirAdmin(actor); const d = configSchema.parse(input);
-  const valor = JSON.stringify({ sistema: d.sistema, usuario: d.usuario, tarefa: d.tarefa, mensagem: d.mensagem && d.mensagem !== SOLICITACAO_PADRAO.trim() ? d.mensagem : '' });
+  const valor = JSON.stringify({ sistema: d.sistema, usuario: d.usuario, tarefa: d.tarefa, motivoSemEmail: d.motivoSemEmail, mensagem: d.mensagem && d.mensagem !== SOLICITACAO_PADRAO.trim() ? d.mensagem : '' });
   await tx(async (c) => {
     await c.query(`INSERT INTO configuracoes(chave,valor,atualizado_por) VALUES ($1,$2,$3) ON CONFLICT (chave) DO UPDATE SET valor=EXCLUDED.valor, atualizado_por=EXCLUDED.atualizado_por, atualizado_em=now()`, [CHAVE, valor, actor.id]);
     await registrar(c, { usuarioId: actor.id, acao: 'gclick.solicitacao_configurar', entidade: 'configuracao', detalhes: { tarefa: d.tarefa, sistema: !!d.sistema } });
@@ -39,9 +41,10 @@ export async function salvarConfigSolicitacao(actor: Actor, input: z.input<typeo
 }
 
 type Tarefa = { id: string; nome: string; status: string; clienteId: number; clienteInscricao?: string | null; clienteApelido?: string | null; dataCompetencia?: string | null; dataVencimento?: string | null };
-type Atividade = { id: string; nome: string; ordem: string | number; tipo: string; respondida: boolean };
+type Atividade = { id: string; nome: string; ordem: string | number; tipo: string; respondida: boolean; resposta?: { nome?: string | null } | null };
 export type ItemSolicitacao = { tarefaId: string; clienteId: number; empresa: string; inscricao: string; emails: number; celular: string | null;
-  empresaId: string | null; vencimento: string | null; envio: { status: string; detalhe: string | null; em: string } | null };
+  empresaId: string | null; vencimento: string | null; envio: Envio | null; /** marcação no G-Click (✔, ou X + ✔ para quem não tem e-mail) */ gclick: Envio | null };
+type Envio = { status: string; detalhe: string | null; em: string };
 export type PreviaSolicitacao = { competencia: string; mes: string; tarefa: string; total: number; concluidas: number;
   porEmail: ItemSolicitacao[]; porWhatsapp: ItemSolicitacao[]; semContato: ItemSolicitacao[] };
 
@@ -87,7 +90,7 @@ async function montarPrevia(c: Cred, comp: string, cfg: ConfigSolicitacao) {
     const celular = emp?.whatsapp || celularDe(cli?.telefones);
     const canal = emails ? 'gclick' : 'whatsapp';
     const item: ItemSolicitacao = { tarefaId: x.id, clienteId: x.clienteId, empresa: (cli?.apelido || x.clienteApelido || cli?.nome || `Cliente ${x.clienteId}`).trim(),
-      inscricao: soDigitos(x.clienteInscricao || cli?.inscricao || ''), emails, celular: celular ?? null, empresaId: emp?.id ?? null, vencimento: x.dataVencimento ?? null, envio: envios.get(`${x.id}|${canal}`) ?? null };
+      inscricao: soDigitos(x.clienteInscricao || cli?.inscricao || ''), emails, celular: celular ?? null, empresaId: emp?.id ?? null, vencimento: x.dataVencimento ?? null, envio: envios.get(`${x.id}|${canal}`) ?? null, gclick: envios.get(`${x.id}|gclick`) ?? null };
     (emails ? previa.porEmail : celular ? previa.porWhatsapp : previa.semContato).push(item);
   }
   const ordem = (a: ItemSolicitacao, b: ItemSolicitacao) => a.empresa.localeCompare(b.empresa, 'pt-BR');
@@ -117,18 +120,22 @@ const msgErro = (e: unknown) => (e instanceof Error ? e.message : String(e));
 async function emLotes<T>(itens: T[], paralelo: number, fn: (x: T) => Promise<void>) {
   for (let i = 0; i < itens.length; i += paralelo) await Promise.all(itens.slice(i, i + paralelo).map(fn));
 }
-export type Resultado = { enviados: number; erros: number; pulados: number; primeiroErro: string | null };
+export type Resultado = { enviados: number; erros: number; pulados: number; primeiroErro: string | null; marcados?: number };
 
-/** ✔ na 1ª atividade (checklist) da tarefa, como o botão verde do G-Click: o G-Click manda o e-mail sozinho. */
-async function responderAtividade(t: string, cfg: ConfigSolicitacao, it: ItemSolicitacao, comp: string): Promise<string> {
-  const ativs = await gclickGet<Atividade[]>(t, `/tarefas/${encodeURIComponent(it.tarefaId)}/atividades`);
-  const ordenadas = [...ativs].sort((a, b) => Number(a.ordem) - Number(b.ordem));
-  const alvo = ordenadas.find((a) => a.nome?.trim().toLowerCase() === cfg.tarefa.trim().toLowerCase()) ?? ordenadas.find((a) => a.tipo === 'C') ?? ordenadas[0];
-  if (!alvo) throw new AppError('A tarefa não tem atividades no G-Click.');
-  if (alvo.respondida) return 'já estava com ✔ no G-Click';
+const lerAtividades = async (t: string, it: ItemSolicitacao) =>
+  [...await gclickGet<Atividade[]>(t, `/tarefas/${encodeURIComponent(it.tarefaId)}/atividades`)].sort((a, b) => Number(a.ordem) - Number(b.ordem));
+/** As duas atividades da tarefa: o checklist ("Solicitação de Documentos Contábeis") e o envio ao cliente ("Enviar para o cliente", AUTO). */
+function atividades(lista: Atividade[], cfg: ConfigSolicitacao) {
+  const check = lista.find((a) => a.nome?.trim().toLowerCase() === cfg.tarefa.trim().toLowerCase()) ?? lista.find((a) => a.tipo === 'C') ?? lista[0];
+  const envio = lista.find((a) => a !== check && (a.tipo === 'E' || /enviar para o cliente/i.test(a.nome ?? '')));
+  return { check, envio };
+}
+/** POST /atividades/resposta (o mesmo que os botões do G-Click). `extras`: resposta "N" (o X vermelho) e o motivo. */
+async function postarResposta(t: string, cfg: ConfigSolicitacao, it: ItemSolicitacao, comp: string, atividadeId: string, extras: Record<string, string> = {}) {
   if (!it.inscricao) throw new AppError('Cliente sem CNPJ/CPF no G-Click.');
   const fd = new FormData();
-  fd.set('idAtividade', alvo.id); fd.set('competencia', comp.replace('-', '')); fd.set('inscricao', it.inscricao); fd.set('usuario', cfg.usuario); fd.set('sistema', cfg.sistema);
+  fd.set('idAtividade', atividadeId); fd.set('competencia', comp.replace('-', '')); fd.set('inscricao', it.inscricao); fd.set('usuario', cfg.usuario); fd.set('sistema', cfg.sistema);
+  for (const [k, v] of Object.entries(extras)) fd.set(k, v);
   let r: Response;
   try { r = await fetch(`${GCLICK_BASE}/atividades/resposta`, { method: 'POST', headers: { authorization: `Bearer ${t}`, accept: 'application/json' }, body: fd, signal: AbortSignal.timeout(60000) }); }
   catch { throw new AppError('O G-Click não respondeu a tempo.'); }
@@ -136,7 +143,38 @@ async function responderAtividade(t: string, cfg: ConfigSolicitacao, it: ItemSol
   if (!r.ok) throw new AppError(`G-Click recusou (${r.status}): ${corpo.slice(0, 200) || 'sem detalhe'}`);
   // o G-Click às vezes responde 200 com {"status":"erro","msg":...}
   if (/"status"\s*:\s*"erro"/i.test(corpo)) { const m = corpo.match(/"msg"\s*:\s*"([^"]*)"/); throw new AppError(`G-Click: ${m?.[1] ?? corpo.slice(0, 200)}`); }
-  return 'ok';
+}
+const resp = (a?: Atividade) => (a?.resposta?.nome ?? '').toUpperCase();
+
+/** Cliente COM e-mail: ✔ na 1ª atividade, como o botão verde; o G-Click manda o e-mail ("Enviar para o cliente", AUTO). Confere depois. */
+async function responderAtividade(t: string, cfg: ConfigSolicitacao, it: ItemSolicitacao, comp: string): Promise<string | null> {
+  const { check } = atividades(await lerAtividades(t, it), cfg);
+  if (!check) throw new AppError('A tarefa não tem atividades no G-Click.');
+  if (check.respondida) return 'já estava com ✔ no G-Click';
+  await postarResposta(t, cfg, it, comp, check.id);
+  const depois = atividades(await lerAtividades(t, it), cfg);
+  if (!depois.check?.respondida) throw new AppError('O G-Click aceitou o pedido, mas a atividade continua sem ✔.');
+  if (depois.envio && !depois.envio.respondida) return '✔ dado; o "Enviar para o cliente" ainda não aparece como enviado no G-Click';
+  return null;
+}
+
+/** Cliente SEM e-mail (o ✔ daria erro no G-Click): X na atividade "Enviar para o cliente" com o motivo e depois ✔ no checklist,
+ *  como o escritório faz à mão. Confere que ficou X (N) — se o G-Click não aceitar o X pela API, para e avisa. */
+async function marcarSemEmail(t: string, cfg: ConfigSolicitacao, it: ItemSolicitacao, comp: string): Promise<string | null> {
+  let { check, envio } = atividades(await lerAtividades(t, it), cfg);
+  if (!check) throw new AppError('A tarefa não tem atividades no G-Click.');
+  if (envio && !envio.respondida) {
+    await postarResposta(t, cfg, it, comp, envio.id, { resposta: 'N', observacao: cfg.motivoSemEmail });
+    ({ check, envio } = atividades(await lerAtividades(t, it), cfg));
+    if (!envio?.respondida || resp(envio) !== 'N')
+      throw new AppError(`O G-Click não registrou o X em "Enviar para o cliente" pela API${envio?.respondida ? ` (ficou "${resp(envio) || '?'}")` : ''}. Marque o X à mão nesta tarefa.`);
+  } else if (envio && resp(envio) !== 'N') throw new AppError(`"Enviar para o cliente" está como "${resp(envio) || '?'}" no G-Click, mas este cliente não tem e-mail: troque para X à mão nesta tarefa.`);
+  if (check && !check.respondida) {
+    await postarResposta(t, cfg, it, comp, check.id);
+    if (!atividades(await lerAtividades(t, it), cfg).check?.respondida) throw new AppError('X registrado, mas o ✔ do checklist não ficou no G-Click.');
+    return null;
+  }
+  return 'já estava marcado no G-Click';
 }
 
 const loteSchema = z.object({ competencia: competenciaSchema, teste: z.boolean() });
@@ -152,7 +190,7 @@ export async function enviarPorGclick(actor: Actor, p: { competencia: string; te
   const res: Resultado = { enviados: 0, erros: 0, pulados: 0, primeiroErro: null };
   await emLotes(alvo, 4, async (it) => {
     if (!(await reservar(actor, it, 'gclick', comp))) { res.pulados++; return; }
-    try { const d = await responderAtividade(t, cfg, it, comp); await concluir(it, 'gclick', true, d === 'ok' ? null : d); res.enviados++; }
+    try { const d = await responderAtividade(t, cfg, it, comp); await concluir(it, 'gclick', true, d); res.enviados++; }
     catch (e) { await concluir(it, 'gclick', false, msgErro(e)); res.erros++; res.primeiroErro ??= `${it.empresa}: ${msgErro(e)}`; }
   });
   await registrar({ query } as never, { usuarioId: actor.id, acao: 'gclick.solicitacao_email', entidade: 'gclick', detalhes: { competencia: comp, teste, ...res } });
@@ -163,16 +201,27 @@ export async function enviarPorGclick(actor: Actor, p: { competencia: string; te
 export async function enviarPorWhatsapp(actor: Actor, p: { competencia: string; teste: boolean }): Promise<Resultado> {
   exigirAdmin(actor); const { competencia: comp, teste } = loteSchema.parse(p);
   const cfg = await lerConfigSolicitacao();
-  const { previa } = await montarPrevia(await credOuErro(), comp, cfg);
-  let alvo = previa.porWhatsapp.filter((x) => x.envio?.status !== 'ok' && x.envio?.status !== 'enviando');
+  const { previa, t } = await montarPrevia(await credOuErro(), comp, cfg);
+  const feito = (e: Envio | null) => e?.status === 'ok' || e?.status === 'enviando';
+  // falta o WhatsApp, ou (com o código do sistema) falta o X/✔ no G-Click
+  let alvo = previa.porWhatsapp.filter((x) => !feito(x.envio) || (cfg.sistema && !feito(x.gclick)));
   if (teste) alvo = alvo.slice(0, 1);
   const base = (process.env.APP_URL ?? '').replace(/\/$/, '');
-  const res: Resultado = { enviados: 0, erros: 0, pulados: 0, primeiroErro: null };
+  const res: Resultado = { enviados: 0, erros: 0, pulados: 0, primeiroErro: null, marcados: 0 };
+  const falhou = (it: ItemSolicitacao, m: string) => { res.erros++; res.primeiroErro ??= `${it.empresa}: ${m}`; };
   await emLotes(alvo, 3, async (it) => {
-    if (!(await reservar(actor, it, 'whatsapp', comp))) { res.pulados++; return; }
-    const dados = { empresa: it.empresa, mes: previa.mes, vencimento: dataBr(it.vencimento), link: base ? (it.empresaId ? `${base}/cliente/${it.empresaId}/documentos?competencia=${comp}` : base) : null };
-    try { await enviarWhatsappDigisac(it.celular!, (nome) => montarSolicitacao(cfg.mensagem, { nome, ...dados })); await concluir(it, 'whatsapp', true, null); res.enviados++; }
-    catch (e) { await concluir(it, 'whatsapp', false, msgErro(e)); res.erros++; res.primeiroErro ??= `${it.empresa}: ${msgErro(e)}`; }
+    let zapOk = feito(it.envio);
+    if (!zapOk) {
+      if (!(await reservar(actor, it, 'whatsapp', comp))) { res.pulados++; return; }
+      const dados = { empresa: it.empresa, mes: previa.mes, vencimento: dataBr(it.vencimento), link: base ? (it.empresaId ? `${base}/cliente/${it.empresaId}/documentos?competencia=${comp}` : base) : null };
+      try { await enviarWhatsappDigisac(it.celular!, (nome) => montarSolicitacao(cfg.mensagem, { nome, ...dados })); await concluir(it, 'whatsapp', true, null); res.enviados++; zapOk = true; }
+      catch (e) { await concluir(it, 'whatsapp', false, msgErro(e)); falhou(it, msgErro(e)); }
+    }
+    // só marca no G-Click depois que o cliente recebeu o WhatsApp
+    if (zapOk && cfg.sistema && !feito(it.gclick) && (await reservar(actor, it, 'gclick', comp))) {
+      try { await concluir(it, 'gclick', true, await marcarSemEmail(t, cfg, it, comp)); res.marcados!++; }
+      catch (e) { await concluir(it, 'gclick', false, msgErro(e)); falhou(it, `G-Click: ${msgErro(e)}`); }
+    }
   });
   await registrar({ query } as never, { usuarioId: actor.id, acao: 'gclick.solicitacao_whatsapp', entidade: 'gclick', detalhes: { competencia: comp, teste, ...res } });
   return res;
@@ -236,7 +285,7 @@ export async function executarAgenda(d = new Date()): Promise<{ rodou: false; mo
   if (!r.rowCount) return { rodou: false, motivo: 'já rodou nesta competência' };
   const actor: Actor = { id: u.id, papel: 'admin' }; const partes: string[] = [];
   const passo = async (nome: string, fn: () => Promise<Resultado>) => {
-    try { const x = await fn(); partes.push(`${nome}: ${x.enviados} enviado(s)${x.pulados ? `, ${x.pulados} já enviado(s)` : ''}${x.erros ? `, ${x.erros} com erro (${x.primeiroErro})` : ''}`); }
+    try { const x = await fn(); partes.push(`${nome}: ${x.enviados} enviado(s)${x.marcados ? `, ${x.marcados} com X/✔ no G-Click` : ''}${x.pulados ? `, ${x.pulados} já enviado(s)` : ''}${x.erros ? `, ${x.erros} com erro (${x.primeiroErro})` : ''}`); }
     catch (e) { partes.push(`${nome}: não rodou (${msgErro(e)})`); }
   };
   if (a.email) await passo('E-mail pelo G-Click', () => enviarPorGclick(actor, { competencia: comp, teste: false }));

@@ -17,19 +17,19 @@ function competencias() {
   const [a, m] = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit' }).format(new Date()).split('-').map(Number);
   return [1, 0, -1, -2].map((k) => { const d = new Date(Date.UTC(a, m - 1 + k, 1)); return d.toISOString().slice(0, 7); });
 }
-function Situacao({ it }: { it: ItemSolicitacao }) {
-  const e = it.envio; if (!e) return <span className="soon">a enviar</span>;
-  if (e.status === 'ok') return <span className="sol-ok" title={e.detalhe ?? ''}>✔ enviado {new Date(e.em).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</span>;
+function Situacao({ e, vazio = 'a enviar', feito = 'enviado' }: { e: ItemSolicitacao['envio']; vazio?: string; feito?: string }) {
+  if (!e) return <span className="soon">{vazio}</span>;
+  if (e.status === 'ok') return <span className="sol-ok" title={e.detalhe ?? ''}>✔ {feito} {new Date(e.em).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</span>;
   if (e.status === 'erro') return <span className="sol-erro" title={e.detalhe ?? ''}>erro: {(e.detalhe ?? '').slice(0, 60)}</span>;
   return <span className="soon">enviando…</span>;
 }
 function Lista({ itens, coluna }: { itens: ItemSolicitacao[]; coluna: 'email' | 'celular' | 'nada' }) {
   if (!itens.length) return null;
-  return (<details className="sol-detalhe"><summary>Ver os {itens.length} clientes</summary><div className="gclick-lista"><table><thead><tr><th>Cliente</th><th>{coluna === 'email' ? 'E-mails' : 'Celular'}</th><th>Vence</th><th>Situação</th></tr></thead><tbody>
-    {itens.map((it) => <tr key={it.tarefaId}><td><strong>{it.empresa}</strong></td><td>{coluna === 'email' ? it.emails : fone(it.celular)}</td><td>{dataBr(it.vencimento)}</td><td><Situacao it={it} /></td></tr>)}
+  return (<details className="sol-detalhe"><summary>Ver os {itens.length} clientes</summary><div className="gclick-lista"><table><thead><tr><th>Cliente</th><th>{coluna === 'email' ? 'E-mails' : 'Celular'}</th><th>Vence</th><th>{coluna === 'email' ? 'Situação' : 'WhatsApp'}</th>{coluna === 'celular' && <th>G-Click (X + ✔)</th>}</tr></thead><tbody>
+    {itens.map((it) => <tr key={it.tarefaId}><td><strong>{it.empresa}</strong></td><td>{coluna === 'email' ? it.emails : fone(it.celular)}</td><td>{dataBr(it.vencimento)}</td><td><Situacao e={it.envio} /></td>{coluna === 'celular' && <td><Situacao e={it.gclick} vazio="a marcar" feito="marcado" /></td>}</tr>)}
   </tbody></table></div></details>);
 }
-const pendentes = (l: ItemSolicitacao[]) => l.filter((x) => x.envio?.status !== 'ok').length;
+const pendentes = (l: ItemSolicitacao[], comGclick = false) => l.filter((x) => x.envio?.status !== 'ok' || (comGclick && x.gclick?.status !== 'ok')).length;
 
 /** Solicitação de documentos do G-Click em dois cliques: ✔ no G-Click (que manda o e-mail) e WhatsApp para quem não tem e-mail. */
 export default async function Solicitacao({ searchParams }: { searchParams: Promise<{ competencia?: string; buscar?: string; erro?: string; ok?: string }> }) {
@@ -39,7 +39,7 @@ export default async function Solicitacao({ searchParams }: { searchParams: Prom
   const prox = agenda.ativo ? proximoEnvio(agenda, ultima) : null;
   let p: PreviaSolicitacao | null = null, erro = '';
   if (st.ligado && sp.buscar) { try { p = await previaSolicitacao(u, comp); } catch (e) { erro = mensagemDeErro(e); } }
-  const faltaEmail = p ? pendentes(p.porEmail) : 0, faltaZap = p ? pendentes(p.porWhatsapp) : 0;
+  const faltaEmail = p ? pendentes(p.porEmail) : 0, faltaZap = p ? pendentes(p.porWhatsapp, !!cfg.sistema) : 0;
   return (<><Topo u={u} /><main className="inicio emp">
     <p className="emp-voltar"><Link href="/admin/gclick">← G-Click</Link></p>
     <section className="inicio-ola"><div><h1>Solicitação de documentos</h1>
@@ -73,11 +73,12 @@ export default async function Solicitacao({ searchParams }: { searchParams: Prom
       </section>
 
       <section className="card emp-bloco sol-passo"><h2><span className="sol-num">2</span> WhatsApp pelo Digisac <small className="soon">{p.porWhatsapp.length} clientes sem e-mail · {faltaZap} a enviar</small></h2>
-        <p className="soon">Manda a mensagem padrão (configuração abaixo) para o celular do cliente: o do painel ou, se não houver, o do G-Click. O nome no &quot;Olá&quot; é o do contato no Digisac.</p>
+        <p className="soon">Para quem não tem e-mail o ✔ verde dá erro no G-Click, então o painel faz como vocês fazem à mão: manda a mensagem padrão pelo WhatsApp (celular do painel ou, se não houver, o do G-Click) e, depois que ela sai, dá o <strong>X em &quot;Enviar para o cliente&quot;</strong> com o motivo &quot;{cfg.motivoSemEmail}&quot; e o <strong>✔ em &quot;{cfg.tarefa}&quot;</strong>. O nome no &quot;Olá&quot; é o do contato no Digisac.</p>
+        {!cfg.sistema && <p className="soon">Sem o código do &quot;sistema&quot; (configuração abaixo), só o WhatsApp é enviado; o X e o ✔ ficam para fazer no G-Click.</p>}
         {!zap && <p className="sol-erro">O Digisac ainda não está ligado: <Link href="/admin/whatsapp">configurar</Link>.</p>}
         <div className="row">
           <form action={acaoEnviarWhatsapp}><input type="hidden" name="competencia" value={comp} /><input type="hidden" name="teste" value="1" />
-            <BotaoConfirmar classe="doc2-btn leve" texto="Testar com 1 cliente" desabilitado={!zap || !faltaZap} pergunta="Mandar a mensagem padrão pelo WhatsApp para 1 cliente?" /></form>
+            <BotaoConfirmar classe="doc2-btn leve" texto="Testar com 1 cliente" desabilitado={!zap || !faltaZap} pergunta={cfg.sistema ? 'Mandar a mensagem padrão pelo WhatsApp para 1 cliente e marcar X/✔ na tarefa dele no G-Click?' : 'Mandar a mensagem padrão pelo WhatsApp para 1 cliente?'} /></form>
           <form action={acaoEnviarWhatsapp}><input type="hidden" name="competencia" value={comp} /><input type="hidden" name="teste" value="0" />
             <BotaoConfirmar texto={`Enviar WhatsApp para os ${faltaZap} sem e-mail`} desabilitado={!zap || !faltaZap} pergunta={`Mandar a mensagem padrão pelo WhatsApp para ${faltaZap} clientes?`} /></form>
         </div>

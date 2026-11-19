@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import { EXEMPLO_SOLICITACAO, MARCADORES_SOLICITACAO, SOLICITACAO_PADRAO, montarSolicitacao } from '@/lib/mensagem-solicitacao';
 import { acaoSalvarConfigSolicitacao } from './actions';
 
-type Cfg = { sistema: string; usuario: string; tarefa: string; mensagem: string; mensagemPersonalizada: boolean };
+type Cfg = { sistema: string; usuario: string; tarefa: string; motivoSemEmail: string; mensagem: string; mensagemPersonalizada: boolean };
 export function EditorSolicitacao({ cfg, competencia }: { cfg: Cfg; competencia: string }) {
   const [texto, setTexto] = useState(cfg.mensagem); const area = useRef<HTMLTextAreaElement>(null);
   const inserir = (m: string) => {
@@ -18,6 +18,7 @@ export function EditorSolicitacao({ cfg, competencia }: { cfg: Cfg; competencia:
       <div><label htmlFor="tarefa">Nome da tarefa no G-Click *</label><input id="tarefa" name="tarefa" required defaultValue={cfg.tarefa} /></div>
       <div><label htmlFor="sistema">Código do &quot;sistema&quot; de integração</label><input id="sistema" name="sistema" defaultValue={cfg.sistema} autoComplete="off" placeholder="G-Click → Configurações → Minha empresa → Sistemas de Integração" /></div>
       <div><label htmlFor="usuario">Usuário que aparece no G-Click</label><input id="usuario" name="usuario" defaultValue={cfg.usuario} placeholder="gclickbot" /></div>
+      <div><label htmlFor="motivoSemEmail">Motivo do X (quem não tem e-mail)</label><input id="motivoSemEmail" name="motivoSemEmail" maxLength={200} defaultValue={cfg.motivoSemEmail} /></div>
     </div>
     <p className="soon">O ✔ pela API é um recurso &quot;para parceiros&quot; do G-Click: ele pede o código do sistema de integração cadastrado no G-Click. Sem esse código, o botão do e-mail fica travado.</p>
     <div className="msg-editor">
