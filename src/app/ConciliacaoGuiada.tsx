@@ -1,6 +1,7 @@
 'use client';
 // Contvoo AI (assistente de classificação): um lançamento por vez, sugestão em destaque, confirmação em um clique ou tecla, pergunta da nota logo em
 // seguida, progresso visível, metas pequenas e pausa sugerida. Cada resposta é salva na hora (o cliente pode parar quando quiser).
+import { RoboContvoo } from './RoboContvoo';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { acaoClassificarLote, acaoConfirmarLinhas, acaoDefinirParticipante, acaoEditarLinha, acaoSemNota } from './conciliacao-actions';
@@ -135,7 +136,7 @@ export function ConciliacaoGuiada({ empresaId, participantes, linhas: inicial, p
 
   return (<div className="guiada">
     <div className="guiada-topo">
-      <div><span className="ai-marca"><span className="ai-logo" aria-hidden="true">AI</span>Contvoo AI</span><h2>Vamos organizar as movimentações de {nomeMes}</h2>
+      <div><span className="ai-marca"><span className="ai-robo" aria-hidden="true"><RoboContvoo size={30} id="rc-topo" /></span>Contvoo AI</span><h2>Vamos organizar as movimentações de {nomeMes}</h2>
         <p className="muted">{total} movimentações · {classificadas} com categoria · {prontas} prontas (categoria e nota) · faltam {total - prontas}</p></div>
       <button className="btn" onClick={onVerTabela}>Ver em tabela</button>
     </div>
@@ -160,6 +161,7 @@ export function ConciliacaoGuiada({ empresaId, participantes, linhas: inicial, p
 
       {etapa === 'categoria' ? (<>
         {atual.conta_codigo != null && !escolhendo && (<div className="sugestao">
+          <span className="ai-robo sugestao-robo" aria-hidden="true"><RoboContvoo size={40} id="rc-sug" /></span>
           <div><span className="muted">{atual.revisado ? 'Categoria escolhida' : 'Sugestão do Contvoo AI'}</span><strong>{atual.conta_nome}</strong>{atual.conta_grupo && <span className="muted">{atual.conta_grupo}</span>}
             {!atual.revisado && atual.motivo && <span className="muted motivo">{atual.motivo}</span>}</div>
           <div className="linha-flex"><button className="btn pri grande" disabled={salvando} onClick={() => void confirmar()} autoFocus>Confirmar <kbd>Enter</kbd></button>

@@ -1,5 +1,6 @@
 'use client';
 // Conciliação com o Contvoo AI (um lançamento por vez) ou em tabela. Cliente abre no Contvoo AI; escritório abre na tabela e chama o Contvoo AI quando quiser.
+import { RoboContvoo } from './RoboContvoo';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ConciliacaoGuiada } from './ConciliacaoGuiada';
@@ -17,7 +18,7 @@ export function ConciliacaoCliente(p: { empresaId: string; participantes: Partic
   if (guiadaPossivel && modo === 'guiada')
     return <ConciliacaoGuiada empresaId={p.empresaId} participantes={p.participantes} linhas={p.linhas} plano={p.plano} mes={p.mes} onVerTabela={() => troca('tabela')} onEnviar={p.enviar} podeEnviar={p.podeEnviar} primeiroBanco={p.bancoInicial} />;
   return (<>
-    {guiadaPossivel && <div className="linha-flex" style={{ justifyContent: 'flex-end' }}><button className="btn pri" onClick={() => troca('guiada')}>Pedir ajuda ao Contvoo AI</button></div>}
+    {guiadaPossivel && <div className="linha-flex" style={{ justifyContent: 'flex-end' }}><button className="btn pri btn-robo" onClick={() => troca('guiada')}><span className="ai-robo" aria-hidden="true"><RoboContvoo size={24} id="rc-botao" /></span>Pedir ajuda ao Contvoo AI</button></div>}
     <ConciliacaoTabela empresaId={p.empresaId} participantes={p.participantes} linhas={p.linhas} plano={p.plano} bancos={p.bancos} admin={!!p.admin} somenteLeitura={p.somenteLeitura} bancoInicial={p.bancoInicial} />
   </>);
 }
