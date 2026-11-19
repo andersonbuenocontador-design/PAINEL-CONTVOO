@@ -7,7 +7,7 @@ import { competenciaSchema } from './documentos';
 import { mesPorExtenso } from './integracao';
 import { GCLICK_BASE, celularDe, lerCred, todosClientes, token, type Cred, type GclickCliente } from './gclick';
 import { enviarWhatsappDigisac } from './digisac';
-import { SOLICITACAO_PADRAO, TAREFA_PADRAO, montarSolicitacao } from '../mensagem-solicitacao';
+import { SOLICITACAO_PADRAO, TAMANHO_MAX_SOLICITACAO, TAREFA_PADRAO, competenciaAbreviada, montarSolicitacao } from '../mensagem-solicitacao';
 
 /* "Solicitação de documentos" do G-Click em um clique:
    - quem TEM e-mail no G-Click: o painel dá o ✔ na 1ª atividade da tarefa (POST /atividades/resposta), igual ao botão verde
@@ -29,7 +29,7 @@ const configSchema = z.object({
   usuario: z.string().trim().max(100).transform((v) => v || 'gclickbot'),
   tarefa: z.string().trim().min(3, 'Informe o nome da tarefa do G-Click.').max(200),
   motivoSemEmail: z.string().trim().max(200).optional().transform((v) => v || MOTIVO_PADRAO),
-  mensagem: z.string().transform((v) => v.replace(/\r\n/g, '\n').trim()).refine((v) => v.length <= 1500, 'Mensagem muito longa (máx. 1500 caracteres).'),
+  mensagem: z.string().transform((v) => v.replace(/\r\n/g, '\n').trim()).refine((v) => v.length <= TAMANHO_MAX_SOLICITACAO, `Mensagem muito longa (máx. ${TAMANHO_MAX_SOLICITACAO} caracteres).`),
 });
 export async function salvarConfigSolicitacao(actor: Actor, input: z.input<typeof configSchema>) {
   exigirAdmin(actor); const d = configSchema.parse(input);
@@ -213,7 +213,7 @@ export async function enviarPorWhatsapp(actor: Actor, p: { competencia: string; 
     let zapOk = feito(it.envio);
     if (!zapOk) {
       if (!(await reservar(actor, it, 'whatsapp', comp))) { res.pulados++; return; }
-      const dados = { empresa: it.empresa, mes: previa.mes, vencimento: dataBr(it.vencimento), link: base ? (it.empresaId ? `${base}/cliente/${it.empresaId}/documentos?competencia=${comp}` : base) : null };
+      const dados = { empresa: it.empresa, mes: previa.mes, competencia: competenciaAbreviada(comp), vencimento: dataBr(it.vencimento), link: base ? (it.empresaId ? `${base}/cliente/${it.empresaId}/documentos?competencia=${comp}` : base) : null };
       try { await enviarWhatsappDigisac(it.celular!, (nome) => montarSolicitacao(cfg.mensagem, { nome, ...dados })); await concluir(it, 'whatsapp', true, null); res.enviados++; zapOk = true; }
       catch (e) { await concluir(it, 'whatsapp', false, msgErro(e)); falhou(it, msgErro(e)); }
     }

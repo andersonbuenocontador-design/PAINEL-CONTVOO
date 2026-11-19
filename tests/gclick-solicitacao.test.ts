@@ -107,7 +107,9 @@ describe('G-Click: solicitação de documentos', () => {
     const r = await enviarPorWhatsapp(admin, { competencia: '2026-11', teste: false });
     expect(r).toMatchObject({ enviados: 1, erros: 1 }); expect(r.primeiroErro).toMatch(/Bar F: número recusado/);
     expect(enviados).toHaveLength(1); expect(enviados[0].numero).toBe('5551988881111');
-    expect(enviados[0].texto).toMatch(/^Olá, Maria Souza Lima!/); expect(enviados[0].texto).toContain('novembro/2026 da Oficina B'); expect(enviados[0].texto).toContain('até 10/12/2026');
+    expect(enviados[0].texto).toMatch(/^Olá!\n\nSolicito os documentos/); expect(enviados[0].texto).toContain('referente à competência NOV/2026.');
+    expect(enviados[0].texto).toContain('• Extrato da Cobrança bancária.'); expect(enviados[0].texto).toMatch(/Atenciosamente,\nContvoo Contabilidade$/);
+    expect(enviados[0].texto).not.toMatch(/\{\w+\}/);
     await enviarPorWhatsapp(admin, { competencia: '2026-11', teste: false });
     expect(enviados.filter((e) => e.numero === '5551988881111')).toHaveLength(1);
     expect(posts.map((x) => [x.idAtividade, x.resposta, 'sistema' in x])).toEqual([['4.28', 'N', false], ['4.29', undefined, false]]); // X e ✔ mesmo sem código
@@ -115,6 +117,8 @@ describe('G-Click: solicitação de documentos', () => {
   it('configuração: texto padrão não fica gravado; personalizado sim; só escritório', async () => {
     await salvarConfigSolicitacao(admin, { sistema: ' S1 ', usuario: '', tarefa: NOME, mensagem: 'Oi {nome}, mande {mes}.' });
     expect(await lerConfigSolicitacao()).toMatchObject({ sistema: 'S1', usuario: 'gclickbot', mensagem: 'Oi {nome}, mande {mes}.', mensagemPersonalizada: true });
+    await salvarConfigSolicitacao(admin, { sistema: '', usuario: '', tarefa: NOME, mensagem: 'x'.repeat(3500) }); // texto longo como o padrão cabe
+    await expect(salvarConfigSolicitacao(admin, { sistema: '', usuario: '', tarefa: NOME, mensagem: 'x'.repeat(4001) })).rejects.toThrow(/muito longa/);
     await expect(previaSolicitacao({ id: admin.id, papel: 'cliente' }, '2026-11')).rejects.toMatchObject({ code: 'proibido' });
   });
   it('envio automático: só no dia/hora (Brasília), competência anterior, uma vez; desligado não envia', async () => {

@@ -1,7 +1,7 @@
 'use client';
 // Configuração da "Solicitação de documentos": código do sistema no G-Click, usuário, nome da tarefa e a mensagem padrão do WhatsApp (com prévia).
 import { useRef, useState } from 'react';
-import { EXEMPLO_SOLICITACAO, MARCADORES_SOLICITACAO, SOLICITACAO_PADRAO, montarSolicitacao } from '@/lib/mensagem-solicitacao';
+import { EXEMPLO_SOLICITACAO, MARCADORES_SOLICITACAO, SOLICITACAO_PADRAO, TAMANHO_MAX_SOLICITACAO, montarSolicitacao } from '@/lib/mensagem-solicitacao';
 import { acaoSalvarConfigSolicitacao } from './actions';
 
 type Cfg = { sistema: string; usuario: string; tarefa: string; motivoSemEmail: string; mensagem: string; mensagemPersonalizada: boolean };
@@ -24,12 +24,12 @@ export function EditorSolicitacao({ cfg, competencia }: { cfg: Cfg; competencia:
     <div className="msg-editor">
       <div className="msg-editor-campo">
         <label htmlFor="mensagem">Mensagem padrão do WhatsApp (para quem não tem e-mail)</label>
-        <textarea id="mensagem" name="mensagem" ref={area} rows={11} maxLength={1500} value={texto} onChange={(e) => setTexto(e.target.value)} />
+        <textarea id="mensagem" name="mensagem" ref={area} rows={18} maxLength={TAMANHO_MAX_SOLICITACAO} value={texto} onChange={(e) => setTexto(e.target.value)} />
         <div className="msg-marcadores"><span className="soon">Clique para inserir:</span>{MARCADORES_SOLICITACAO.map((m) => <button type="button" key={m.chave} className="msg-chip" title={m.explica} onClick={() => inserir(m.chave)}>{m.chave}</button>)}</div>
         <ul className="soon msg-legenda">{MARCADORES_SOLICITACAO.map((m) => <li key={m.chave}><code>{m.chave}</code> {m.explica}</li>)}</ul>
         <div className="row"><button>Salvar configuração</button>
           {texto !== SOLICITACAO_PADRAO && <button type="button" className="sec" onClick={() => setTexto(SOLICITACAO_PADRAO)}>Voltar ao texto padrão</button>}
-          <span className="soon">{texto.length}/1500</span></div>
+          <span className="soon">{texto.length}/{TAMANHO_MAX_SOLICITACAO}</span></div>
       </div>
       <div className="msg-previa"><span className="soon">Como chega no WhatsApp (exemplo):</span><div className="msg-balao">{montarSolicitacao(texto, EXEMPLO_SOLICITACAO)}</div></div>
     </div>
