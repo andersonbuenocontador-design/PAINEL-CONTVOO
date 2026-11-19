@@ -10,17 +10,21 @@ import { cnpjValido } from '../cnpj';
    Hoje: importar clientes (CNPJ, nome, apelido, telefone) e ligar às empresas do painel. */
 
 export const GCLICK_BASE = 'https://api.gclick.com.br';
-export type Cred = { id: string; segredo: string };
+export type Cred = { id: string; segredo: string; origem?: 'render' | 'painel' };
 export type GclickCliente = { id: number; nome: string; apelido: string | null; emails?: { email?: string | null }[] | null; inscricao?: string | null; tipoInscricao?: string | null; status?: string | null; telefones?: { numero?: string | null }[] | null };
 type Pagina<T> = { content: T[]; last?: boolean; totalElements?: number };
 
+/** Chave do G-Click: primeiro a do Render (GCLICK_CLIENT_ID / GCLICK_CLIENT_SECRET, os mesmos nomes do Contvoo Gestão);
+ *  sem ela, a colada na tela do painel (segredo cifrado no banco). */
 export async function lerCred(): Promise<Cred | null> {
+  const envId = process.env.GCLICK_CLIENT_ID?.trim(), envSeg = process.env.GCLICK_CLIENT_SECRET?.trim();
+  if (envId && envSeg) return { id: envId, segredo: envSeg, origem: 'render' };
   const m = new Map((await query(`SELECT chave, valor FROM configuracoes WHERE chave IN ('gclick_client_id','gclick_client_secret')`)).rows.map((r) => [r.chave as string, r.valor as string]));
   const id = m.get('gclick_client_id'), s = m.get('gclick_client_secret');
   if (!id || !s) return null;
-  try { return { id, segredo: decifrar(s) }; } catch { return null; }
+  try { return { id, segredo: decifrar(s), origem: 'painel' }; } catch { return null; }
 }
-export async function statusGclick(actor: Actor) { exigirAdmin(actor); const c = await lerCred(); return { ligado: !!c, clientId: c?.id ?? null }; }
+export async function statusGclick(actor: Actor) { exigirAdmin(actor); const c = await lerCred(); return { ligado: !!c, clientId: c?.id ?? null, origem: c?.origem ?? null }; }
 
 export async function salvarAcessoGclick(actor: Actor, p: { clientId: string; segredo?: string }) {
   exigirAdmin(actor); const id = p.clientId.trim(); const seg = (p.segredo ?? '').trim();
@@ -38,30 +42,49 @@ export async function desligarGclick(actor: Actor) {
   await tx(async (c) => { await c.query(`DELETE FROM configuracoes WHERE chave IN ('gclick_client_id','gclick_client_secret')`); await registrar(c, { usuarioId: actor.id, acao: 'gclick.desligar', entidade: 'configuracao' }); });
 }
 
+/* Memória curta (o painel roda num só servidor): o token vale ~1 hora e a lista de clientes muda pouco.
+   Sem isso, cada tela baixava os ~2.200 clientes de novo (~30 s). */
+const memoria = { token: null as null | { chave: string; valor: string; ate: number }, clientes: null as null | { chave: string; valor: GclickCliente[]; ate: number } };
+export function limparMemoriaGclick() { memoria.token = null; memoria.clientes = null; }
+const chaveDe = (c: Cred) => `${c.id}:${c.segredo.length}:${c.segredo.slice(-4)}`;
+
 export async function token(c: Cred) {
+  if (memoria.token && memoria.token.chave === chaveDe(c) && memoria.token.ate > Date.now()) return memoria.token.valor;
   let r: Response;
   try { r = await fetch(`${GCLICK_BASE}/oauth/token`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: c.id, client_secret: c.segredo, grant_type: 'client_credentials' }), signal: AbortSignal.timeout(30000) }); }
   catch { throw new AppError('Não foi possível falar com o G-Click agora. Tente de novo em alguns minutos.'); }
-  if (r.status === 400 || r.status === 401) throw new AppError('O G-Click recusou o client_id/client_secret. Confira em Configurações → API do G-Click.');
+  if (r.status === 400 || r.status === 401) throw new AppError(c.origem === 'render'
+    ? 'O G-Click recusou o GCLICK_CLIENT_ID/GCLICK_CLIENT_SECRET do Render. Confira os valores no Render → Environment (sem espaços).'
+    : 'O G-Click recusou o client_id/client_secret. Confira em Configurações → API do G-Click.');
   if (!r.ok) throw new AppError(`O G-Click respondeu com erro ${r.status} ao entrar.`);
-  return ((await r.json()) as { access_token: string }).access_token;
+  const j = (await r.json()) as { access_token: string; expires_in?: number };
+  memoria.token = { chave: chaveDe(c), valor: j.access_token, ate: Date.now() + Math.max(60, (j.expires_in ?? 3600) - 120) * 1000 };
+  return j.access_token;
 }
-/** Todos os clientes do G-Click (páginas de 500). */
-export async function todosClientes(c: Cred): Promise<GclickCliente[]> {
-  const t = await token(c); const lista: GclickCliente[] = [];
-  for (let page = 0; page < 50; page++) {
-    let r: Response;
-    try { r = await fetch(`${GCLICK_BASE}/clientes?size=500&page=${page}`, { headers: { authorization: `Bearer ${t}`, accept: 'application/json' }, signal: AbortSignal.timeout(60000) }); }
-    catch { throw new AppError('O G-Click não respondeu a tempo. Tente de novo.'); }
-    if (!r.ok) throw new AppError(`O G-Click respondeu com erro ${r.status} ao listar os clientes.`);
-    const p = (await r.json()) as Pagina<GclickCliente>; lista.push(...(p.content ?? []));
-    if (p.last || !p.content?.length) break;
+async function paginaClientes(t: string, page: number) {
+  let r: Response;
+  try { r = await fetch(`${GCLICK_BASE}/clientes?size=500&page=${page}`, { headers: { authorization: `Bearer ${t}`, accept: 'application/json' }, signal: AbortSignal.timeout(60000) }); }
+  catch { throw new AppError('O G-Click não respondeu a tempo. Tente de novo.'); }
+  if (r.status === 401) { memoria.token = null; throw new AppError('O G-Click pediu para entrar de novo. Clique em buscar outra vez.'); }
+  if (!r.ok) throw new AppError(`O G-Click respondeu com erro ${r.status} ao listar os clientes.`);
+  return (await r.json()) as Pagina<GclickCliente>;
+}
+/** Todos os clientes do G-Click: 1ª página e depois as outras ao mesmo tempo; guardados por 10 minutos. `novo`: ignora a memória. */
+export async function todosClientes(c: Cred, novo = false): Promise<GclickCliente[]> {
+  if (!novo && memoria.clientes && memoria.clientes.chave === chaveDe(c) && memoria.clientes.ate > Date.now()) return memoria.clientes.valor;
+  const t = await token(c);
+  const p0 = await paginaClientes(t, 0); const lista = [...(p0.content ?? [])];
+  if (!p0.last && p0.content?.length) {
+    const total = p0.totalElements ?? 0; const paginas = total ? Math.min(50, Math.ceil(total / 500)) : 0;
+    if (paginas > 1) for (const p of await Promise.all(Array.from({ length: paginas - 1 }, (_, i) => paginaClientes(t, i + 1)))) lista.push(...(p.content ?? []));
+    else for (let page = 1; page < 50; page++) { const p = await paginaClientes(t, page); lista.push(...(p.content ?? [])); if (p.last || !p.content?.length) break; }
   }
+  memoria.clientes = { chave: chaveDe(c), valor: lista, ate: Date.now() + 10 * 60 * 1000 };
   return lista;
 }
 
 const digitos = (s?: string | null) => (s ?? '').replace(/\D/g, '');
-/** Primeiro celular brasileiro (aceita o formato antigo sem o 9) (DDD + 9 + 8 dígitos) entre os telefones do cliente, no formato 55DDNNNNNNNNN. */
+/** Primeiro celular brasileiro (aceita o formato antigo sem o 9) entre os telefones do cliente, no formato 55DDNNNNNNNNN. */
 export function celularDe(tels?: { numero?: string | null }[] | null) {
   for (const t of tels ?? []) {
     let d = digitos(t.numero); if (d.startsWith('55') && d.length >= 12) d = d.slice(2); if (d.startsWith('0')) d = d.slice(1);

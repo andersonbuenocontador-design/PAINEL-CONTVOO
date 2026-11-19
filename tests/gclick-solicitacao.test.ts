@@ -8,7 +8,7 @@ vi.mock('../src/lib/services/digisac', () => ({
   },
 }));
 import { getPool, query } from '../src/lib/db';
-import { salvarAcessoGclick } from '../src/lib/services/gclick';
+import { limparMemoriaGclick, salvarAcessoGclick } from '../src/lib/services/gclick';
 import { enviarPorGclick, enviarPorWhatsapp, executarAgenda, lerAgenda, lerConfigSolicitacao, previaSolicitacao, proximoEnvio, salvarAgenda, salvarConfigSolicitacao } from '../src/lib/services/gclick-solicitacao';
 import type { Actor } from '../src/lib/errors';
 
@@ -34,6 +34,7 @@ const CLIENTES = [
   { id: 6, nome: 'BAR F LTDA', apelido: 'Bar F', emails: null, telefones: [{ numero: '51 97777-0000' }] },
 ];
 beforeEach(async () => {
+  limparMemoriaGclick();
   for (const t of ['no_update', 'no_truncate']) await query(`ALTER TABLE auditoria DISABLE TRIGGER auditoria_${t}`);
   await query('TRUNCATE gclick_envios, configuracoes, usuario_empresas, empresas, usuarios, auditoria CASCADE');
   for (const t of ['no_update', 'no_truncate']) await query(`ALTER TABLE auditoria ENABLE TRIGGER auditoria_${t}`);

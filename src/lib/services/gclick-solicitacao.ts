@@ -295,3 +295,12 @@ export async function executarAgenda(d = new Date()): Promise<{ rodou: false; mo
   await registrar({ query } as never, { usuarioId: actor.id, acao: 'gclick.agenda_executar', entidade: 'gclick', detalhes: { competencia: comp, resumo } });
   return { rodou: true, competencia: comp, resumo };
 }
+
+/** Resumo rápido para a tela inicial (só o banco do painel, sem chamar o G-Click). */
+export async function resumoSolicitacao(competencia: string) {
+  const comp = competenciaSchema.parse(competencia);
+  const r = (await query(`SELECT count(*) FILTER (WHERE canal='gclick' AND status='ok')::int gclick, count(*) FILTER (WHERE canal='whatsapp' AND status='ok')::int whatsapp,
+    count(*) FILTER (WHERE status='erro')::int erros FROM gclick_envios WHERE competencia=$1`, [comp])).rows[0];
+  const { agenda } = await lerAgenda();
+  return { gclick: r.gclick as number, whatsapp: r.whatsapp as number, erros: r.erros as number, agenda, ligado: !!(await lerCred()) };
+}

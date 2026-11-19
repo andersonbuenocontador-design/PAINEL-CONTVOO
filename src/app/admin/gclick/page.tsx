@@ -22,12 +22,16 @@ export default async function Gclick({ searchParams }: { searchParams: Promise<{
     <Avisos erro={sp.erro || erro} ok={sp.ok} />
 
     <section className="card emp-bloco"><h2>1. Acesso à API do G-Click</h2>
-      <form action={acaoSalvarGclick} className="emp-form"><div className="grid">
-        <div><label htmlFor="clientId">client_id *</label><input id="clientId" name="clientId" required defaultValue={st.clientId ?? ''} autoComplete="off" /></div>
-        <div><label htmlFor="segredo">client_secret {st.ligado ? '' : '*'}</label><input id="segredo" name="segredo" type="password" autoComplete="off" required={!st.ligado} placeholder={st.ligado ? '•••••••• (guardado; cole outro só para trocar)' : 'Cole o client_secret'} /></div></div>
-        <p className="soon">No G-Click: Configurações → API. São os mesmos do Contvoo Gestão (no Render dele: GCLICK_CLIENT_ID e GCLICK_CLIENT_SECRET). O segredo fica cifrado no banco do painel.</p>
+      {st.origem === 'render' ? <p>✅ Ligado pela chave guardada no <strong>Render</strong> (GCLICK_CLIENT_ID e GCLICK_CLIENT_SECRET). Não precisa colar nada aqui. Para trocar a chave, mude esses dois valores no Render → Environment.</p> : <>
+      {st.ligado && <p>✅ Ligado com a chave salva no painel (client_id {st.clientId}). Não precisa colar de novo.</p>}
+      <details open={!st.ligado} className="sol-detalhe"><summary>{st.ligado ? 'Trocar a chave' : 'Colar a chave do G-Click'}</summary>
+      <form action={acaoSalvarGclick} className="emp-form" autoComplete="off"><div className="grid">
+        <div><label htmlFor="clientId">client_id *</label><input id="clientId" name="clientId" required defaultValue={st.clientId ?? ''} autoComplete="off" data-1p-ignore data-lpignore="true" /></div>
+        <div><label htmlFor="segredo">client_secret {st.ligado ? '' : '*'}</label><input id="segredo" name="segredo" type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" required={!st.ligado} placeholder={st.ligado ? 'cole outro só para trocar' : 'Cole o client_secret'} /></div></div>
+        <p className="soon">Melhor ainda: coloque GCLICK_CLIENT_ID e GCLICK_CLIENT_SECRET no Render → Environment (os mesmos do Contvoo Gestão) e o painel usa de lá, sem esta tela. Aqui, o segredo fica cifrado no banco.</p>
         <button>Salvar acesso</button></form>
       {st.ligado && <form action={acaoDesligarGclick} style={{ marginTop: 10 }}><button className="link-perigo">Desligar e apagar a chave</button></form>}
+      </details></>}
     </section>
 
     {st.ligado && <section className="card emp-bloco"><h2>2. Clientes do G-Click</h2>

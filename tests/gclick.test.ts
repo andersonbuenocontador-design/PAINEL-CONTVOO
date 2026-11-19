@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getPool, query } from '../src/lib/db';
 import { criarEmpresa } from '../src/lib/services/empresas';
-import { celularDe, importarGclick, previaGclick, salvarAcessoGclick, statusGclick } from '../src/lib/services/gclick';
+import { celularDe, importarGclick, limparMemoriaGclick, previaGclick, salvarAcessoGclick, statusGclick } from '../src/lib/services/gclick';
 import type { Actor } from '../src/lib/errors';
 
 let admin: Actor, empA: string;
@@ -12,6 +12,7 @@ const CLIENTES = [
   { id: 103, nome: 'JOSÉ PESSOA FÍSICA', apelido: null, inscricao: '529.712.440-91', tipoInscricao: 'CPF', status: 'Ativo', telefones: [] },
 ];
 beforeEach(async () => {
+  limparMemoriaGclick(); delete process.env.GCLICK_CLIENT_ID; delete process.env.GCLICK_CLIENT_SECRET;
   for (const t of ['no_update', 'no_truncate']) await query(`ALTER TABLE auditoria DISABLE TRIGGER auditoria_${t}`);
   await query('TRUNCATE configuracoes, plano_contas, usuario_empresas, empresas, usuarios, auditoria CASCADE');
   for (const t of ['no_update', 'no_truncate']) await query(`ALTER TABLE auditoria ENABLE TRIGGER auditoria_${t}`);
@@ -35,7 +36,7 @@ describe('G-Click: importar clientes', () => {
   it('liga pelo CNPJ, completa só o que está vazio, cadastra as escolhidas e ignora CPF', async () => {
     await expect(previaGclick(admin)).rejects.toThrow(/Ligue o G-Click/);
     await salvarAcessoGclick(admin, { clientId: 'cid', segredo: 'segredo-gclick' });
-    expect(await statusGclick(admin)).toEqual({ ligado: true, clientId: 'cid' });
+    expect(await statusGclick(admin)).toEqual({ ligado: true, clientId: 'cid', origem: 'painel' });
     expect((await query(`SELECT valor FROM configuracoes WHERE chave='gclick_client_secret'`)).rows[0].valor).not.toContain('segredo-gclick');
     const p = await previaGclick(admin);
     expect(p.ligadas).toEqual([{ empresaId: empA, razao: 'Empresa A Ltda', gclickId: 101, whatsappNovo: '5551999990000', apelidoNovo: 'Padaria A' }]);
@@ -53,8 +54,18 @@ describe('G-Click: importar clientes', () => {
   });
   it('credencial recusada e acesso só do escritório', async () => {
     await salvarAcessoGclick(admin, { clientId: 'cid', segredo: 's' });
-    vi.stubGlobal('fetch', vi.fn(async () => resp(401, {})));
+    limparMemoriaGclick(); vi.stubGlobal('fetch', vi.fn(async () => resp(401, {})));
     await expect(previaGclick(admin)).rejects.toThrow(/recusou o client_id/);
     await expect(previaGclick({ id: admin.id, papel: 'cliente' })).rejects.toMatchObject({ code: 'proibido' });
+  });
+  it('chave no Render (GCLICK_CLIENT_ID/SECRET) vale sem colar nada; token e lista ficam na memória', async () => {
+    process.env.GCLICK_CLIENT_ID = 'render-id'; process.env.GCLICK_CLIENT_SECRET = ' render-seg ';
+    expect(await statusGclick(admin)).toEqual({ ligado: true, clientId: 'render-id', origem: 'render' });
+    await previaGclick(admin); await previaGclick(admin);
+    const f = fetch as unknown as ReturnType<typeof vi.fn>;
+    expect(f.mock.calls.filter(([u]) => String(u).endsWith('/oauth/token'))).toHaveLength(1);
+    expect(f.mock.calls.filter(([u]) => String(u).includes('/clientes'))).toHaveLength(1);
+    expect(String(f.mock.calls[0][1].body)).toContain('client_secret=render-seg&');
+    delete process.env.GCLICK_CLIENT_ID; delete process.env.GCLICK_CLIENT_SECRET;
   });
 });
