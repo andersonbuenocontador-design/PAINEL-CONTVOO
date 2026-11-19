@@ -61,11 +61,12 @@ async function todosClientes(c: Cred): Promise<GclickCliente[]> {
 }
 
 const digitos = (s?: string | null) => (s ?? '').replace(/\D/g, '');
-/** Primeiro celular brasileiro (DDD + 9 + 8 dígitos) entre os telefones do cliente, no formato 55DDNNNNNNNNN. */
+/** Primeiro celular brasileiro (aceita o formato antigo sem o 9) (DDD + 9 + 8 dígitos) entre os telefones do cliente, no formato 55DDNNNNNNNNN. */
 export function celularDe(tels?: { numero?: string | null }[] | null) {
   for (const t of tels ?? []) {
     let d = digitos(t.numero); if (d.startsWith('55') && d.length >= 12) d = d.slice(2); if (d.startsWith('0')) d = d.slice(1);
     if (/^\d{2}9\d{8}$/.test(d)) return `55${d}`;
+    if (/^\d{2}[6-9]\d{7}$/.test(d)) return `55${d.slice(0, 2)}9${d.slice(2)}`; // celular antigo, sem o 9 da frente (fixo começa com 2 a 5)
   }
   return null;
 }

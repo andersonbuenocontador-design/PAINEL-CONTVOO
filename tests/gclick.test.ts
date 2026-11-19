@@ -28,7 +28,9 @@ describe('G-Click: importar clientes', () => {
     expect(celularDe([{ numero: '(51) 3333-4444' }, { numero: '51 99999-0000' }])).toBe('5551999990000');
     expect(celularDe([{ numero: '+55 (51) 98888-1111' }])).toBe('5551988881111');
     expect(celularDe([{ numero: '051 99999-0000' }])).toBe('5551999990000');
-    expect(celularDe([{ numero: '3333-4444' }])).toBeNull(); expect(celularDe(null)).toBeNull();
+    expect(celularDe([{ numero: '3333-4444' }])).toBeNull();
+    expect(celularDe([{ numero: '555133334444' }, { numero: '555184445555' }])).toBe('5551984445555');
+    expect(celularDe([{ numero: "5551984445555'" }])).toBe('5551984445555'); expect(celularDe(null)).toBeNull();
   });
   it('liga pelo CNPJ, completa só o que está vazio, cadastra as escolhidas e ignora CPF', async () => {
     await expect(previaGclick(admin)).rejects.toThrow(/Ligue o G-Click/);
