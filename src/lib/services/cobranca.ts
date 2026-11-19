@@ -62,3 +62,10 @@ export async function resolverCobrancaSeCompleto(c: Runner, actor: Actor, empres
   }
 }
 
+
+/** Cobranças mandadas no WhatsApp (Digisac) no mês, por empresa: quantas vezes e a última (vem da auditoria). */
+export async function cobrancasWhatsapp(actor: Actor, competencia: string) {
+  exigirAdmin(actor); competenciaSchema.parse(competencia);
+  const { rows } = await query(`SELECT empresa_id, count(*)::int n, max(criado_em) ultimo FROM auditoria WHERE acao='cobranca.whatsapp_enviada' AND detalhes->>'competencia'=$1 GROUP BY empresa_id`, [competencia]);
+  return new Map(rows.map((r) => [r.empresa_id as string, { vezes: r.n as number, ultimo: r.ultimo as Date }]));
+}

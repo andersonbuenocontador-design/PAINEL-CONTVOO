@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { exigirUsuario } from '@/lib/session';
 import { visaoGeral } from '@/lib/services/documentos';
 import { query } from '@/lib/db';
-import { cobrancasAbertas } from '@/lib/services/cobranca';
+import { cobrancasWhatsapp } from '@/lib/services/cobranca';
 import { pendenciasDoMes } from '@/lib/services/integracao';
 import { BotaoCobrar } from './BotaoCobrar';
 import { digisacPronto } from '@/lib/services/digisac';
@@ -10,7 +10,7 @@ import { Avisos, Topo, CompetenciaSeletor, competenciaDe } from '../../component
 
 export default async function Entregas({ searchParams }: { searchParams: Promise<{ competencia?: string; erro?: string; ok?: string }> }) {
   const u = await exigirUsuario('admin'); const sp = await searchParams; const comp = competenciaDe(sp.competencia);
-  const [v, cobradas, zap, digisac] = await Promise.all([visaoGeral(u, comp), cobrancasAbertas(u, comp), pendenciasDoMes(comp, false), digisacPronto()]);
+  const [v, cobradas, zap, digisac] = await Promise.all([visaoGeral(u, comp), cobrancasWhatsapp(u, comp), pendenciasDoMes(comp, false), digisacPronto()]);
   const msg = new Map(zap.todas.map((x) => [x.empresaId, x]));
   const novos = new Map((await query(`SELECT empresa_id, count(*)::int n FROM documentos_avulsos WHERE visto_em IS NULL AND removido_em IS NULL AND descartado_em IS NULL GROUP BY empresa_id`)).rows.map((r) => [r.empresa_id as string, r.n as number]));
   const concluidas = v.filter((e) => e.concluida).length, semConfig = v.filter((e) => e.exigidos === 0).length;
@@ -42,7 +42,7 @@ export default async function Entregas({ searchParams }: { searchParams: Promise
             {e.rejeitados > 0 && <span className="ent-chip recusado">{e.rejeitados} recusado{e.rejeitados > 1 ? 's' : ''}</span>}
             {aConferir > 0 && <span className="ent-chip conferir">{aConferir} para conferir</span>}
             </div>
-            {estado === 'vermelho' && cb && <div className="ent-cobrado" title={`1ª cobrança em ${dt(cb.criado_em)}. A solicitação está no painel do cliente e se encerra sozinha quando ele enviar tudo.`}>Cobrado {cb.lembretes + 1}x · último em {dt(cb.ultimo)}</div>}</td>
+            {estado === 'vermelho' && cb && <div className="ent-cobrado" title="Mensagens de cobrança mandadas no WhatsApp pelo Digisac neste mês">Cobrado no WhatsApp {cb.vezes}x · último em {dt(cb.ultimo)}</div>}</td>
           <td><div className="ent-acoes">
             {estado === 'vermelho' && <BotaoCobrar empresaId={e.id} competencia={comp} rotulo={cb ? 'Cobrar de novo' : 'Cobrar envio'} whatsapp={msg.get(e.id)?.whatsapp} mensagem={msg.get(e.id)?.mensagem} automatico={digisac} />}
             <Link className={`ent-btn ${aConferir > 0 || nov > 0 ? 'principal' : ''}`} href={`/admin/empresas/${e.id}/documentos?competencia=${comp}`}>{aConferir > 0 ? 'Conferir' : 'Abrir'}</Link></div></td>
