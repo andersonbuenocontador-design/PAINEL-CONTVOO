@@ -16,11 +16,11 @@ export function EditorSolicitacao({ cfg, competencia }: { cfg: Cfg; competencia:
     <input type="hidden" name="competencia" value={competencia} />
     <div className="grid">
       <div><label htmlFor="tarefa">Nome da tarefa no G-Click *</label><input id="tarefa" name="tarefa" required defaultValue={cfg.tarefa} /></div>
-      <div><label htmlFor="sistema">Código do &quot;sistema&quot; de integração</label><input id="sistema" name="sistema" defaultValue={cfg.sistema} autoComplete="off" placeholder="G-Click → Configurações → Minha empresa → Sistemas de Integração" /></div>
+      <div><label htmlFor="sistema">Código do &quot;sistema&quot; (opcional)</label><input id="sistema" name="sistema" defaultValue={cfg.sistema} autoComplete="off" placeholder="deixe em branco se o G-Click não deu" /></div>
       <div><label htmlFor="usuario">Usuário que aparece no G-Click</label><input id="usuario" name="usuario" defaultValue={cfg.usuario} placeholder="gclickbot" /></div>
       <div><label htmlFor="motivoSemEmail">Motivo do X (quem não tem e-mail)</label><input id="motivoSemEmail" name="motivoSemEmail" maxLength={200} defaultValue={cfg.motivoSemEmail} /></div>
     </div>
-    <p className="soon">O ✔ pela API é um recurso &quot;para parceiros&quot; do G-Click: ele pede o código do sistema de integração cadastrado no G-Click. Sem esse código, o botão do e-mail fica travado.</p>
+    <p className="soon">Só preencha o código do &quot;sistema&quot; se o suporte do G-Click passar um (é para integrações parceiras). Sem ele o painel tenta do mesmo jeito; se o G-Click recusar, a tela avisa.</p>
     <div className="msg-editor">
       <div className="msg-editor-campo">
         <label htmlFor="mensagem">Mensagem padrão do WhatsApp (para quem não tem e-mail)</label>

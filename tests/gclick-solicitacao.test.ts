@@ -70,8 +70,17 @@ describe('G-Click: solicitação de documentos', () => {
     expect(p.semContato.map((x) => x.empresa)).toEqual(['Loja C']);
     expect(posts).toEqual([]); expect(enviados).toEqual([]);
   });
-  it('e-mail: exige o código do sistema; dá o ✔ com os campos certos; pula quem já tem ✔; não repete no 2º clique', async () => {
-    await expect(enviarPorGclick(admin, { competencia: '2026-11', teste: false })).rejects.toThrow(/sistema/);
+  it('e-mail: sem código do sistema o pedido sai sem o campo; G-Click com erro 500 vira aviso claro', async () => {
+    const f = fetch as unknown as ReturnType<typeof vi.fn>; const orig = f.getMockImplementation()!;
+    f.mockImplementation(async (url: string, init?: RequestInit) => url.endsWith('/atividades/resposta') ? (posts.push(Object.fromEntries((init!.body as FormData).entries()) as Record<string, string>), resp(500, '{"error":"Internal Server Error"}')) : orig(url, init));
+    const r = await enviarPorGclick(admin, { competencia: '2026-11', teste: false });
+    expect(r).toMatchObject({ enviados: 1, erros: 1 }); expect(r.primeiroErro).toMatch(/não aceitou o ✔\/X pela API \(erro 500\).*suporte do G-Click.*à mão/);
+    expect(posts).toEqual([{ idAtividade: '4.19', competencia: '202611', inscricao: '11222333000181', usuario: 'gclickbot' }]);
+    f.mockImplementation(orig); posts.length = 0;
+    expect(await enviarPorGclick(admin, { competencia: '2026-11', teste: false })).toMatchObject({ enviados: 1, erros: 0 }); // o erro pode ser tentado de novo
+    expect(posts[0]).not.toHaveProperty('sistema');
+  });
+  it('e-mail: dá o ✔ com os campos certos; pula quem já tem ✔; não repete no 2º clique', async () => {
     await salvarConfigSolicitacao(admin, { sistema: 'SIS9', usuario: '', tarefa: NOME, mensagem: '' });
     expect(await enviarPorGclick(admin, { competencia: '2026-11', teste: true })).toMatchObject({ enviados: 1, erros: 0 });
     // Mercado D (4.4) vem primeiro e já tinha ✔: registrado sem POST
@@ -101,7 +110,7 @@ describe('G-Click: solicitação de documentos', () => {
     expect(enviados[0].texto).toMatch(/^Olá, Maria Souza Lima!/); expect(enviados[0].texto).toContain('novembro/2026 da Oficina B'); expect(enviados[0].texto).toContain('até 10/12/2026');
     await enviarPorWhatsapp(admin, { competencia: '2026-11', teste: false });
     expect(enviados.filter((e) => e.numero === '5551988881111')).toHaveLength(1);
-    expect(posts).toEqual([]);
+    expect(posts.map((x) => [x.idAtividade, x.resposta, 'sistema' in x])).toEqual([['4.28', 'N', false], ['4.29', undefined, false]]); // X e ✔ mesmo sem código
   });
   it('configuração: texto padrão não fica gravado; personalizado sim; só escritório', async () => {
     await salvarConfigSolicitacao(admin, { sistema: ' S1 ', usuario: '', tarefa: NOME, mensagem: 'Oi {nome}, mande {mes}.' });
@@ -112,7 +121,6 @@ describe('G-Click: solicitação de documentos', () => {
     // 04/12/2026 08h de Brasília = 11h UTC
     const em = (dia: number, horaBr: number) => new Date(Date.UTC(2026, 11, dia, horaBr + 3, 10));
     expect(await executarAgenda(em(4, 9))).toEqual({ rodou: false, motivo: 'desligado' });
-    await expect(salvarAgenda(admin, { ativo: true, dia: 4, hora: 8, email: true, whatsapp: true })).rejects.toThrow(/sistema/);
     await salvarConfigSolicitacao(admin, { sistema: 'SIS9', usuario: '', tarefa: NOME, mensagem: '' });
     await expect(salvarAgenda(admin, { ativo: true, dia: 4, hora: 8, email: false, whatsapp: false })).rejects.toThrow(/canal/);
     await salvarAgenda(admin, { ativo: true, dia: 4, hora: 8, email: true, whatsapp: true });

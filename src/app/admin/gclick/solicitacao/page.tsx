@@ -39,7 +39,7 @@ export default async function Solicitacao({ searchParams }: { searchParams: Prom
   const prox = agenda.ativo ? proximoEnvio(agenda, ultima) : null;
   let p: PreviaSolicitacao | null = null, erro = '';
   if (st.ligado && sp.buscar) { try { p = await previaSolicitacao(u, comp); } catch (e) { erro = mensagemDeErro(e); } }
-  const faltaEmail = p ? pendentes(p.porEmail) : 0, faltaZap = p ? pendentes(p.porWhatsapp, !!cfg.sistema) : 0;
+  const faltaEmail = p ? pendentes(p.porEmail) : 0, faltaZap = p ? pendentes(p.porWhatsapp, true) : 0;
   return (<><Topo u={u} /><main className="inicio emp">
     <p className="emp-voltar"><Link href="/admin/gclick">← G-Click</Link></p>
     <section className="inicio-ola"><div><h1>Solicitação de documentos</h1>
@@ -62,23 +62,22 @@ export default async function Solicitacao({ searchParams }: { searchParams: Prom
 
       <section className="card emp-bloco sol-passo"><h2><span className="sol-num">1</span> E-mail pelo G-Click <small className="soon">{p.porEmail.length} clientes · {faltaEmail} a enviar</small></h2>
         <p className="soon">Dá o ✔ na atividade &quot;{cfg.tarefa}&quot; de cada tarefa, como o botão verde do G-Click. O G-Click então manda o e-mail dele (&quot;Enviar para o cliente&quot;, AUTO). Quem já tem ✔ é pulado.</p>
-        {!cfg.sistema && <p className="sol-erro">Falta o código do &quot;sistema&quot; de integração (configuração abaixo). Sem ele o G-Click não aceita o ✔ pela API.</p>}
+        <p className="soon">Comece pelo <strong>Testar com 1 cliente</strong> e confira a tarefa no G-Click. Se o G-Click não aceitar o ✔ pela API, o painel mostra o erro aqui e nada mais é enviado por esse caminho.</p>
         <div className="row">
           <form action={acaoEnviarGclick}><input type="hidden" name="competencia" value={comp} /><input type="hidden" name="teste" value="1" />
-            <BotaoConfirmar classe="doc2-btn leve" texto="Testar com 1 cliente" desabilitado={!cfg.sistema || !faltaEmail} pergunta="Dar o ✔ no G-Click em 1 tarefa (o G-Click vai mandar o e-mail para esse cliente)?" /></form>
+            <BotaoConfirmar classe="doc2-btn leve" texto="Testar com 1 cliente" desabilitado={!faltaEmail} pergunta="Dar o ✔ no G-Click em 1 tarefa (o G-Click vai mandar o e-mail para esse cliente)?" /></form>
           <form action={acaoEnviarGclick}><input type="hidden" name="competencia" value={comp} /><input type="hidden" name="teste" value="0" />
-            <BotaoConfirmar texto={`✔ Enviar para os ${faltaEmail} com e-mail`} desabilitado={!cfg.sistema || !faltaEmail} pergunta={`Dar o ✔ no G-Click em ${faltaEmail} tarefas? O G-Click vai mandar o e-mail para todos esses clientes.`} /></form>
+            <BotaoConfirmar texto={`✔ Enviar para os ${faltaEmail} com e-mail`} desabilitado={!faltaEmail} pergunta={`Dar o ✔ no G-Click em ${faltaEmail} tarefas? O G-Click vai mandar o e-mail para todos esses clientes.`} /></form>
         </div>
         <Lista itens={p.porEmail} coluna="email" />
       </section>
 
       <section className="card emp-bloco sol-passo"><h2><span className="sol-num">2</span> WhatsApp pelo Digisac <small className="soon">{p.porWhatsapp.length} clientes sem e-mail · {faltaZap} a enviar</small></h2>
         <p className="soon">Para quem não tem e-mail o ✔ verde dá erro no G-Click, então o painel faz como vocês fazem à mão: manda a mensagem padrão pelo WhatsApp (celular do painel ou, se não houver, o do G-Click) e, depois que ela sai, dá o <strong>X em &quot;Enviar para o cliente&quot;</strong> com o motivo &quot;{cfg.motivoSemEmail}&quot; e o <strong>✔ em &quot;{cfg.tarefa}&quot;</strong>. O nome no &quot;Olá&quot; é o do contato no Digisac.</p>
-        {!cfg.sistema && <p className="soon">Sem o código do &quot;sistema&quot; (configuração abaixo), só o WhatsApp é enviado; o X e o ✔ ficam para fazer no G-Click.</p>}
         {!zap && <p className="sol-erro">O Digisac ainda não está ligado: <Link href="/admin/whatsapp">configurar</Link>.</p>}
         <div className="row">
           <form action={acaoEnviarWhatsapp}><input type="hidden" name="competencia" value={comp} /><input type="hidden" name="teste" value="1" />
-            <BotaoConfirmar classe="doc2-btn leve" texto="Testar com 1 cliente" desabilitado={!zap || !faltaZap} pergunta={cfg.sistema ? 'Mandar a mensagem padrão pelo WhatsApp para 1 cliente e marcar X/✔ na tarefa dele no G-Click?' : 'Mandar a mensagem padrão pelo WhatsApp para 1 cliente?'} /></form>
+            <BotaoConfirmar classe="doc2-btn leve" texto="Testar com 1 cliente" desabilitado={!zap || !faltaZap} pergunta="Mandar a mensagem padrão pelo WhatsApp para 1 cliente e marcar X/✔ na tarefa dele no G-Click?" /></form>
           <form action={acaoEnviarWhatsapp}><input type="hidden" name="competencia" value={comp} /><input type="hidden" name="teste" value="0" />
             <BotaoConfirmar texto={`Enviar WhatsApp para os ${faltaZap} sem e-mail`} desabilitado={!zap || !faltaZap} pergunta={`Mandar a mensagem padrão pelo WhatsApp para ${faltaZap} clientes?`} /></form>
         </div>

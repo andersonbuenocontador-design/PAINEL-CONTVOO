@@ -134,12 +134,13 @@ function atividades(lista: Atividade[], cfg: ConfigSolicitacao) {
 async function postarResposta(t: string, cfg: ConfigSolicitacao, it: ItemSolicitacao, comp: string, atividadeId: string, extras: Record<string, string> = {}) {
   if (!it.inscricao) throw new AppError('Cliente sem CNPJ/CPF no G-Click.');
   const fd = new FormData();
-  fd.set('idAtividade', atividadeId); fd.set('competencia', comp.replace('-', '')); fd.set('inscricao', it.inscricao); fd.set('usuario', cfg.usuario); fd.set('sistema', cfg.sistema);
+  fd.set('idAtividade', atividadeId); fd.set('competencia', comp.replace('-', '')); fd.set('inscricao', it.inscricao); fd.set('usuario', cfg.usuario); if (cfg.sistema) fd.set('sistema', cfg.sistema); // código de parceiro: só se o escritório tiver
   for (const [k, v] of Object.entries(extras)) fd.set(k, v);
   let r: Response;
   try { r = await fetch(`${GCLICK_BASE}/atividades/resposta`, { method: 'POST', headers: { authorization: `Bearer ${t}`, accept: 'application/json' }, body: fd, signal: AbortSignal.timeout(60000) }); }
   catch { throw new AppError('O G-Click não respondeu a tempo.'); }
   const corpo = await r.text().catch(() => '');
+  if (r.status >= 500 || r.status === 401 || r.status === 403) throw new AppError(`O G-Click não aceitou o ✔/X pela API (erro ${r.status})${cfg.sistema ? '' : '. Ele pode exigir cadastro como sistema parceiro: peça ao suporte do G-Click o código do campo "sistema" para a API /atividades/resposta'}. Por enquanto, marque no G-Click à mão.`);
   if (!r.ok) throw new AppError(`G-Click recusou (${r.status}): ${corpo.slice(0, 200) || 'sem detalhe'}`);
   // o G-Click às vezes responde 200 com {"status":"erro","msg":...}
   if (/"status"\s*:\s*"erro"/i.test(corpo)) { const m = corpo.match(/"msg"\s*:\s*"([^"]*)"/); throw new AppError(`G-Click: ${m?.[1] ?? corpo.slice(0, 200)}`); }
@@ -183,7 +184,6 @@ const loteSchema = z.object({ competencia: competenciaSchema, teste: z.boolean()
 export async function enviarPorGclick(actor: Actor, p: { competencia: string; teste: boolean }): Promise<Resultado> {
   exigirAdmin(actor); const { competencia: comp, teste } = loteSchema.parse(p);
   const cfg = await lerConfigSolicitacao();
-  if (!cfg.sistema) throw new AppError('Informe o código do "sistema" de integração do G-Click na configuração abaixo antes de enviar.');
   const { previa, t } = await montarPrevia(await credOuErro(), comp, cfg);
   let alvo = previa.porEmail.filter((x) => x.envio?.status !== 'ok' && x.envio?.status !== 'enviando');
   if (teste) alvo = alvo.slice(0, 1);
@@ -203,8 +203,8 @@ export async function enviarPorWhatsapp(actor: Actor, p: { competencia: string; 
   const cfg = await lerConfigSolicitacao();
   const { previa, t } = await montarPrevia(await credOuErro(), comp, cfg);
   const feito = (e: Envio | null) => e?.status === 'ok' || e?.status === 'enviando';
-  // falta o WhatsApp, ou (com o código do sistema) falta o X/✔ no G-Click
-  let alvo = previa.porWhatsapp.filter((x) => !feito(x.envio) || (cfg.sistema && !feito(x.gclick)));
+  // falta o WhatsApp, ou falta o X/✔ no G-Click
+  let alvo = previa.porWhatsapp.filter((x) => !feito(x.envio) || !feito(x.gclick));
   if (teste) alvo = alvo.slice(0, 1);
   const base = (process.env.APP_URL ?? '').replace(/\/$/, '');
   const res: Resultado = { enviados: 0, erros: 0, pulados: 0, primeiroErro: null, marcados: 0 };
@@ -218,7 +218,7 @@ export async function enviarPorWhatsapp(actor: Actor, p: { competencia: string; 
       catch (e) { await concluir(it, 'whatsapp', false, msgErro(e)); falhou(it, msgErro(e)); }
     }
     // só marca no G-Click depois que o cliente recebeu o WhatsApp
-    if (zapOk && cfg.sistema && !feito(it.gclick) && (await reservar(actor, it, 'gclick', comp))) {
+    if (zapOk && !feito(it.gclick) && (await reservar(actor, it, 'gclick', comp))) {
       try { await concluir(it, 'gclick', true, await marcarSemEmail(t, cfg, it, comp)); res.marcados!++; }
       catch (e) { await concluir(it, 'gclick', false, msgErro(e)); falhou(it, `G-Click: ${msgErro(e)}`); }
     }
@@ -243,7 +243,6 @@ const agendaSchema = z.object({ ativo: z.boolean(), dia: z.coerce.number().int()
   .refine((a) => !a.ativo || a.email || a.whatsapp, 'Escolha pelo menos um canal (e-mail ou WhatsApp).');
 export async function salvarAgenda(actor: Actor, input: z.input<typeof agendaSchema>) {
   exigirAdmin(actor); const d = agendaSchema.parse(input);
-  if (d.ativo && d.email && !(await lerConfigSolicitacao()).sistema) throw new AppError('Para o envio automático por e-mail, informe antes o código do "sistema" de integração do G-Click (Configuração).');
   await tx(async (c) => {
     await c.query(`INSERT INTO configuracoes(chave,valor,atualizado_por) VALUES ($1,$2,$3) ON CONFLICT (chave) DO UPDATE SET valor=EXCLUDED.valor, atualizado_por=EXCLUDED.atualizado_por, atualizado_em=now()`, [AGENDA, JSON.stringify({ ...d, usuarioId: actor.id }), actor.id]);
     await registrar(c, { usuarioId: actor.id, acao: d.ativo ? 'gclick.agenda_ligar' : 'gclick.agenda_desligar', entidade: 'configuracao', detalhes: d });
