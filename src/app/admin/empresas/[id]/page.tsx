@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ArrowRight, Banknote, ClipboardList, Landmark, ListTree, MessagesSquare, Settings2, Users } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import { exigirUsuario } from '@/lib/session';
 import { obterEmpresa, usuariosDaEmpresa } from '@/lib/services/empresas';
@@ -15,6 +16,7 @@ import { acaoEditarEmpresa, acaoSituacaoEmpresa, acaoVincular, acaoCriarUsuario 
 const CONC = { revisao: ['Cliente preenchendo', 'neutro'], enviada: ['Aguardando sua conferência', 'conferir'], devolvida: ['Devolvida ao cliente', 'falta'], concluida: ['Concluída', 'ok'] } as const;
 const LUCROS = { atencao: ['Atenção', 'falta'], aguardando_extrato: ['Aguardando extrato', 'conferir'], ok: ['Tudo confere', 'ok'], sem_movimento: ['Sem movimento', 'neutro'] } as const;
 const fone = (w: string) => { const d = w.replace(/^55/, ''); return d.length >= 10 ? `(${d.slice(0, 2)}) ${d.slice(2, -4)}-${d.slice(-4)}` : w; };
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 const brl = (c: number) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 /** Painel da empresa: tudo do mês num lugar só (documentos, conciliação, lucros, pendências), acessos e dados cadastrais recolhidos. */
@@ -34,48 +36,65 @@ export default async function EmpresaDetalhe({ params, searchParams }: { params:
   const m = movs.rows[0] as { n: number; revisar: number }; const nNovos = novos.rows[0].n as number;
   const responsavel = admins.rows.find((a) => a.id === e.responsavel_id)?.nome as string | undefined;
   const [concTxt, concCls] = CONC[conc]; const [lucTxt, lucCls] = LUCROS[lucros.status];
-  return (<><Topo u={u} /><main className="emp">
+  const zap = e.whatsapp ? fone(e.whatsapp) : null;
+  const fazer = [
+    aConferir > 0 && { href: `/admin/empresas/${id}/documentos${c}`, n: aConferir, txt: aConferir === 1 ? 'documento para conferir' : 'documentos para conferir', tom: 'azul' },
+    nNovos > 0 && { href: `/admin/empresas/${id}/documentos${c}#outros`, n: nNovos, txt: nNovos === 1 ? 'arquivo novo do cliente' : 'arquivos novos do cliente', tom: 'azul' },
+    conc === 'enviada' && { href: `/admin/empresas/${id}/extratos${c}`, n: null, txt: 'Conciliação aguardando sua conferência', tom: 'azul' },
+    lucros.resumo.esquecidas > 0 && { href: `/admin/lucros/${id}${c}`, n: lucros.resumo.esquecidas, txt: lucros.resumo.esquecidas === 1 ? 'retirada que o cliente pode ter esquecido' : 'retiradas que o cliente pode ter esquecido', tom: 'laranja' },
+    ind.pendentes + ind.rejeitados > 0 && { href: `/admin/entregas${c}`, n: ind.pendentes + ind.rejeitados, txt: ind.pendentes + ind.rejeitados === 1 ? 'documento que o cliente ainda deve' : 'documentos que o cliente ainda deve', tom: 'laranja' },
+    pend.vencidas > 0 && { href: `/admin/empresas/${id}/pendencias`, n: pend.vencidas, txt: pend.vencidas === 1 ? 'pendência vencida' : 'pendências vencidas', tom: 'laranja' },
+  ].filter(Boolean) as { href: string; n: number | null; txt: string; tom: string }[];
+  return (<><Topo u={u} /><main className="inicio emp">
     <p className="emp-voltar"><Link href={`/admin/entregas${c}`}>← Entregas do mês</Link></p>
-    <header className="emp-cabeca">
+    <section className="inicio-ola">
       <div><h1>{e.razao_social} <span className={`emp-situacao ${e.situacao}`}>{e.situacao === 'ativa' ? 'Ativa' : 'Inativa'}</span></h1>
-        <p className="emp-meta">CNPJ {formatarCnpj(e.cnpj)}{e.nome_fantasia && e.nome_fantasia !== e.razao_social ? ` · ${e.nome_fantasia}` : ''}{e.email_contato ? ` · ${e.email_contato}` : ''}{responsavel ? ` · Responsável: ${responsavel}` : ''}</p></div>
+        <p className="inicio-sub">CNPJ {formatarCnpj(e.cnpj)}{zap ? ` · WhatsApp ${zap}` : ''}{e.nome_fantasia && e.nome_fantasia !== e.razao_social ? ` · ${e.nome_fantasia}` : ''}</p></div>
       <CompetenciaSeletor atual={comp} mini />
-    </header>
+    </section>
     <Avisos erro={sp.erro} ok={sp.ok} />
 
-    <section className="emp-cartoes" aria-label="Situação do mês">
-      <article className="emp-cartao">
-        <header><h2>Documentos do mês</h2>{ind.exigidos ? (ind.concluida ? <span className="ent-chip ok">Concluída</span> : null) : <span className="ent-chip neutro">Nada pedido</span>}</header>
-        {ind.exigidos > 0 && <><div className="ent-barra"><div style={{ width: `${ind.percentual}%` }} /></div><p className="emp-num">{ind.aprovados} de {ind.exigidos} aprovados</p></>}
-        <div className="ent-chips">{ind.pendentes > 0 && <span className="ent-chip falta">Falta {ind.pendentes}</span>}{ind.rejeitados > 0 && <span className="ent-chip recusado">{ind.rejeitados} recusado{ind.rejeitados > 1 ? 's' : ''}</span>}
-          {aConferir > 0 && <span className="ent-chip conferir">{aConferir} para conferir</span>}{nNovos > 0 && <span className="ent-chip conferir">{nNovos} arquivo{nNovos > 1 ? 's' : ''} novo{nNovos > 1 ? 's' : ''}</span>}</div>
-        <Link className={`ent-btn ${aConferir || nNovos ? 'principal' : ''}`} href={`/admin/empresas/${id}/documentos${c}`}>{aConferir ? 'Conferir documentos' : 'Abrir documentos'}</Link>
-      </article>
-      <article className="emp-cartao">
-        <header><h2>Conciliação</h2><span className={`ent-chip ${concCls}`}>{m.n ? concTxt : 'Sem extrato'}</span></header>
-        <p className="emp-num">{m.n ? `${m.n} lançamento${m.n > 1 ? 's' : ''}` : 'Nenhum extrato importado no mês'}</p>
-        {m.revisar > 0 && <div className="ent-chips"><span className="ent-chip falta">{m.revisar} para revisar</span></div>}
-        <Link className={`ent-btn ${conc === 'enviada' ? 'principal' : ''}`} href={`/admin/empresas/${id}/extratos${c}`}>{conc === 'enviada' ? 'Conferir conciliação' : 'Abrir conciliação'}</Link>
-      </article>
-      <article className="emp-cartao">
-        <header><h2>Lucros dos sócios</h2><span className={`ent-chip ${lucCls}`}>{lucTxt}</span></header>
-        <p className="emp-num">{lucros.resumo.informadas ? `${brl(lucros.resumo.totalInformado)} informado${lucros.envio ? '' : ' (não enviado)'}` : lucros.envio?.sem_retiradas ? 'Cliente informou: sem retiradas' : 'Nada informado'}</p>
-        <div className="ent-chips">{lucros.resumo.esquecidas > 0 && <span className="ent-chip falta">{lucros.resumo.esquecidas} possível(is) esquecida(s)</span>}
-          {lucros.resumo.naoEncontradas + lucros.resumo.divergentes > 0 && <span className="ent-chip recusado">{lucros.resumo.naoEncontradas + lucros.resumo.divergentes} não bate(m)</span>}
-          {lucros.acimaDoLimite.length > 0 && <span className="ent-chip recusado">acima de R$ 50 mil</span>}</div>
-        <div className="emp-links"><Link className={`ent-btn ${lucros.status === 'atencao' ? 'principal' : ''}`} href={`/admin/lucros/${id}${c}`}>Comparar com o extrato</Link>
-          <Link className="emp-link" href={`/admin/empresas/${id}/informes${c}`}>Sócios e retiradas</Link></div>
-      </article>
-      <article className="emp-cartao">
-        <header><h2>Pendências</h2>{pend.abertas ? <span className={`ent-chip ${pend.vencidas ? 'recusado' : 'conferir'}`}>{pend.abertas} em aberto</span> : <span className="ent-chip ok">Nenhuma</span>}</header>
-        <p className="emp-num">{pend.abertas ? `${pend.aguardando} aguardando o cliente${pend.vencidas ? ` · ${pend.vencidas} vencida${pend.vencidas > 1 ? 's' : ''}` : ''}` : 'Nada aguardando'}</p>
-        <Link className="ent-btn" href={`/admin/empresas/${id}/pendencias`}>Abrir pendências</Link>
-      </article>
+    <section className="inicio-atencao" aria-label="O que pede atenção nesta empresa">
+      {fazer.length ? <><h2>Para fazer agora</h2><div className="inicio-chips">{fazer.map((a) => (
+        <Link key={a.txt} href={a.href} className={`inicio-chip ${a.tom}`}>{a.n != null && <strong>{a.n}</strong>} {a.txt} <ArrowRight size={14} /></Link>))}</div></>
+        : <p className="inicio-tudo-certo">✓ Tudo em dia com esta empresa neste mês.</p>}
     </section>
 
+    <h2 className="inicio-secao">Mês de {MESES[Number(comp.slice(5)) - 1]}</h2>
+    <section className="inicio-grandes">
+      <Link href={`/admin/empresas/${id}/documentos${c}`} className="inicio-cartao">
+        <span className="ic laranja"><ClipboardList size={22} /></span>
+        <div className="corpo"><strong>Documentos do mês</strong>
+          {ind.exigidos ? <><div className="barra"><div style={{ width: `${ind.percentual}%` }} /></div>
+            <span className="num">{ind.concluida ? 'Tudo aprovado ✓' : `${ind.aprovados} de ${ind.exigidos} aprovados`}{ind.pendentes ? <b className="alerta"> · falta {ind.pendentes}</b> : ''}{ind.rejeitados ? <b className="alerta"> · {ind.rejeitados} recusado{ind.rejeitados > 1 ? 's' : ''}</b> : ''}</span></>
+            : <span className="num">Nenhum documento pedido · <u>configurar</u></span>}</div>
+      </Link>
+      <Link href={`/admin/empresas/${id}/extratos${c}`} className="inicio-cartao">
+        <span className="ic azul"><Landmark size={22} /></span>
+        <div className="corpo"><strong>Conciliação</strong>
+          <span className="num">{m.n ? <>{conc === 'enviada' ? <b className="alerta">{concTxt}</b> : concTxt} · {m.n} lançamento{m.n > 1 ? 's' : ''}{m.revisar ? ` · ${m.revisar} para revisar` : ''}</> : 'Nenhum extrato no mês'}</span></div>
+      </Link>
+      <Link href={`/admin/lucros/${id}${c}`} className="inicio-cartao">
+        <span className="ic verde"><Banknote size={22} /></span>
+        <div className="corpo"><strong>Lucros dos sócios</strong>
+          <span className="num">{lucros.status === 'atencao' ? <b className="alerta">{lucTxt}</b> : lucTxt}{lucros.resumo.informadas ? ` · ${brl(lucros.resumo.totalInformado)} informado` : lucros.envio?.sem_retiradas ? ' · sem retiradas' : ''}{lucros.acimaDoLimite.length ? <b className="alerta"> · acima de R$ 50 mil</b> : ''}</span></div>
+      </Link>
+      <Link href={`/admin/empresas/${id}/pendencias`} className="inicio-cartao">
+        <span className="ic roxo"><MessagesSquare size={22} /></span>
+        <div className="corpo"><strong>Pendências</strong>
+          <span className="num">{pend.abertas ? <>{pend.abertas} em aberto · {pend.aguardando} aguardando o cliente{pend.vencidas ? <b className="alerta"> · {pend.vencidas} vencida{pend.vencidas > 1 ? 's' : ''}</b> : ''}</> : 'Nenhuma pendência ✓'}</span></div>
+      </Link>
+    </section>
+
+    <h2 className="inicio-secao">Cadastro</h2>
+    <section className="inicio-pequenos" style={{ marginBottom: 14 }}>
+      <Link href={`/admin/empresas/${id}/informes${c}`} className="inicio-mini"><Users size={18} /><span><strong>Sócios e retiradas</strong><small>Sócios com CPF e retiradas informadas</small></span></Link>
+      <Link href={`/admin/empresas/${id}/plano`} className="inicio-mini"><ListTree size={18} /><span><strong>Plano de contas</strong><small>Categorias da conciliação</small></span></Link>
+      <Link href={`/admin/empresas/${id}/documentos${c}`} className="inicio-mini"><Settings2 size={18} /><span><strong>Documentos pedidos</strong><small>O que o cliente envia todo mês</small></span></Link>
+    </section>
     <div className="emp-colunas">
       <section className="card emp-bloco"><h2>Quem acessa <span className="soon">({vinculados.length})</span></h2>
-        <ul className="emp-usuarios">{vinculados.map((v) => (<li key={v.id}><span className="emp-avatar" aria-hidden="true">{v.nome.trim().charAt(0).toUpperCase()}</span>
+        <ul className="emp-usuarios">{vinculados.map((v) => (<li key={v.id}><span className="emp-avatar" aria-hidden="true">{(v.nome.match(/[A-Za-zÀ-ÿ]/)?.[0] ?? '?').toUpperCase()}</span>
           <div><strong>{v.nome}</strong>{!v.ativo && <span className="ent-chip neutro" style={{ marginLeft: 6 }}>bloqueado</span>}<div className="soon">{v.email}</div></div>
           <form action={acaoVincular}><input type="hidden" name="usuarioId" value={v.id} /><input type="hidden" name="empresaId" value={id} /><input type="hidden" name="modo" value="desvincular" /><input type="hidden" name="voltar" value={voltar} /><button className="link-perigo">Remover</button></form></li>))}
           {!vinculados.length && <li className="soon">Ninguém acessa esta empresa ainda.</li>}</ul>
@@ -95,7 +114,7 @@ export default async function EmpresaDetalhe({ params, searchParams }: { params:
         <dl className="emp-dados">
           <div><dt>Razão social</dt><dd>{e.razao_social}</dd></div>
           <div><dt>CNPJ</dt><dd>{formatarCnpj(e.cnpj)}</dd></div>
-          {e.nome_fantasia && <div><dt>Nome fantasia</dt><dd>{e.nome_fantasia}</dd></div>}
+          {e.nome_fantasia && e.nome_fantasia !== e.razao_social && <div><dt>Nome fantasia</dt><dd>{e.nome_fantasia}</dd></div>}
           <div><dt>E-mail de contato</dt><dd>{e.email_contato || <span className="soon">—</span>}</dd></div>
           <div><dt>WhatsApp</dt><dd>{e.whatsapp ? fone(e.whatsapp) : <span className="soon">— (cadastre para a cobrança pelo Digisac)</span>}</dd></div>
           <div><dt>Responsável</dt><dd>{responsavel || <span className="soon">—</span>}</dd></div>
