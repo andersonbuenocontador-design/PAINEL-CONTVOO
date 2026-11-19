@@ -9,7 +9,7 @@ vi.mock('../src/lib/services/digisac', () => ({
 }));
 import { getPool, query } from '../src/lib/db';
 import { salvarAcessoGclick } from '../src/lib/services/gclick';
-import { enviarPorGclick, enviarPorWhatsapp, lerConfigSolicitacao, previaSolicitacao, salvarConfigSolicitacao } from '../src/lib/services/gclick-solicitacao';
+import { enviarPorGclick, enviarPorWhatsapp, executarAgenda, lerAgenda, lerConfigSolicitacao, previaSolicitacao, proximoEnvio, salvarAgenda, salvarConfigSolicitacao } from '../src/lib/services/gclick-solicitacao';
 import type { Actor } from '../src/lib/errors';
 
 let admin: Actor; let posts: Record<string, string>[]; let respondidas: Set<string>;
@@ -98,5 +98,33 @@ describe('G-Click: solicitação de documentos', () => {
     await salvarConfigSolicitacao(admin, { sistema: ' S1 ', usuario: '', tarefa: NOME, mensagem: 'Oi {nome}, mande {mes}.' });
     expect(await lerConfigSolicitacao()).toMatchObject({ sistema: 'S1', usuario: 'gclickbot', mensagem: 'Oi {nome}, mande {mes}.', mensagemPersonalizada: true });
     await expect(previaSolicitacao({ id: admin.id, papel: 'cliente' }, '2026-11')).rejects.toMatchObject({ code: 'proibido' });
+  });
+  it('envio automático: só no dia/hora (Brasília), competência anterior, uma vez; desligado não envia', async () => {
+    // 04/12/2026 08h de Brasília = 11h UTC
+    const em = (dia: number, horaBr: number) => new Date(Date.UTC(2026, 11, dia, horaBr + 3, 10));
+    expect(await executarAgenda(em(4, 9))).toEqual({ rodou: false, motivo: 'desligado' });
+    await expect(salvarAgenda(admin, { ativo: true, dia: 4, hora: 8, email: true, whatsapp: true })).rejects.toThrow(/sistema/);
+    await salvarConfigSolicitacao(admin, { sistema: 'SIS9', usuario: '', tarefa: NOME, mensagem: '' });
+    await expect(salvarAgenda(admin, { ativo: true, dia: 4, hora: 8, email: false, whatsapp: false })).rejects.toThrow(/canal/);
+    await salvarAgenda(admin, { ativo: true, dia: 4, hora: 8, email: true, whatsapp: true });
+    const { agenda } = await lerAgenda();
+    expect(proximoEnvio(agenda, null, em(1, 10))).toEqual({ data: '04/12/2026', hora: 8, competencia: '2026-11', atrasado: false });
+    expect(proximoEnvio(agenda, null, em(20, 10))).toMatchObject({ data: '04/01/2027', competencia: '2026-12' });
+    expect(await executarAgenda(em(4, 7))).toMatchObject({ rodou: false, motivo: 'fora do dia/hora' });
+    expect(await executarAgenda(em(3, 15))).toMatchObject({ rodou: false });
+    const r = await executarAgenda(em(4, 8));
+    expect(r).toMatchObject({ rodou: true, competencia: '2026-11' });
+    expect((r as { resumo: string }).resumo).toMatch(/E-mail pelo G-Click: 2 enviado\(s\).*WhatsApp: 1 enviado\(s\), 1 com erro/);
+    expect(posts).toHaveLength(1); expect(enviados).toHaveLength(1);
+    expect(await executarAgenda(em(4, 9))).toEqual({ rodou: false, motivo: 'já rodou nesta competência' });
+    expect(await executarAgenda(em(5, 9))).toEqual({ rodou: false, motivo: 'já rodou nesta competência' });
+    expect(posts).toHaveLength(1); expect(enviados).toHaveLength(1);
+    expect((await lerAgenda()).ultima).toMatchObject({ competencia: '2026-11' });
+    expect(proximoEnvio(agenda, (await lerAgenda()).ultima, em(4, 10))).toMatchObject({ data: '04/01/2027' });
+  });
+  it('envio automático: atrasado (site fora do ar no dia) roda até 2 dias depois, não no 3º', async () => {
+    await salvarAgenda(admin, { ativo: true, dia: 4, hora: 8, email: false, whatsapp: true });
+    expect(await executarAgenda(new Date(Date.UTC(2026, 11, 7, 12)))).toMatchObject({ rodou: false, motivo: 'fora do dia/hora' });
+    expect(await executarAgenda(new Date(Date.UTC(2026, 11, 6, 12)))).toMatchObject({ rodou: true, competencia: '2026-11' });
   });
 });

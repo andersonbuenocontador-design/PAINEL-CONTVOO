@@ -1,12 +1,12 @@
 import Link from 'next/link';
 import { exigirUsuario } from '@/lib/session';
 import { statusGclick } from '@/lib/services/gclick';
-import { lerConfigSolicitacao, previaSolicitacao, type ItemSolicitacao, type PreviaSolicitacao } from '@/lib/services/gclick-solicitacao';
+import { lerAgenda, lerConfigSolicitacao, previaSolicitacao, proximoEnvio, type ItemSolicitacao, type PreviaSolicitacao } from '@/lib/services/gclick-solicitacao';
 import { digisacPronto } from '@/lib/services/digisac';
 import { mesPorExtenso } from '@/lib/services/integracao';
 import { mensagemDeErro } from '@/lib/actions-util';
 import { Avisos, Topo } from '../../../components';
-import { acaoEnviarGclick, acaoEnviarWhatsapp } from './actions';
+import { acaoEnviarGclick, acaoEnviarWhatsapp, acaoSalvarAgenda } from './actions';
 import { BotaoConfirmar } from './BotaoConfirmar';
 import { EditorSolicitacao } from './EditorSolicitacao';
 
@@ -35,7 +35,8 @@ const pendentes = (l: ItemSolicitacao[]) => l.filter((x) => x.envio?.status !== 
 export default async function Solicitacao({ searchParams }: { searchParams: Promise<{ competencia?: string; buscar?: string; erro?: string; ok?: string }> }) {
   const u = await exigirUsuario('admin'); const sp = await searchParams;
   const opcoes = competencias(); const comp = sp.competencia && /^\d{4}-\d{2}$/.test(sp.competencia) ? sp.competencia : opcoes[1];
-  const [st, cfg, zap] = await Promise.all([statusGclick(u), lerConfigSolicitacao(), digisacPronto()]);
+  const [st, cfg, zap, { agenda, ultima }] = await Promise.all([statusGclick(u), lerConfigSolicitacao(), digisacPronto(), lerAgenda()]);
+  const prox = agenda.ativo ? proximoEnvio(agenda, ultima) : null;
   let p: PreviaSolicitacao | null = null, erro = '';
   if (st.ligado && sp.buscar) { try { p = await previaSolicitacao(u, comp); } catch (e) { erro = mensagemDeErro(e); } }
   const faltaEmail = p ? pendentes(p.porEmail) : 0, faltaZap = p ? pendentes(p.porWhatsapp) : 0;
@@ -84,6 +85,22 @@ export default async function Solicitacao({ searchParams }: { searchParams: Prom
         {p.semContato.length > 0 && <><p className="sol-erro">{p.semContato.length} cliente(s) sem e-mail e sem celular: cadastre um dos dois no G-Click.</p><Lista itens={p.semContato} coluna="nada" /></>}
       </section>
     </>}
+
+    {st.ligado && <section className="card emp-bloco sol-agenda" id="agenda"><h2>Envio automático {agenda.ativo ? <span className="emp-situacao ativa">Ligado</span> : <span className="emp-situacao inativa">Desligado</span>}</h2>
+      <p className="soon">Todo mês, no dia e hora marcados, o painel faz sozinho os dois cliques acima para a <strong>competência anterior</strong> (ex.: dia 4 de dezembro envia novembro). Roda uma vez por competência; quem já recebeu não recebe de novo. Se o site estiver fora do ar no dia, tenta de novo nos 2 dias seguintes.</p>
+      {agenda.ativo && prox && <p className="sol-prox">Próximo envio: <strong>{prox.atrasado ? 'na próxima hora' : `${prox.data} a partir das ${prox.hora}h`}</strong> · competência {mesPorExtenso(prox.competencia)}</p>}
+      {ultima && <p className="soon">Último envio automático ({mesPorExtenso(ultima.competencia)}, {new Date(ultima.em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' })}): {ultima.resumo}</p>}
+      <form action={acaoSalvarAgenda} className="emp-form"><input type="hidden" name="competencia" value={comp} />
+        <div className="sol-agenda-campos">
+          <label className="sol-check"><input type="checkbox" name="ativo" value="1" defaultChecked={agenda.ativo} /> Ligar o envio automático</label>
+          <label>Dia do mês <select name="dia" defaultValue={agenda.dia}>{Array.from({ length: 28 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}</option>)}</select></label>
+          <label>Hora <select name="hora" defaultValue={agenda.hora}>{Array.from({ length: 15 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>{h}h</option>)}</select></label>
+          <label className="sol-check"><input type="checkbox" name="email" value="1" defaultChecked={agenda.email} /> E-mail pelo G-Click (✔)</label>
+          <label className="sol-check"><input type="checkbox" name="whatsapp" value="1" defaultChecked={agenda.whatsapp} /> WhatsApp para quem não tem e-mail</label>
+        </div>
+        <p className="soon">Horário de Brasília. O agendador do GitHub chama o painel de hora em hora; o envio pode começar alguns minutos depois da hora marcada.</p>
+        <button>Salvar envio automático</button></form>
+    </section>}
 
     {st.ligado && <section className="card emp-bloco" id="config"><h2>Configuração</h2><EditorSolicitacao cfg={cfg} competencia={comp} /></section>}
   </main></>);

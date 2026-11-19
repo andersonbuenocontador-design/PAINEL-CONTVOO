@@ -177,3 +177,72 @@ export async function enviarPorWhatsapp(actor: Actor, p: { competencia: string; 
   await registrar({ query } as never, { usuarioId: actor.id, acao: 'gclick.solicitacao_whatsapp', entidade: 'gclick', detalhes: { competencia: comp, teste, ...res } });
   return res;
 }
+
+/* ---------- Envio automático: num dia e hora do mês, faz sozinho os dois cliques para a competência anterior ---------- */
+export type Agenda = { ativo: boolean; dia: number; hora: number; email: boolean; whatsapp: boolean; usuarioId: string | null };
+export type UltimaExecucao = { competencia: string; em: string; resumo: string } | null;
+const AGENDA = 'gclick_agenda', ULTIMA = 'gclick_agenda_ultima';
+const JANELA_DIAS = 3; // se o agendador falhar no dia, ainda tenta nos 2 dias seguintes
+
+export async function lerAgenda(): Promise<{ agenda: Agenda; ultima: UltimaExecucao }> {
+  const m = new Map((await query(`SELECT chave, valor FROM configuracoes WHERE chave IN ($1,$2)`, [AGENDA, ULTIMA])).rows.map((r) => [r.chave as string, r.valor as string]));
+  const ler = (k: string) => { try { return JSON.parse(m.get(k) ?? 'null'); } catch { return null; } };
+  const a = ler(AGENDA) ?? {};
+  return { agenda: { ativo: !!a.ativo, dia: a.dia ?? 4, hora: a.hora ?? 8, email: a.email ?? true, whatsapp: a.whatsapp ?? true, usuarioId: a.usuarioId ?? null }, ultima: ler(ULTIMA) };
+}
+const agendaSchema = z.object({ ativo: z.boolean(), dia: z.coerce.number().int().min(1, 'Dia entre 1 e 28.').max(28, 'Dia entre 1 e 28.'), hora: z.coerce.number().int().min(6, 'Hora entre 6h e 20h.').max(20, 'Hora entre 6h e 20h.'), email: z.boolean(), whatsapp: z.boolean() })
+  .refine((a) => !a.ativo || a.email || a.whatsapp, 'Escolha pelo menos um canal (e-mail ou WhatsApp).');
+export async function salvarAgenda(actor: Actor, input: z.input<typeof agendaSchema>) {
+  exigirAdmin(actor); const d = agendaSchema.parse(input);
+  if (d.ativo && d.email && !(await lerConfigSolicitacao()).sistema) throw new AppError('Para o envio automático por e-mail, informe antes o código do "sistema" de integração do G-Click (Configuração).');
+  await tx(async (c) => {
+    await c.query(`INSERT INTO configuracoes(chave,valor,atualizado_por) VALUES ($1,$2,$3) ON CONFLICT (chave) DO UPDATE SET valor=EXCLUDED.valor, atualizado_por=EXCLUDED.atualizado_por, atualizado_em=now()`, [AGENDA, JSON.stringify({ ...d, usuarioId: actor.id }), actor.id]);
+    await registrar(c, { usuarioId: actor.id, acao: d.ativo ? 'gclick.agenda_ligar' : 'gclick.agenda_desligar', entidade: 'configuracao', detalhes: d });
+  });
+}
+
+/** Data e hora em Brasília. */
+export function agoraBrasilia(d = new Date()) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' }).formatToParts(d).map((x) => [x.type, x.value]));
+  return { ano: Number(p.year), mes: Number(p.month), dia: Number(p.day), hora: Number(p.hour) };
+}
+const compAnterior = (ano: number, mes: number) => new Date(Date.UTC(ano, mes - 2, 1)).toISOString().slice(0, 7);
+/** Próxima data em que o envio automático roda (para mostrar na tela). */
+export function proximoEnvio(a: Agenda, ultima: UltimaExecucao, d = new Date()) {
+  const b = agoraBrasilia(d);
+  for (let k = 0; k < 3; k++) {
+    const ano = b.ano + Math.floor((b.mes - 1 + k) / 12), mes = ((b.mes - 1 + k) % 12) + 1; const comp = compAnterior(ano, mes);
+    if (ultima?.competencia === comp) continue;
+    if (k === 0 && b.dia >= a.dia + JANELA_DIAS) continue; // a janela deste mês já passou
+    return { data: `${String(a.dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}/${ano}`, hora: a.hora, competencia: comp, atrasado: k === 0 && (b.dia > a.dia || (b.dia === a.dia && b.hora >= a.hora)) };
+  }
+  return null;
+}
+
+/** Chamado pelo agendador (de hora em hora). Roda uma vez por competência, no dia/hora marcados (ou até 2 dias depois, se falhou). */
+export async function executarAgenda(d = new Date()): Promise<{ rodou: false; motivo: string } | { rodou: true; competencia: string; resumo: string }> {
+  const { agenda: a } = await lerAgenda();
+  if (!a.ativo || !a.usuarioId) return { rodou: false, motivo: 'desligado' };
+  const b = agoraBrasilia(d);
+  const naJanela = (b.dia === a.dia && b.hora >= a.hora) || (b.dia > a.dia && b.dia < a.dia + JANELA_DIAS);
+  if (!naJanela) return { rodou: false, motivo: 'fora do dia/hora' };
+  const comp = compAnterior(b.ano, b.mes);
+  const u = (await query(`SELECT id FROM usuarios WHERE id=$1 AND ativo AND papel='admin'`, [a.usuarioId])).rows[0];
+  if (!u) return { rodou: false, motivo: 'quem ligou o envio automático não é mais administrador ativo' };
+  // reserva a competência (duas chamadas ao mesmo tempo não rodam duas vezes)
+  const marca = JSON.stringify({ competencia: comp, em: d.toISOString(), resumo: 'em andamento…' });
+  const r = await query(`INSERT INTO configuracoes(chave,valor) VALUES ($1,$2) ON CONFLICT (chave) DO UPDATE SET valor=EXCLUDED.valor, atualizado_em=now()
+     WHERE (configuracoes.valor::jsonb->>'competencia') IS DISTINCT FROM $3 RETURNING chave`, [ULTIMA, marca, comp]);
+  if (!r.rowCount) return { rodou: false, motivo: 'já rodou nesta competência' };
+  const actor: Actor = { id: u.id, papel: 'admin' }; const partes: string[] = [];
+  const passo = async (nome: string, fn: () => Promise<Resultado>) => {
+    try { const x = await fn(); partes.push(`${nome}: ${x.enviados} enviado(s)${x.pulados ? `, ${x.pulados} já enviado(s)` : ''}${x.erros ? `, ${x.erros} com erro (${x.primeiroErro})` : ''}`); }
+    catch (e) { partes.push(`${nome}: não rodou (${msgErro(e)})`); }
+  };
+  if (a.email) await passo('E-mail pelo G-Click', () => enviarPorGclick(actor, { competencia: comp, teste: false }));
+  if (a.whatsapp) await passo('WhatsApp', () => enviarPorWhatsapp(actor, { competencia: comp, teste: false }));
+  const resumo = partes.join(' · ');
+  await query(`UPDATE configuracoes SET valor=$2, atualizado_em=now() WHERE chave=$1`, [ULTIMA, JSON.stringify({ competencia: comp, em: d.toISOString(), resumo })]);
+  await registrar({ query } as never, { usuarioId: actor.id, acao: 'gclick.agenda_executar', entidade: 'gclick', detalhes: { competencia: comp, resumo } });
+  return { rodou: true, competencia: comp, resumo };
+}

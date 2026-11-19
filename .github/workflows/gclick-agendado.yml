@@ -1,0 +1,31 @@
+# De hora em hora: avisa o painel para fazer a "Solicitação de documentos" do G-Click, se for o dia/hora marcados
+# em G-Click → Solicitação de documentos → Envio automático. Fora do dia marcado (ou desligado), o painel não faz nada.
+name: G-Click envio automático
+on:
+  schedule:
+    - cron: '23 9-23 * * *'   # 06h23 a 20h23 de Brasília
+  workflow_dispatch:
+concurrency: { group: gclick-agendado, cancel-in-progress: false }
+jobs:
+  chamar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Chamar o painel
+        env:
+          APP_URL: ${{ vars.APP_URL || secrets.APP_URL || 'https://painel-contvoo.onrender.com' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          [ -n "$CRON_SECRET" ] || { echo "::error::Falta o segredo CRON_SECRET no GitHub (o mesmo valor do Render → Environment)"; exit 1; }
+          # o Render grátis "dorme": a 1ª chamada pode levar ~1 minuto para acordar o site
+          for i in 1 2 3 4 5; do
+            code=$(curl -sS -o r.json -w '%{http_code}' --max-time 120 -H "Authorization: Bearer $CRON_SECRET" "${APP_URL%/}/api/gclick/agendado" || echo 000)
+            [ "$code" = 200 ] || [ "$code" = 401 ] || [ "$code" = 503 ] && break
+            echo "tentativa $i: HTTP $code"; sleep 30
+          done
+          case "$code" in
+            200) echo "::notice::$(cat r.json)";;
+            401) echo "::error::O CRON_SECRET do GitHub está diferente do CRON_SECRET do Render"; exit 1;;
+            503) echo "::error::CRON_SECRET não configurado no Render"; exit 1;;
+            *) echo "::error::O site não respondeu (HTTP $code)"; exit 1;;
+          esac

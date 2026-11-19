@@ -403,3 +403,8 @@ header.top .tema-botao{border:0!important;box-shadow:none!important}
 .doc2-btn:disabled,.doc2-btn[disabled]{opacity:.45;cursor:not-allowed;filter:grayscale(.4)}
 .sol-mes{display:flex;gap:8px;align-items:center}
 .sol-mes select{min-width:180px}
+.sol-agenda-campos{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:center;margin:8px 0}
+.sol-agenda-campos label{display:flex;align-items:center;gap:8px;margin:0;font-weight:500}
+.sol-agenda-campos select{width:auto}
+.sol-check input{width:18px;height:18px}
+.sol-prox{background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:8px 12px;color:#1e3a8a}

@@ -2,7 +2,7 @@
 import { redirect } from 'next/navigation';
 import { exigirUsuario } from '@/lib/session';
 import { executar, mensagemDeErro, recarregar } from '@/lib/actions-util';
-import { enviarPorGclick, enviarPorWhatsapp, salvarConfigSolicitacao, type Resultado } from '@/lib/services/gclick-solicitacao';
+import { enviarPorGclick, enviarPorWhatsapp, salvarAgenda, salvarConfigSolicitacao, type Resultado } from '@/lib/services/gclick-solicitacao';
 
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? '');
 const V = '/admin/gclick/solicitacao';
@@ -21,3 +21,8 @@ async function lote(fd: FormData, fn: typeof enviarPorGclick, oque: string) {
 }
 export async function acaoEnviarGclick(fd: FormData) { await lote(fd, enviarPorGclick, 'tarefa(s) com ✔ no G-Click (o G-Click manda o e-mail)'); }
 export async function acaoEnviarWhatsapp(fd: FormData) { await lote(fd, enviarPorWhatsapp, 'mensagem(ns) enviada(s) pelo WhatsApp'); }
+export async function acaoSalvarAgenda(fd: FormData) {
+  const u = await exigirUsuario('admin'); const ativo = s(fd, 'ativo') === '1';
+  await executar(`${V}?competencia=${comp(fd)}#agenda`, ativo ? 'Envio automático ligado.' : 'Envio automático desligado.', () =>
+    salvarAgenda(u, { ativo, dia: Number(s(fd, 'dia')), hora: Number(s(fd, 'hora')), email: s(fd, 'email') === '1', whatsapp: s(fd, 'whatsapp') === '1' }));
+}
