@@ -8,6 +8,7 @@ import { Avisos, CompetenciaSeletor, Topo, competenciaDe } from '../../../compon
 import { acaoRemoverAvulso } from '../../actions';
 import { ExcluirArquivo } from '../../ExcluirArquivo';
 import { ApagarExtratosMes } from '../../ApagarExtratosMes';
+import { MarcaDoc } from '../../../MarcaDoc';
 import { EnviarDocumento } from '../../EnviarDocumento';
 import { EnviarOutros } from '../../EnviarOutros';
 
@@ -51,18 +52,18 @@ export default async function DocumentosCliente({ params, searchParams }: { para
     <div className="d2-topo"><h1>Documentos de {nomeMes}</h1><CompetenciaSeletor atual={comp} mini /></div>
     <Avisos erro={sp.erro} ok={sp.ok} />
 
-    <section className={`card d2-hero ${hero.cls ?? ''}`} aria-live="polite">
-      <div><h2>{hero.t}</h2><p>{hero.d}</p></div>
-      {s.itens.length > 0 && <div className="d2-progresso" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Documentos enviados">
-        <div className="d2-barra"><div style={{ width: `${pct}%` }} /></div><span>{prontos} de {s.itens.length}</span></div>}
+    <section className={`d2-hero2 ${hero.cls ?? ''}`} aria-live="polite">
+      {s.itens.length > 0 && <div className="doc2-anel" style={{ ['--p' as string]: `${pct * 3.6}deg` }} role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Documentos enviados"><span>{prontos}/{s.itens.length}</span><small>enviados</small></div>}
+      <div className="d2-hero2-txt"><h2>{hero.t}</h2><p>{hero.d}</p></div>
     </section>
 
     {s.itens.length > 0 && <section className="card d2-lista" aria-label={`Documentos pedidos de ${mes}/${ano}`}><ul>
       {s.itens.map((i) => { const st = SITUACAO[i.situacao] ?? SITUACAO.pendente; return (<li key={i.exigencia_id} className={`d2-item ${st.cls}`}>
-        <span className="d2-icone" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">{ICONE[st.cls]}</svg></span>
+        <span className="d2-selo"><MarcaDoc nome={i.nome} instituicao={i.instituicao} tamanho={46} />
+          <span className={`d2-ponto ${st.cls}`} aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">{ICONE[st.cls]}</svg></span></span>
         <div className="d2-info">
           <div className="d2-nome">{i.nome}{i.instituicao && <span> · {i.instituicao}</span>}{!i.obrigatorio && <span className="d2-opc">opcional</span>}</div>
-          <div className="d2-sit">{st.txt}{i.arquivo_id && i.situacao !== 'rejeitado' && <> · <a href={`/api/arquivos/${i.arquivo_id}`}>{i.nome_original}</a></>}</div>
+          <div className="d2-sit"><span className={`d2-chip ${st.cls}`}>{st.txt.split(' · ')[0]}</span>{st.txt.includes(' · ') ? ` ${st.txt.split(' · ').slice(1).join(' · ')}` : ''}{i.arquivo_id && i.situacao !== 'rejeitado' && <> · <a href={`/api/arquivos/${i.arquivo_id}`}>{i.nome_original}</a></>}</div>
           {i.situacao === 'rejeitado' && i.motivo_rejeicao && <div className="d2-recado">Recado do escritório: {i.motivo_rejeicao}</div>}
           {i.instrucoes && (i.situacao === 'pendente' || i.situacao === 'rejeitado') && <div className="d2-dica">{i.instrucoes}</div>}
         </div>
@@ -82,6 +83,7 @@ export default async function DocumentosCliente({ params, searchParams }: { para
       <EnviarOutros empresaId={empresaId} competencia={comp} />
       {avulsos.length > 0 && <ul className="d2-avulsos">
         {avulsos.map((d) => (<li key={d.id}>
+          <MarcaDoc nome={`${d.nome_original} ${d.descricao ?? ''}`} tamanho={36} />
           <div className="d2-info">{d.descartado_em ? <span className="d2-sub">{d.nome_original} (descartado)</span> : <a href={`/api/avulsos/${d.id}`}>{d.nome_original}</a>}
             <span className="d2-sub">{d.descricao ? `${d.descricao} · ` : ''}{dataHora(d.enviado_em)}{d.visto_em ? ' · recebido pelo escritório ✓' : ''}</span></div>
           {!d.visto_em && <form action={acaoRemoverAvulso}><input type="hidden" name="empresaId" value={empresaId} /><input type="hidden" name="competencia" value={comp} /><input type="hidden" name="id" value={d.id} /><button className="link-perigo">Retirar</button></form>}

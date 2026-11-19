@@ -335,3 +335,21 @@ header.top .tema-botao{border:0!important;box-shadow:none!important}
 .marca-doc.com-logo{background:#fff;box-shadow:inset 0 0 0 1px #e3e6ec,0 2px 6px rgb(16 24 40 / .08)}.marca-doc.com-logo img{display:block;object-fit:contain}
 .doc2-banco .marca-doc.com-logo{border-radius:99px;box-shadow:inset 0 0 0 1px #e3e6ec}
 :root[data-theme="dark"] .marca-doc.com-logo{background:#fff}
+/* ===== Documentos do mês (cliente): logo do banco e cores ===== */
+.d2-hero2{display:flex;align-items:center;gap:20px;margin-top:10px;background:linear-gradient(135deg,#0b2a4a,#163d66);color:#fff;border-radius:16px;padding:18px 22px;box-shadow:0 8px 24px rgb(11 42 74 / .18)}
+.d2-hero2.ok{background:linear-gradient(135deg,#0b5c3f,#12805c)}.d2-hero2 .doc2-anel{background:radial-gradient(closest-side,#13345a 78%,transparent 79% 100%),conic-gradient(#32d583 var(--p),rgb(255 255 255 / .14) 0)}
+.d2-hero2.ok .doc2-anel{background:radial-gradient(closest-side,#0e6b4c 78%,transparent 79% 100%),conic-gradient(#a6f4c5 var(--p),rgb(255 255 255 / .14) 0)}
+.d2-hero2 .doc2-anel span{font-size:1.15rem}.d2-hero2-txt h2{margin:0 0 4px;font-size:1.3rem}.d2-hero2-txt p{margin:0;color:rgb(255 255 255 / .8)}
+.d2-item{grid-template-columns:52px 1fr auto;position:relative}
+.d2-item::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:4px;border-radius:0 4px 4px 0;background:#d0d5dd}
+.d2-item.ok::before{background:#12805c}.d2-item.recebido::before{background:#1f5eff}.d2-item.falta::before{background:#f79009}.d2-item.ajuste::before{background:#d92d20}
+.d2-selo{position:relative;display:inline-block;width:46px;height:46px}
+.d2-ponto{position:absolute;right:-5px;bottom:-5px;width:20px;height:20px;border-radius:99px;display:grid;place-items:center;border:2px solid var(--card);color:#fff}.d2-ponto svg{width:11px;height:11px}
+.d2-ponto.ok{background:#12805c}.d2-ponto.recebido{background:#1f5eff}.d2-ponto.falta{background:#f79009}.d2-ponto.ajuste{background:#d92d20}
+.d2-chip{display:inline-block;font-size:.74rem;font-weight:700;padding:2px 9px;border-radius:99px;margin-right:2px}
+.d2-chip.ok{background:#ecfdf3;color:#12805c}.d2-chip.recebido{background:#eef2ff;color:#1f5eff}.d2-chip.falta{background:#fff4e5;color:#b54708}.d2-chip.ajuste{background:#fef3f2;color:#b42318}
+.d2-item.ok .d2-sit,.d2-item.ajuste .d2-sit{color:var(--mut);font-weight:400}
+.d2-avulsos li{justify-content:flex-start}.d2-avulsos li>.d2-info{flex:1}
+@media (max-width:640px){.d2-item{grid-template-columns:46px 1fr}.d2-hero2{gap:14px}}
+.d2-hero2{margin-bottom:14px}
+.doc2-anel{flex:none}

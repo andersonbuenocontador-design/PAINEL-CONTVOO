@@ -7,7 +7,7 @@ import { listarAvulsos, listarExigencias, situacaoCompetencia, historicoVersoes 
 import { AppError } from '@/lib/errors';
 import { Avisos, CompetenciaSeletor, ROTULO, Topo, competenciaDe } from '../../../../components';
 import { CamposExigencia } from '../../../FormExigencia';
-import { MarcaDoc } from '../../../MarcaDoc';
+import { MarcaDoc } from '../../../../MarcaDoc';
 import { AnexarEscritorio } from '../../../AnexarEscritorio';
 import { AtalhosBancos } from '../../../AtalhosBancos';
 import { acaoAtivarExigencia, acaoConferir, acaoCriarExigencia, acaoEditarExigencia, acaoRemoverAvulsoAdmin } from '../../../docs-actions';
