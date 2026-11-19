@@ -1,27 +1,29 @@
 import Link from 'next/link';
 import { TemaBotao } from './TemaBotao';
+import { BotaoMenu, MenuLateral } from './MenuLateral';
+import { MenuUsuario } from './MenuUsuario';
 import { sair } from './actions';
 import type { UsuarioSessao } from '@/lib/services/usuarios';
 import { mfaDisponivel } from '@/lib/session';
 
-/** Topo enxuto: marca (leva à tela inicial), nome e Sair. A navegação fica nos cartões da tela inicial. */
+/** Topo e menu lateral no estilo do Contvoo Gestão: barra azul-marinho com marca, ajuda, modo noite e menu do usuário; menu lateral por grupos. */
 export function Topo({ u }: { u: UsuarioSessao }) {
   const inicio = u.papel === 'admin' ? '/admin' : '/cliente';
   const nome = u.papel === 'admin' && u.nome === 'Administrador' ? 'Contvoo Contabilidade' : u.nome;
-  return (
+  return (<>
     <header className="top">
+      <BotaoMenu />
       <Link href={inicio} className="marca-topo" title="Voltar à tela inicial">
         <img src="/logo-contvoo.png" alt="Contvoo Contabilidade" height={30} style={{ display: 'block' }} />
         <strong>{u.papel === 'admin' ? 'Painel Contvoo' : 'Painel do Cliente'}</strong>
       </Link>
       <span className="espaco" />
-      <Link href={inicio} className="inicio-topo">Início</Link>
-      <Link href="/ajuda" className="inicio-topo">Ajuda</Link>
-      {mfaDisponivel(u) ? <a href="/conta/seguranca" title="Segurança da conta" className="nome-topo">{nome}</a> : <span className="nome-topo">{nome}</span>}
+      <Link href="/ajuda" className="topo-icone" title="Ajuda" aria-label="Ajuda"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01" /></svg></Link>
       <TemaBotao />
-      <form action={sair}><button className="sec">Sair</button></form>
+      <MenuUsuario nome={nome} papel={u.papel === 'admin' ? 'Escritório' : 'Cliente'} email={u.email} seguranca={mfaDisponivel(u)} sair={sair} />
     </header>
-  );
+    <MenuLateral papel={u.papel} />
+  </>);
 }
 
 const ICONES: Record<string, string> = {

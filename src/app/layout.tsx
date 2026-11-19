@@ -1,3 +1,4 @@
+import '@fontsource-variable/inter';
 import './globals.css';
 import './tema-escuro.css';
 export const metadata = { title: 'Contvoo — Painel do Cliente', icons: { icon: '/logo-contvoo.png' } };
