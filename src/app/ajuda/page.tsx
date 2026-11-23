@@ -1,3 +1,5 @@
+import Link from 'next/link';
+import { FileBarChart, ShieldCheck } from 'lucide-react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { exigirUsuario } from '@/lib/session';
@@ -28,6 +30,10 @@ export default async function Ajuda() {
   const cliente = AULAS.filter((a) => a.publico === 'cliente'); const escritorio = AULAS.filter((a) => a.publico === 'escritorio');
   return (<><Topo u={u} /><main className="ajuda">
     <div className="saudacao"><div><h1>Ajuda: vídeos e passo a passo</h1><p className="empresa-sub">Aprenda cada função do painel em poucos minutos. Os exemplos usam dados fictícios.</p></div></div>
+    {admin && <section className="inicio-pequenos">
+      <Link href="/admin/relatorios" className="inicio-mini"><FileBarChart size={18} /><span><strong>Relatórios</strong><small>Visão geral e Excel</small></span></Link>
+      <Link href="/admin/lgpd" className="inicio-mini"><ShieldCheck size={18} /><span><strong>LGPD</strong><small>Dados pessoais e retenção</small></span></Link>
+    </section>}
     <nav className="ajuda-indice card" aria-label="Aulas">
       {admin && <div><strong>Para o escritório</strong><ul>{escritorio.map((a) => <li key={a.id}><a href={`#${a.id}`}>{a.titulo}</a></li>)}</ul></div>}
       <div><strong>{admin ? 'Para os clientes' : 'Aulas'}</strong><ul>{cliente.map((a) => <li key={a.id}><a href={`#${a.id}`}>{a.titulo}</a></li>)}</ul></div>
