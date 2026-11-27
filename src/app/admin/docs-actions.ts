@@ -2,13 +2,14 @@
 import { redirect } from 'next/navigation';
 import { exigirUsuario } from '@/lib/session';
 import { executar, mensagemDeErro } from '@/lib/actions-util';
-import { aplicarModelo, conferirArquivo, criarExigencia, criarModeloDeEmpresa, definirExigenciaAtiva, editarExigencia, enviarArquivo, removerAvulso } from '@/lib/services/documentos';
+import { aplicarModelo, conferirArquivo, criarExigencia, criarModeloDeEmpresa, definirExigenciaAtiva, editarExigencia, enviarArquivo, exigenciaEhExtrato, removerAvulso } from '@/lib/services/documentos';
 import { AppError } from '@/lib/errors';
 import { digisacPronto, enviarWhatsappDigisac } from '@/lib/services/digisac';
 import { pendenciasDoMes } from '@/lib/services/integracao';
 import { registrar } from '@/lib/services/auditoria';
 import { query } from '@/lib/db';
-import { retirarLancamentosDoArquivo } from '@/lib/services/extratos';
+import { lerExtratoDoDocumento, marcarExtratoVerificado, resumoImportacao, retirarLancamentosDoArquivo, urlConciliacao } from '@/lib/services/extratos';
+import { recarregar } from '@/lib/actions-util';
 
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? '');
 const item = (fd: FormData) => ({
@@ -45,11 +46,29 @@ export async function acaoConferir(fd: FormData) {
   });
 }
 export async function acaoEnviarPeloEscritorio(fd: FormData) {
-  const a = await exigirUsuario('admin'); const e = s(fd, 'empresaId'); const c = s(fd, 'competencia');
-  await executar(`/admin/empresas/${e}/documentos?competencia=${c}`, 'Arquivo registrado.', async () => {
+  const a = await exigirUsuario('admin'); const e = s(fd, 'empresaId'); const c = s(fd, 'competencia'); const exigenciaId = s(fd, 'exigenciaId');
+  const voltar = `/admin/empresas/${e}/documentos?competencia=${c}`; recarregar(voltar); recarregar(`/admin/empresas/${e}/extratos`);
+  let destino: string;
+  try {
     const f = fd.get('arquivo'); if (!(f instanceof File) || !f.size) throw new AppError('Selecione um arquivo.');
-    await enviarArquivo(a, { empresaId: e, exigenciaId: s(fd, 'exigenciaId'), competencia: c, nome: f.name, dados: Buffer.from(await f.arrayBuffer()) });
-  });
+    const arqId = await enviarArquivo(a, { empresaId: e, exigenciaId, competencia: c, nome: f.name, dados: Buffer.from(await f.arrayBuffer()) });
+    if (!(await exigenciaEhExtrato(a, e, exigenciaId).catch(() => false))) { await marcarExtratoVerificado('arquivos', arqId); destino = `${voltar}&ok=${encodeURIComponent('Arquivo registrado.')}`; }
+    else {
+      // Extrato bancário: além de registrar o documento, já leva os lançamentos para a conciliação e abre a conciliação
+      try { const r = await lerExtratoDoDocumento(a, arqId); destino = urlConciliacao(`/admin/empresas/${e}/extratos`, r, { ok: `Arquivo registrado. ${resumoImportacao(r, c)}` }); }
+      catch (x) { await marcarExtratoVerificado('arquivos', arqId).catch(() => {}); destino = `${voltar}&erro=${encodeURIComponent(`Arquivo registrado em Documentos do mês, mas não consegui levar os lançamentos para a conciliação: ${mensagemDeErro(x)}`)}`; }
+    }
+  } catch (x) { destino = `${voltar}&erro=${encodeURIComponent(mensagemDeErro(x))}`; }
+  redirect(destino);
+}
+/** Botão "Ler na conciliação": lê (ou lê de novo) o extrato já anexado no documento e abre a conciliação com o resultado. */
+export async function acaoLerExtratoDoDocumento(fd: FormData) {
+  const a = await exigirUsuario('admin'); const e = s(fd, 'empresaId'); const c = s(fd, 'competencia');
+  const voltar = `/admin/empresas/${e}/documentos?competencia=${c}`; recarregar(voltar); recarregar(`/admin/empresas/${e}/extratos`);
+  let destino: string;
+  try { const r = await lerExtratoDoDocumento(a, s(fd, 'arquivoId')); destino = urlConciliacao(`/admin/empresas/${e}/extratos`, r, { ok: resumoImportacao(r, c) }); }
+  catch (x) { destino = `${voltar}&erro=${encodeURIComponent(`Não consegui ler este extrato na conciliação: ${mensagemDeErro(x)}`)}`; }
+  redirect(destino);
 }
 export async function acaoRemoverAvulsoAdmin(fd: FormData) {
   const a = await exigirUsuario('admin'); const e = s(fd, 'empresaId'); const c = s(fd, 'competencia');
