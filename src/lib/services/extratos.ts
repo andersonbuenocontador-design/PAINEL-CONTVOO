@@ -324,6 +324,24 @@ export async function puxarExtratosDosDocumentos(actor: Actor, empresaId: string
   }
   return resultados;
 }
+/** Escritório: lê na conciliação o extrato anexado num documento do mês (botão "Ler na conciliação" e "Anexar pelo escritório").
+ *  Diferente da leitura automática, aqui o motivo da falha aparece (arquivo ilegível, conta não identificada, outro período...). */
+export async function lerExtratoDoDocumento(actor: Actor, arquivoId: string) {
+  exigirAdmin(actor);
+  if (!z.string().uuid().safeParse(arquivoId).success) throw new AppError('Arquivo não encontrado.', 'nao_encontrado');
+  const a = (await query(
+    `SELECT a.id, a.empresa_id, a.competencia, a.nome_original, a.chave_storage, a.situacao, (x.nome || ' ' || coalesce(x.categoria,'')) rotulo
+       FROM arquivos a JOIN exigencias x ON x.id=a.exigencia_id WHERE a.id=$1`, [arquivoId])).rows[0];
+  if (!a) throw new AppError('Arquivo não encontrado.', 'nao_encontrado');
+  await obterEmpresa(actor, a.empresa_id);
+  if (a.situacao === 'substituido') throw new AppError('Esta versão já foi substituída. Use a versão atual do documento.');
+  if (!/extrato/i.test(a.rotulo)) throw new AppError('Este documento não está configurado como extrato bancário (o nome ou a categoria precisa ter "extrato").');
+  let dados: Buffer;
+  try { dados = await ler(a.chave_storage); } catch { throw new AppError('Não consegui abrir o arquivo guardado. Tente de novo em instantes.'); }
+  const r = await importarDireto(actor, { empresaId: a.empresa_id, competencia: a.competencia, nome: a.nome_original, dados });
+  await marcarExtratoVerificado('arquivos', a.id);
+  return r;
+}
 export async function marcarExtratoVerificado(tabela: 'arquivos' | 'documentos_avulsos', id: string) {
   await query(`UPDATE ${tabela === 'arquivos' ? 'arquivos' : 'documentos_avulsos'} SET extrato_verificado_em=now() WHERE id=$1`, [id]);
 }

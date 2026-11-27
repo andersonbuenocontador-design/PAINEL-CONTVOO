@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Check, ChevronRight, Eye, History, Plus, X } from 'lucide-react';
+import { Check, ChevronRight, Eye, History, Landmark, Plus, X } from 'lucide-react';
 import { exigirUsuario } from '@/lib/session';
 import { obterEmpresa } from '@/lib/services/empresas';
 import { listarAvulsos, listarExigencias, situacaoCompetencia, historicoVersoes } from '@/lib/services/documentos';
@@ -10,7 +10,7 @@ import { CamposExigencia } from '../../../FormExigencia';
 import { MarcaDoc } from '../../../../MarcaDoc';
 import { AnexarEscritorio } from '../../../AnexarEscritorio';
 import { AtalhosBancos } from '../../../AtalhosBancos';
-import { acaoAtivarExigencia, acaoConferir, acaoCriarExigencia, acaoEditarExigencia, acaoRemoverAvulsoAdmin } from '../../../docs-actions';
+import { acaoAtivarExigencia, acaoConferir, acaoCriarExigencia, acaoEditarExigencia, acaoLerExtratoDoDocumento, acaoRemoverAvulsoAdmin } from '../../../docs-actions';
 
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 const quando = (d: Date | string) => new Date(d).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -70,6 +70,7 @@ export default async function DocsEmpresa({ params, searchParams }: { params: Pr
                 <form action={acaoConferir} className="grade">{oc(i.arquivo_id)}<input type="hidden" name="decisao" value="rejeitado" /><input name="motivo" required placeholder={`Ex.: período errado, envie o de ${mes}/${ano}`} />
                   <label className="soon"><input type="checkbox" name="retirarLancamentos" /> Se for extrato, retirar da conciliação os lançamentos dele</label><button className="doc2-btn vermelho">Desfazer aprovação e recusar</button></form>
                 <form action={acaoConferir}>{oc(i.arquivo_id)}<input type="hidden" name="decisao" value="em_conferencia" /><button className="doc2-btn leve">Voltar para “em conferência”</button></form></div></details>}
+            {i.arquivo_id && /extrato/i.test(`${i.nome} ${i.categoria ?? ''}`) && <form action={acaoLerExtratoDoDocumento}>{oc(i.arquivo_id)}<button className="doc2-btn leve" title="Lê este extrato e leva os lançamentos para a conciliação do cliente"><Landmark size={14} /> Ler na conciliação</button></form>}
             <AnexarEscritorio empresaId={id} competencia={comp} exigenciaId={i.exigencia_id} />
           </footer>
         </article>); })}
